@@ -80,8 +80,11 @@ jobs:
           fi
           umask 077
           printf '%s\n' "$AUTHOR_KEY" > "$RUNNER_TEMP/author.key"
+          # HMG-API's signer wants the public key beside it (<key>.pub): derived from the private one
+          base64 -d < "$RUNNER_TEMP/author.key" | openssl pkey -inform DER -pubout -outform DER | base64 -w0 > "$RUNNER_TEMP/author.key.pub"
+          echo >> "$RUNNER_TEMP/author.key.pub"
           sh hmgapi-mod/build.sh "$RUNNER_TEMP/author.key"
-          rm -f "$RUNNER_TEMP/author.key"
+          rm -f "$RUNNER_TEMP/author.key" "$RUNNER_TEMP/author.key.pub"
           ls -l "dist/egmp-aa-ev-${{ steps.version.outputs.version }}.zip"
 
       - name: Attach to the release
