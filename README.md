@@ -2,6 +2,14 @@
 
 Real EV routing in Google Maps on Android Auto for the Hyundai Ioniq 5's Gen5W head unit: battery % on arrival, charging stops, realistic charge times, and automatic battery preconditioning on the way to a fast charger. Built on [NEMESIS](https://github.com/xwtk/hmg_nemesis) and [HMG Leafia Plus](https://github.com/VysseCodes/HMG-Leafia-Plus).
 
+> [!NOTE]
+> **HMG-API mod:** HMG Leafia Plus is archived; its successor is
+> [HMG-API](https://github.com/VysseCodes/HMG-API). [`hmgapi-mod/`](hmgapi-mod/README.md)
+> is this project as an HMG-API mod (no file changes, firmware support through HMG-API's
+> hook maps; not tested on a car yet). What each side offers for EV routing:
+> [docs/HMG-API-COMPARISON.md](docs/HMG-API-COMPARISON.md). The rest of this page is the
+> NEMESIS + Leafia build.
+
 > [!WARNING]
 > This modifies your infotainment system's files. The installer checks every file first and keeps a byte-for-byte backup, but you use it at your own risk. Not affiliated with Hyundai, Kia or Google.
 
@@ -68,3 +76,7 @@ sh tools/build_release.sh v0.2.0           # USB release zip
 ## Credits
 
 [NEMESIS](https://github.com/xwtk/hmg_nemesis) (xwtk), [HMG Leafia Plus](https://github.com/VysseCodes/HMG-Leafia-Plus) (including `lpatch`, GPL-3.0), [aa-proxy-rs](https://github.com/aa-proxy/aa-proxy-rs), [open-android-auto](https://github.com/mrmees/open-android-auto), [gen5w-preconditioning](https://github.com/paytondevs/gen5w-preconditioning).
+
+## License
+
+[AGPL-3.0](LICENSE), the same as HMG-API. `third_party/lpatch` stays GPL-3.0 (its own [LICENSE](third_party/lpatch/LICENSE)), which the AGPL allows combining with.

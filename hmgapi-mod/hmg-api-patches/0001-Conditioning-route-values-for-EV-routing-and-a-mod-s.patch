@@ -1,0 +1,283 @@
+From 4128be0d78e88c4d3cf87c605d4ab18d783dc27e Mon Sep 17 00:00:00 2001
+From: anthonyanderson <tonyanderson526@gmail.com>
+Date: Tue, 3 Nov 2026 08:19:54 -0500
+Subject: [PATCH] Conditioning: route values for EV routing, and a mod's own
+ stop isn't a manual stop
+
+The BMS times battery heating from the distance and time to the charger it's
+given. conditioning start/auto-start now take optional "<km> <minutes>" (0-2046,
+0-1022, as the car's navigation sends; default 9/18, Launchpad's), and the mod
+conditioning keeps them current with "conditioning route <km> <minutes>"; the
+5 s refresh resends the current values. A mod routing to a real charger (EGMP AA
+EV: Google Maps' charging stop) gives the car the real ones.
+
+A stop by the mod whose automatic request it is (it arrived, or the route
+ended) no longer sets the manual-stop latch, which blocked every later
+automatic start until a manual one. A stop by the owner or another mod, or the
+stop of a manual start, still does.
+
+Off-car only: commands-test.sh (19 new checks, 97 in all).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ core/client/java/hmgapi/client/HmgApi.java    |  3 +-
+ core/runtime/java/hmgapi/engine/Vehicle.java  |  2 +-
+ .../runtime/java/hmgapi/vehicle/Commands.java | 94 ++++++++++++++-----
+ .../test/hmgapi/vehicle/CommandsTest.java     | 28 ++++++
+ docs/vehicle-commands.md                      | 12 ++-
+ 5 files changed, 112 insertions(+), 27 deletions(-)
+
+diff --git a/core/client/java/hmgapi/client/HmgApi.java b/core/client/java/hmgapi/client/HmgApi.java
+index e543d0c..49e2338 100644
+--- a/core/client/java/hmgapi/client/HmgApi.java
++++ b/core/client/java/hmgapi/client/HmgApi.java
+@@ -157,7 +157,8 @@ public final class HmgApi {
+     /**
+      * A vehicle command the mod declared ("vehicle": {"commands": [...]}):
+      * command("charge_door", "open"), command("seat_heat", "driver", "low"),
+-     * command("conditioning", "start"), command("ambient_light", "color", "ff8000"),
++     * command("conditioning", "start"), command("conditioning", "auto-start", "37", "25"),
++     * command("conditioning", "route", "30", "20"), command("ambient_light", "color", "ff8000"),
+      * command("guide_lines", "off"). Each has the guard its review gave it (park only,
+      * one holder ...); a refusal throws HmgApiException with the reason. Returns the
+      * car's "ok ..." line.
+diff --git a/core/runtime/java/hmgapi/engine/Vehicle.java b/core/runtime/java/hmgapi/engine/Vehicle.java
+index 000fe31..a860122 100644
+--- a/core/runtime/java/hmgapi/engine/Vehicle.java
++++ b/core/runtime/java/hmgapi/engine/Vehicle.java
+@@ -81,7 +81,7 @@ public final class Vehicle {
+         cmd(m, "seat_heat", "driver|passenger|rear_left|rear_right off|low|medium|high", "the seat's climate setting, as the climate app sets it");
+         cmd(m, "seat_vent", "driver|passenger off|low|medium|high", "the seat's ventilation through the same seat setting the climate app uses (owner's request, 2026-10-31)");
+         cmd(m, "wheel_heat", "on|off", "on or off only");
+-        cmd(m, "conditioning", "start|auto-start|stop", "one state for the unit; a manual stop blocks automatic starts until the next manual start; stopped when the mod that started it is turned off");
++        cmd(m, "conditioning", "start|auto-start [<km> <minutes>]|route <km> <minutes>|stop", "one state for the unit; route values as the car's navigation sends them (0-2046 km, 0-1022 min; default 9 km, 18 min), changed only by the mod conditioning; a manual stop blocks automatic starts until the next manual start (the mod whose automatic request it is ending it doesn't); stopped when the mod that started it is turned off");
+         cmd(m, "ambient_light", "color <rrggbb>|brightness <0-10>|release|owner_change release|keep", "one mod at a time (the first to ask holds it until it releases or is turned off); the owner's light is put back on release, including a change made in the car's menu meanwhile (owner_change release: such a change ends the hold instead); the owner's switch block_ambient_light keeps every mod off it; 10 changes a second at most");
+         cmd(m, "guide_lines", "on|off|restore", "the state before the first change comes back when the mod restores, releases or is turned off");
+         cmd(m, "rear_camera", "take|release", "one mod at a time (coordination: the car's reverse view always comes first); free again when the mod is turned off");
+diff --git a/core/runtime/java/hmgapi/vehicle/Commands.java b/core/runtime/java/hmgapi/vehicle/Commands.java
+index a730cb5..c8e37e6 100644
+--- a/core/runtime/java/hmgapi/vehicle/Commands.java
++++ b/core/runtime/java/hmgapi/vehicle/Commands.java
+@@ -78,6 +78,12 @@ final class Commands {
+     static final java.util.List<String> SEATS = java.util.Arrays.asList("driver", "passenger", "rear_left", "rear_right");
+     static final int LINES_OFF = 1, LINES_ON = 2;
+     static final long DOOR_GAP_MS = 5000, LIGHT_GAP_MS = 100, KEEP_MS = 5000;
++    /**
++     * Conditioning's route values when a mod gives none (Launchpad's), and the most the
++     * car's navigation sends (2047 km and 1023 min mean "no route"): the BMS times the
++     * heating from them, so a mod routing to a real charger sends the real ones.
++     */
++    static final int ROUTE_KM = 9, ROUTE_MIN = 18, KM_MAX = 2046, MIN_MAX = 1022;
+     /**
+      * The ambient light's custom colours (the vehicle settings app's 64-colour picker,
+      * EV6 260507): the car ignores any other colour, so a colour is sent as the nearest one
+@@ -97,6 +103,9 @@ final class Commands {
+     long doorAt = -DOOR_GAP_MS, lightAt = -LIGHT_GAP_MS, keptAt;
+     String conditioningBy, lightBy, linesBy, cameraBy;
+     boolean manualStop, noticeDone;
++    /** the conditioning request in force: an automatic one (auto-start), and its route values */
++    boolean conditioningAuto;
++    int conditioningKm = ROUTE_KM, conditioningMin = ROUTE_MIN;
+     int linesBefore;
+     int[] lightSaved;   // the owner's light, taken when a mod first changes it
+     /** mods that let go of the light when the owner changes it in the menu (default: they keep it) */
+@@ -135,15 +144,15 @@ final class Commands {
+     }
+ 
+     synchronized String handle(String mod, String cmd, String[] args) {
+-        String a0 = args.length > 0 ? args[0] : "", a1 = args.length > 1 ? args[1] : "";
++        String a0 = args.length > 0 ? args[0] : "", a1 = args.length > 1 ? args[1] : "", a2 = args.length > 2 ? args[2] : "";
+         String r;
+         try {
+             r = owner(mod, cmd, a0);
+-            if (r == null) r = run(mod, cmd, a0, a1);
++            if (r == null) r = "conditioning".equals(cmd) ? conditioning(mod, a0, a1, a2) : run(mod, cmd, a0, a1);
+         } catch (RuntimeException e) {
+             r = "refused: the car's service failed (" + e + ")";
+         }
+-        car.log(mod + " " + cmd + " " + a0 + (a1.isEmpty() ? "" : " " + a1) + " -> " + r);
++        car.log(mod + " " + cmd + " " + a0 + (a1.isEmpty() ? "" : " " + a1) + (a2.isEmpty() ? "" : " " + a2) + " -> " + r);
+         return r;
+     }
+ 
+@@ -173,22 +182,6 @@ final class Commands {
+             car.wheelHeat("on".equals(a0) ? 1 : 0);
+             return "ok wheel heat " + a0;
+         }
+-        if ("conditioning".equals(cmd)) {
+-            if ("stop".equals(a0)) {
+-                if (conditioningBy == null) return "ok not conditioning";
+-                stopConditioning();
+-                manualStop = true;   // a stop is the driver's (or a mod's) call: automatic starts wait for a manual one
+-                return "ok conditioning stopped";
+-            }
+-            boolean auto = "auto-start".equals(a0);
+-            if (!auto && !"start".equals(a0)) return "refused: conditioning start|auto-start|stop";
+-            if (auto && manualStop) return "refused: stopped by hand; automatic starts wait for a manual start";
+-            if (conditioningBy != null) return "ok already conditioning (" + conditioningBy + ")";
+-            if (!auto) manualStop = false;
+-            conditioningBy = mod;
+-            startConditioning();
+-            return "ok conditioning started";
+-        }
+         if ("ambient_light".equals(cmd)) {
+             if (car.lightBlocked() && !"release".equals(a0)) return "refused: the owner turned off mod light control (HMG-API app)";
+             if ("owner_change".equals(a0)) {
+@@ -274,10 +267,62 @@ final class Commands {
+         return "refused: unknown command " + cmd;
+     }
+ 
++    /**
++     * Battery conditioning: start, auto-start (a mod's own decision, e.g. routing to a
++     * charger), both with optional route values "<km> <minutes>"; route (the mod
++     * conditioning keeps its values current); stop. A stop blocks automatic starts until
++     * the next manual start, except the stop of the mod whose automatic request it is
++     * (that's the request ending, e.g. at the charger, not the driver saying no).
++     */
++    private String conditioning(String mod, String a0, String a1, String a2) {
++        if ("stop".equals(a0)) {
++            if (conditioningBy == null) return "ok not conditioning";
++            boolean ownAuto = conditioningAuto && conditioningBy.equals(mod);
++            stopConditioning();
++            if (!ownAuto) manualStop = true;   // a stop is the driver's (or another mod's) call: automatic starts wait for a manual one
++            return "ok conditioning stopped";
++        }
++        int[] route = a1.isEmpty() && a2.isEmpty() ? new int[] { ROUTE_KM, ROUTE_MIN } : route(a1, a2);
++        if (route == null) return "refused: route values are <km 0-" + KM_MAX + "> <minutes 0-" + MIN_MAX + ">";
++        if ("route".equals(a0)) {
++            if (a1.isEmpty()) return "refused: conditioning route <km> <minutes>";
++            if (conditioningBy == null || !conditioningBy.equals(mod)) {
++                return "refused: only the mod conditioning changes its route (" + (conditioningBy == null ? "not conditioning" : conditioningBy) + ")";
++            }
++            conditioningKm = route[0];
++            conditioningMin = route[1];
++            car.conditioningRoute(conditioningKm);
++            car.conditioningTime(conditioningMin);
++            keptAt = car.now();
++            return "ok conditioning route " + conditioningKm + " km " + conditioningMin + " min";
++        }
++        boolean auto = "auto-start".equals(a0);
++        if (!auto && !"start".equals(a0)) return "refused: conditioning start|auto-start|stop|route";
++        if (auto && manualStop) return "refused: stopped by hand; automatic starts wait for a manual start";
++        if (conditioningBy != null) return "ok already conditioning (" + conditioningBy + ")";
++        if (!auto) manualStop = false;
++        conditioningBy = mod;
++        conditioningAuto = auto;
++        conditioningKm = route[0];
++        conditioningMin = route[1];
++        startConditioning();
++        return "ok conditioning started";
++    }
++
++    /** "<km> <minutes>" within what the car's navigation sends, or null */
++    static int[] route(String km, String min) {
++        try {
++            int k = Integer.parseInt(km), m = Integer.parseInt(min);
++            return k < 0 || k > KM_MAX || m < 0 || m > MIN_MAX ? null : new int[] { k, m };
++        } catch (NumberFormatException e) {
++            return null;
++        }
++    }
++
+     /** as the car's navigation does: route metadata, then "routed to a station" (Launchpad's order and timing) */
+     void startConditioning() {
+-        car.conditioningRoute(9);
+-        car.conditioningTime(18);
++        car.conditioningRoute(conditioningKm);
++        car.conditioningTime(conditioningMin);
+         car.pause(10);
+         car.conditioningStation(2, 3);
+         car.pause(130);
+@@ -286,6 +331,9 @@ final class Commands {
+ 
+     void stopConditioning() {
+         conditioningBy = null;
++        conditioningAuto = false;
++        conditioningKm = ROUTE_KM;
++        conditioningMin = ROUTE_MIN;
+         car.conditioningRoute(2047);
+         car.conditioningTime(1023);
+         car.conditioningStation(0, 0);
+@@ -397,8 +445,8 @@ final class Commands {
+         } else if (conditioningBy != null && car.now() - keptAt >= KEEP_MS) {
+             // the station too: the car's navigation sends "no station" when it has no route of
+             // its own (seen when the owner turned Battery Conditioning on), which undid ours
+-            car.conditioningRoute(9);
+-            car.conditioningTime(18);
++            car.conditioningRoute(conditioningKm);
++            car.conditioningTime(conditioningMin);
+             car.conditioningStation(2, 3);
+             keptAt = car.now();
+         }
+diff --git a/core/runtime/test/hmgapi/vehicle/CommandsTest.java b/core/runtime/test/hmgapi/vehicle/CommandsTest.java
+index 2776544..34cd29b 100644
+--- a/core/runtime/test/hmgapi/vehicle/CommandsTest.java
++++ b/core/runtime/test/hmgapi/vehicle/CommandsTest.java
+@@ -116,6 +116,34 @@ public final class CommandsTest {
+         c.tick(declared("egmp conditioning"));
+         check("the mod that started it is turned off: stopped", "route 2047 | time 1023 | station 0,0", calls(car));
+ 
++        // route values: an automatic request to a real charger (EV routing)
++        Commands r = new Commands(car);
++        check("auto-start with route values", "ok conditioning started", r.handle("egmp", "conditioning", new String[] { "auto-start", "37", "25" }));
++        check("... sent as the route", "route 37 | time 25 | station 2,3", calls(car));
++        check("the holder updates them", "ok conditioning route 30 km 20 min", r.handle("egmp", "conditioning", new String[] { "route", "30", "20" }));
++        check("... at once", "route 30 | time 20", calls(car));
++        car.now += 5000;
++        r.tick(declared("egmp conditioning"));
++        check("kept up with the current values", "route 30 | time 20 | station 2,3", calls(car));
++        check("another mod can't change them", "refused: only the mod conditioning changes its route (egmp)", r.handle("pad", "conditioning", new String[] { "route", "1", "1" }));
++        check("values past what the navigation sends", "refused: route values are <km 0-2046> <minutes 0-1022>", r.handle("egmp", "conditioning", new String[] { "route", "2047", "20" }));
++        check("not numbers", true, r.handle("egmp", "conditioning", new String[] { "route", "ten", "20" }).startsWith("refused: route values"));
++        check("route needs both values", true, r.handle("egmp", "conditioning", new String[] { "route" }).startsWith("refused"));
++        calls(car);
++        check("the holder ends its own automatic request (arrived)", "ok conditioning stopped", r.handle("egmp", "conditioning", new String[] { "stop" }));
++        calls(car);
++        check("... which isn't a manual stop: the next automatic start goes", "ok conditioning started", r.handle("egmp", "conditioning", new String[] { "auto-start", "12", "9" }));
++        check("... with its own values", "route 12 | time 9 | station 2,3", calls(car));
++        check("the owner stops it", "ok conditioning stopped", r.handle("-", "conditioning", new String[] { "stop" }));
++        calls(car);
++        check("... a manual stop: automatic starts wait", "refused: stopped by hand; automatic starts wait for a manual start", r.handle("egmp", "conditioning", new String[] { "auto-start", "12", "9" }));
++        check("route without conditioning", "refused: only the mod conditioning changes its route (not conditioning)", r.handle("egmp", "conditioning", new String[] { "route", "1", "1" }));
++        check("a manual start without values: the defaults", "ok conditioning started", r.handle("pad", "conditioning", new String[] { "start" }));
++        check("... 9 km, 18 min", "route 9 | time 18 | station 2,3", calls(car));
++        check("a manual start's own stop still counts as manual", "ok conditioning stopped", r.handle("pad", "conditioning", new String[] { "stop" }));
++        calls(car);
++        check("... automatic starts wait", "refused: stopped by hand; automatic starts wait for a manual start", r.handle("egmp", "conditioning", new String[] { "auto-start" }));
++
+         check("ambient light: first mod holds it; sent as the car's nearest colour", "ok color ff6930 (the car's nearest to ff8000)", c.handle("amb", "ambient_light", new String[] { "color", "ff8000" }));
+         check("... the car asked for its light first (not heard yet), then {0,r},{0,g},{0,b}", "light status | rgb 255,105,48", calls(car));
+         car.now += 200;
+diff --git a/docs/vehicle-commands.md b/docs/vehicle-commands.md
+index 2f54bac..2aae0f6 100644
+--- a/docs/vehicle-commands.md
++++ b/docs/vehicle-commands.md
+@@ -21,7 +21,7 @@ charge_door open` or `api.command("charge_door", "open")`.
+ | `seat_heat` | `driver` / `passenger` / `rear_left` / `rear_right`, `off` / `low` / `medium` / `high` (a two-level seat, the EV6's rear: `off` / `low` / `high`, from the seat's own option) |
+ | `seat_vent` | `driver` / `passenger` (no rear ventilation), `off` / `low` / `medium` / `high` (added at the owner's request, 2026-10-31) |
+ | `wheel_heat` | `on` / `off` |
+-| `conditioning` | `start` / `auto-start` / `stop` |
++| `conditioning` | `start` / `auto-start` (both optionally `<km> <minutes>`) / `route <km> <minutes>` / `stop` |
+ | `ambient_light` | `color <rrggbb>` / `brightness <0-10>` / `release` / `owner_change release\|keep` |
+ | `guide_lines` | `on` / `off` / `restore` (cars with a plain rear camera; a 360-view car draws its own and refuses, EV6 2026-10-31) |
+ | `startup_notice` | `dismiss` (only after the owner turns on "Startup notice" in the HMG-API app, or `hmgapid allow startup_notice on`) |
+@@ -88,7 +88,15 @@ P (`ISystemService.getGearPStatus`, 36), HEV status flags (`IHEVService.getHEVSt
+ - **Guard:** one conditioning state for the unit, requests logged with the mod;
+   a manual stop wins over an automatic start; values limited to what the car's
+   navigation sends; stopped (values cleared) when the mod that started it is
+-  turned off. Open question: whether the car's own navigation overrides these
++  turned off.
++- **Route values (EV routing):** the BMS times the heating from the distance and
++  time it's given, so a mod routing to a real charger (EGMP AA EV: Google Maps'
++  charging stop) starts with `auto-start <km> <minutes>` and keeps them current with
++  `route <km> <minutes>` (only the mod conditioning may); without values it's 9 km,
++  18 min (Launchpad's). 0-2046 km and 0-1022 min, as the navigation sends them
++  (2047 / 1023 mean "no route"). The mod whose automatic request it is ending it
++  (it arrived, or the route ended) isn't a manual stop: its next automatic start
++  isn't blocked. A stop by the owner or another mod still is. Open question: whether the car's own navigation overrides these
+   when it has a route; to check on a car.
+ 
+ ## 5. Ambient light
+-- 
+2.54.0 (Apple Git-157)
+
