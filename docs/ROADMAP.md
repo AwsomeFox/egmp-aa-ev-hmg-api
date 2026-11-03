@@ -2,6 +2,10 @@
 
 Planned additions, roughly in priority order. Each links to what we already know. Items 1–3 are built and verified on the car (2022 Ioniq 5, 2026-10-29, v0.2.0).
 
+## 0. HMG-API mod (built, not yet on a car)
+
+HMG Leafia Plus is archived; its successor HMG-API hooks the car's apps while they run instead of replacing their files. `hmgapi-mod/` is this project as an HMG-API mod: same energy model, preconditioning and logs, firmware support through HMG-API's hook maps (US Ioniq 5, 260507 or newer). Next: test it on a car; get route values and the stop latch fixed in HMG-API ([VysseCodes/HMG-API#47](https://github.com/VysseCodes/HMG-API/pull/47)); ask for the library recipe, readings and hook points in HMG-API itself ([#44](https://github.com/VysseCodes/HMG-API/issues/44), [#45](https://github.com/VysseCodes/HMG-API/issues/45), [#46](https://github.com/VysseCodes/HMG-API/issues/46)); a recipe for each other library build. See [HMG-API-COMPARISON](HMG-API-COMPARISON.md).
+
 ## 1. Automatic battery preconditioning (done)
 
 When Google Maps on Android Auto is guiding to a DC fast charger, ask the car to precondition the battery, as the car's own navigation does. No buttons.

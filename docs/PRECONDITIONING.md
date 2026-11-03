@@ -1,5 +1,7 @@
 # Automatic battery preconditioning from Google Maps (Android Auto)
 
+> **HMG-API mod:** the same decision logic (`PrecondCore`), with the hooks and the car side changed. Maps' route payloads come from `gpm.navigation_status.next_turn` event 33 (HMG-API's Wireless CarPlay + Android Auto mod's library patch, as Leafia's did), guidance from `gpm.navigation_status.status`, and the session end from `gpm.receiver.destroy` / `gpm.receiver_service.disconnected`. The car is read by name through HMG-API's hook map, and the commands go through HMG-API's reviewed `conditioning` command (`auto-start <km> <min>`, `route <km> <min>`, `stop`), sent by the mod's relay service; HMG-API beta.6 keeps its fixed 9 km / 18 min until [VysseCodes/HMG-API#47](https://github.com/VysseCodes/HMG-API/pull/47). See [HMG-API-COMPARISON](HMG-API-COMPARISON.md) and `hmgapi-mod/`.
+
 Date: 2026-10-28 (research); implementation 2026-10-29, **verified on the car 2026-10-29** (v0.2.0, see [Implementation](#implementation) and [Test 3](#test-3-automatic-mode-after-building)). Car: 2022 Ioniq 5, Gen5W `NEEV.USA.0000.V015.012.260507`, NEMESIS + Leafia v1.0.5 + our EV-model patch (`HANDOFF.md`).
 
 Goal: when Google Maps on Android Auto is guiding to a DC fast charger (the destination, or a charging stop Maps added), the car preconditions the battery the way it does for its own navigation. No buttons.

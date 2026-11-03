@@ -63,8 +63,10 @@ HMGAPI=../HMG-API sh hmgapi-mod/build.sh ~/hmg-keys/egmp.key
    (its turn-by-turn adds Maps' route data, which preconditioning needs).
 3. Hook map: the Ioniq 5 maps aren't checked on a car yet, so HMG-API keeps hooks off
    until you run `hmgapid engine verify-map` or turn on testing maps in the HMG-API app.
-4. Put `egmp-aa-ev-<version>.zip` in `HMGAPI/updates/` on a USB stick, then
-   **Check USB updates** in the HMG-API app (or install it over adb).
+4. Download `egmp-aa-ev-<version>.zip` from the repo's Releases (or build it, above), put
+   it in `HMGAPI/updates/` on a USB stick, then **Check USB updates** in the HMG-API app
+   (or install it over adb). Until the author key is on HMG-API's trusted list
+   (`maps/authors.json`), HMG-API installs it with a warning.
 5. The first automatic preconditioning asks you on screen to allow `conditioning` for
    this mod.
 
@@ -72,3 +74,26 @@ What to look at on the car: HMG-API's log for `[egmp-aa-ev]` lines (the native p
 "applied", "EV routing hooks in ..."), logcat tags `EvModelSender` ("energy model sent")
 and `EvPrecond`, and `hmgapid service-log relay`. "energy model off: the Android Auto
 library patch isn't in place" means this car's library isn't the US 260507 build.
+
+## Releasing
+
+Releases are built by CI, from a release created in GitHub's UI
+(`.github/workflows/release.yml`):
+
+1. Set `"version"` in `hmgapi-mod/mod.json` (e.g. `0.3.1`) and merge it to `main`.
+2. In GitHub: **Releases → Draft a new release**, tag `v0.3.1` (the same version), publish.
+3. CI checks the tag matches `mod.json`, checks out HMG-API (`HMGAPI_REF` in the
+   workflow, a release tag), runs `test/run.sh`, builds the mod signed with your author
+   key and attaches `egmp-aa-ev-0.3.1.zip` to the release. A failed check leaves the
+   release without the zip; fix it and re-run the workflow.
+
+Repository secret it needs (Settings → Secrets and variables → Actions):
+
+| Secret | What |
+|---|---|
+| `HMGAPI_AUTHOR_KEY` | the contents of your HMG-API author key file (`Signing keygen`, one line). Every version must be signed with the same key: HMG-API only updates a mod from the key that installed it. Keep the file backed up outside GitHub too. |
+
+The mod's id comes with a UUID made from that key (`java -cp ../HMG-API/out/engine-host
+hmgapi.engine.Signing uuid <key file>`); to have HMG-API list it as a trusted author,
+open an issue on HMG-API with the UUID and where the mod is published.
+
