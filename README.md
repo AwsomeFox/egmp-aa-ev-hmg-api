@@ -21,15 +21,15 @@ This fork runs it as a mod for [HMG-API](https://github.com/VysseCodes/HMG-API),
 - **Cold weather:** live outside temperature raises heating and rolling losses in the model.
 - **Charge times:** calibrated on real DC sessions and the car's own estimate, including the slow last 10–20 %.
 - **EV connectors:** Maps is told the car is electric with CCS1 and J1772, for charger filtering.
-- **Preconditioning:** when the next stop is a charger over 50 kW within an hour, the car is asked to warm the battery, through HMG-API's reviewed `conditioning` command. Off with the mod's setting or the car's own *battery conditioning* setting.
+- **Preconditioning:** when the next stop is a charger over 50 kW within an hour, the car is asked to warm the battery, through HMG-API's reviewed `conditioning` command. The minimum power, the start window, the arrival distance and the starts per route are settings. Off with the mod's setting or the car's own *battery conditioning* setting.
 - **EV logs:** driving and charging, whenever the head unit is on; copied to any USB drive with an `egmp-aa-ev-logs` folder; share them through an [EV log issue](https://github.com/willemcvu/egmp-aa-ev-feat/issues/new?template=log-submission.yml).
-- **Settings** in the HMG-API app: energy model, preconditioning, EV logs (all on).
+- **Settings** in the HMG-API app: energy model, preconditioning (and its thresholds: chargers faster than 50 kW, start within 60 min, arrived within 200 m, 3 starts per route), EV logs. All on by default; changes apply at once.
 
 ## Install
 
 1. **Remove the NEMESIS versions first:** in NEMESIS Manager (press NAV three times), uninstall `aa.ev.model` and HMG Leafia Plus, then reboot. They replace the Android Auto files HMG-API expects stock, and two energy models would go to Maps.
 2. Install [HMG-API](https://github.com/VysseCodes/HMG-API/releases) and its Wireless CarPlay + Android Auto mod.
-3. **Let hooks run:** the Ioniq 5 hook maps aren't verified on a car yet, so turn on *testing maps* in the HMG-API app (or run `hmgapid engine verify-map` over adb).
+3. **Let hooks run:** the Ioniq 5 hook maps aren't verified on a car yet. In the HMG-API app's **Settings**, tap **Check the map on this car** (it checks the Ioniq 5 hook map against your car; hooks run once it passes and the head unit restarts), or turn on **Try unchecked maps** (at the next restart; HMG-API's boot guard turns hooks off if the head unit fails to start three times). No adb needed.
 4. Download `egmp-aa-ev-<version>.zip` from [Releases](../../releases), put it in a folder `HMGAPI/updates/` on a USB stick, plug it in, and tap **Check USB updates** in the HMG-API app.
 5. The first time it preconditions, HMG-API asks on screen to allow `conditioning` for this mod: allow it.
 

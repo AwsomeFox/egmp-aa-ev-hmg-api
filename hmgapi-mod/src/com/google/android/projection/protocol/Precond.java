@@ -29,7 +29,8 @@ import java.util.concurrent.TimeUnit;
  *
  * The mod's "preconditioning" setting turns it off; so does the car's own
  * "battery conditioning" EV setting (HEV EV_BATTERYCONDITIONING). Requests preconditioning for the next
- * stop when it is a charging stop above PrecondCore.MIN_DC_KW.
+ * stop when it is a charging stop above the minimum power (the mod's
+ * settings, PrecondCore.Config; 50 kW by default).
  *
  * Everything runs on one HandlerThread; PrecondCore holds the logic.
  */
@@ -43,6 +44,8 @@ public final class Precond {
     private static volatile PrecondCore sCore;
     private static boolean sTicking;
     private static boolean sLoggedParseError;
+    /** the thresholds from the mod's settings (configure), for a core made later */
+    private static volatile PrecondCore.Config sConfig = PrecondCore.DEFAULT_CONFIG;
 
     private Precond() {}
 
@@ -99,6 +102,36 @@ public final class Precond {
     }
 
     // ---- entry points ----------------------------------------------------------
+
+    /**
+     * The owner's thresholds (HmgApiEntry, from the mod's settings, at start and on
+     * every change). Applied on Precond's thread; the charging stop is picked again.
+     */
+    public static void configure(final PrecondCore.Config c) {
+        try {
+            sConfig = c;
+            Handler h;
+            synchronized (LOCK) {
+                h = sHandler;
+            }
+            if (h == null) {
+                return;   // ensure() applies it when the core is made
+            }
+            h.post(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        sCore.setConfig(c, now());
+                        scheduleTick();
+                    } catch (Throwable t) {
+                        Log.w(TAG, "settings failed: " + t);
+                    }
+                }
+            });
+        } catch (Throwable t) {
+            // never disturb GPM
+        }
+    }
 
     public static void onSessionStart(Context ctx) {
         try {
@@ -220,6 +253,7 @@ public final class Precond {
                 public void run() {
                     try {
                         long n = now();
+                        sCore.setConfig(sConfig, n);
                         sCore.recover(n);
                         scheduleTick();
                     } catch (Throwable t) {

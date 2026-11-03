@@ -15,7 +15,35 @@
       "default": true,
       "title": "Precondition the battery on the way to a DC fast charger",
       "apply": "restart",
-      "description": "When Maps (Android Auto) guides to a charging stop above 50 kW within an hour, asks the car to warm or cool the battery, with the real distance and time to it. Off too when the car's own Battery Conditioning setting is off. Needs the route data the Wireless CarPlay + Android Auto mod's turn-by-turn adds."
+      "description": "When Maps (Android Auto) guides to a charging stop, asks the car to warm or cool the battery, with the real distance and time to it (the thresholds are below). Off too when the car's own Battery Conditioning setting is off. Needs the route data the Wireless CarPlay + Android Auto mod's turn-by-turn adds."
+    },
+    {
+      "key": "precond_min_kw",
+      "type": "number",
+      "default": 50,
+      "title": "Precondition for chargers faster than (kW)",
+      "description": "Maps' charging stops above this power count (0-400; 50 by default, so DC fast chargers only). Applies at once, to the current route too."
+    },
+    {
+      "key": "precond_window_min",
+      "type": "number",
+      "default": 60,
+      "title": "Start when the charger is this many minutes away",
+      "description": "By Maps' remaining time (5-180; 60 by default). The car's battery system then times the heating from the distance and time it's sent. With HMG-API 1.0.0-beta.6 the car is always told 18 minutes, so a value near 20-30 matches that better."
+    },
+    {
+      "key": "precond_arrival_m",
+      "type": "number",
+      "default": 200,
+      "title": "Arrived within (metres)",
+      "description": "Closer than this to the charger, preconditioning stops and doesn't start (50-2000; 200 by default)."
+    },
+    {
+      "key": "precond_max_starts",
+      "type": "number",
+      "default": 3,
+      "title": "Starts per route at most",
+      "description": "If the car keeps ending the request (1-10; 3 by default)."
     },
     {
       "key": "ev_log",

@@ -3,6 +3,7 @@
 #  - egmp's own tests (gpm-ev/test: PrecondTest, SenderRowTest, EvLogTest,
 #    ScaleTest) against the mod's classes: the shared logic, and the EV log row
 #    and model scaling with the mod's EvCar / EvModelSender in place
+#  - PrecondConfigTest: the preconditioning thresholds from the mod's settings
 #  - ModTest: Precond's HMG-API vehicle (start / route / stop to the relay),
 #    sensor 23, EvCar without a hook map
 #  - RelayTest: the relay service's requests to HMG-API
@@ -30,11 +31,11 @@ javac -nowarn -d "$OUT/classes" -cp "$ANDROID_JAR:$HMGAPI/out/classes:$HMGAPI/ou
     hmgapi-mod/src/$PKG/*.java \
     gpm-ev/stubs/com/hkmc/cluster/NavigationCluster.java gpm-ev/stubs/com/hkmc/cluster/NavigationClusterListener.java \
     gpm-ev/test/PrecondTest.java gpm-ev/test/SenderRowTest.java gpm-ev/test/EvLogTest.java gpm-ev/test/ScaleTest.java \
-    hmgapi-mod/test/ModTest.java hmgapi-mod/test/NativeCheckTest.java \
+    hmgapi-mod/test/ModTest.java hmgapi-mod/test/NativeCheckTest.java hmgapi-mod/test/PrecondConfigTest.java \
     hmgapi-mod/service/src/dev/egmp/aaev/RelayService.java hmgapi-mod/test/RelayTest.java
 CP="$REPO/$OUT/classes:$HMGAPI/out/classes:$HMGAPI/out/hmgapi-client.jar:$ANDROID_JAR"
 # from gpm-ev/, where egmp's tests find ../tools/evlog_schema.json
-for t in PrecondTest SenderRowTest EvLogTest ScaleTest ModTest; do
+for t in PrecondTest PrecondConfigTest SenderRowTest EvLogTest ScaleTest ModTest; do
     rc=0
     (cd gpm-ev && java -cp "$CP" com.google.android.projection.protocol.$t) > "$OUT/$t.log" 2>&1 || rc=$?
     grep -v "not found by name; using" "$OUT/$t.log" || true

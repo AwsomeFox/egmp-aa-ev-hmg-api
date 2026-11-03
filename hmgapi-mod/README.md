@@ -20,7 +20,7 @@ while it runs and patches its library in memory.
 | `recipes/*.recipe` | egmp's three Android Auto library patches as HMG-API memory recipes, one per library build (`tools/mkrecipe.py`; today the US 260507 build), clear of the Wireless mod's turn-by-turn recipe. `NativeCheck` reads them itself, so another build is one more recipe here and in `mod.json` |
 | `relay.jar` (`service/`) | service `relay` (user `system`): sends Precond's requests as HMG-API's `conditioning` command, which HMG-API answers only for a mod's own service |
 | `scripts/offload.sh` | service `offload` (root): copies EV logs to a USB drive with an `egmp-aa-ev-logs` folder |
-| `settings.json` | `energy_model`, `preconditioning`, `ev_log` (all on) |
+| `settings.json` | `energy_model`, `preconditioning`, `ev_log` (all on), and the preconditioning thresholds `precond_min_kw` (50), `precond_window_min` (60), `precond_arrival_m` (200), `precond_max_starts` (3): `PrecondCore.Config`, applied at once |
 | `hmg-api-patches/` | a change to HMG-API itself: real route values for conditioning, and a mod's own stop no longer blocks its next automatic start (see the comparison doc, 3.1) |
 
 Hook points used (all in HMG-API 1.0.0-beta.6, mapped on both Ioniq 5 maps):
@@ -62,7 +62,10 @@ HMGAPI=../HMG-API sh hmgapi-mod/build.sh ~/hmg-keys/egmp.key
 2. HMG-API 1.0.0-beta.6 or newer, with its **Wireless CarPlay + Android Auto** mod
    (its turn-by-turn adds Maps' route data, which preconditioning needs).
 3. Hook map: the Ioniq 5 maps aren't checked on a car yet, so HMG-API keeps hooks off
-   until you run `hmgapid engine verify-map` or turn on testing maps in the HMG-API app.
+   until it is. In the HMG-API app's **Settings**, tap **Check the map on this car** (hooks
+   run once it passes and the head unit restarts), or turn on **Try unchecked maps** (at
+   the next restart; the boot guard turns hooks off if the unit fails to start three
+   times). Making a Car Report runs the same check. No adb needed.
 4. Download `egmp-aa-ev-<version>.zip` from the repo's Releases (or build it, above), put
    it in `HMGAPI/updates/` on a USB stick, then **Check USB updates** in the HMG-API app
    (or install it over adb). Until the author key is on HMG-API's trusted list
