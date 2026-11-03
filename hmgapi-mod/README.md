@@ -1,0 +1,99 @@
+# egmp-aa-ev as an HMG-API mod
+
+The same EV routing as the NEMESIS package (energy model for Google Maps, automatic
+battery preconditioning on the way to a DC charger, EV logs), as a mod for
+[HMG-API](https://github.com/VysseCodes/HMG-API), the replacement for HMG Leafia Plus.
+Nothing in the head unit's files is changed: HMG-API hooks the Android Auto app (GPM)
+while it runs and patches its library in memory.
+
+> [!WARNING]
+> **Not tested on a car yet.** Everything below is checked off the car only
+> (`test/run.sh`). Read [docs/HMG-API-COMPARISON.md](../docs/HMG-API-COMPARISON.md)
+> for what's known and what isn't.
+
+## How it maps onto HMG-API
+
+| Part | What it is |
+|---|---|
+| `mod.json` | id `egmp-aa-ev`; Ioniq 5 (NEEV, NEEV23, NEEV23SE), US, firmware 260507 or newer (hooks run where HMG-API has a map); hook points, the library recipe, Android Auto fuel/connector types, the `conditioning` command, the USB folder, two services |
+| `hooks.jar` (`src/`) | in GPM: `HmgApiEntry` (the hooks), `EvModelSender`, `Precond`, `EvCar` over `HmgCar` (the car's services by name through HMG-API's hook map), `NativeCheck`, `Relay`; plus NavProto, PrecondCore, EvRowAgg, EvLogger, EvModelTemplate and EvDriveLog shared with the NEMESIS build (`gpm-ev/src`) |
+| `recipes/*.recipe` | egmp's three Android Auto library patches as HMG-API memory recipes, one per library build (`tools/mkrecipe.py`; today the US 260507 build), clear of the Wireless mod's turn-by-turn recipe. `NativeCheck` reads them itself, so another build is one more recipe here and in `mod.json` |
+| `relay.jar` (`service/`) | service `relay` (user `system`): sends Precond's requests as HMG-API's `conditioning` command, which HMG-API answers only for a mod's own service |
+| `scripts/offload.sh` | service `offload` (root): copies EV logs to a USB drive with an `egmp-aa-ev-logs` folder |
+| `settings.json` | `energy_model`, `preconditioning`, `ev_log` (all on) |
+| `hmg-api-patches/` | a change to HMG-API itself: real route values for conditioning, and a mod's own stop no longer blocks its next automatic start (see the comparison doc, 3.1) |
+
+Hook points used (all in HMG-API 1.0.0-beta.6, mapped on both Ioniq 5 maps):
+`gpm.sensor_source.init` (change: sensor 23 when the library patch is in place; start
+the sender and preconditioning), `gpm.receiver.destroy` and
+`gpm.receiver_service.disconnected` (stop both), `gpm.navigation_status.next_turn`
+(Maps' route messages, event 33), `gpm.navigation_status.status` (guidance state).
+
+## Build
+
+Needs a JDK, the Android SDK (build-tools and a platform `android.jar`; `ANDROID_HOME`)
+and an HMG-API checkout (`HMGAPI`, default `../HMG-API`). No car files.
+
+```bash
+HMGAPI=../HMG-API sh hmgapi-mod/build.sh
+```
+
+```bash
+HMGAPI=../HMG-API sh hmgapi-mod/test/run.sh
+```
+
+The first gives `build/mod/egmp-aa-ev/`. With your HMG-API author key it also signs the
+package, `dist/egmp-aa-ev-<version>.zip`. Make a key once, keep it private and backed up
+(a lost key means owners must remove the mod before installing a new one):
+
+```bash
+java -cp ../HMG-API/out/engine-host hmgapi.engine.Signing keygen ~/hmg-keys/egmp.key
+```
+
+```bash
+HMGAPI=../HMG-API sh hmgapi-mod/build.sh ~/hmg-keys/egmp.key
+```
+
+## Install (on a car with HMG-API)
+
+1. **Remove the NEMESIS build first** (NEMESIS Manager → `aa.ev.model` → uninstall,
+   reboot), and HMG Leafia Plus: both replace the files HMG-API hooks, and two energy
+   models would go to Maps.
+2. HMG-API 1.0.0-beta.6 or newer, with its **Wireless CarPlay + Android Auto** mod
+   (its turn-by-turn adds Maps' route data, which preconditioning needs).
+3. Hook map: the Ioniq 5 maps aren't checked on a car yet, so HMG-API keeps hooks off
+   until you run `hmgapid engine verify-map` or turn on testing maps in the HMG-API app.
+4. Download `egmp-aa-ev-<version>.zip` from the repo's Releases (or build it, above), put
+   it in `HMGAPI/updates/` on a USB stick, then **Check USB updates** in the HMG-API app
+   (or install it over adb). Until the author key is on HMG-API's trusted list
+   (`maps/authors.json`), HMG-API installs it with a warning.
+5. The first automatic preconditioning asks you on screen to allow `conditioning` for
+   this mod.
+
+What to look at on the car: HMG-API's log for `[egmp-aa-ev]` lines (the native patch
+"applied", "EV routing hooks in ..."), logcat tags `EvModelSender` ("energy model sent")
+and `EvPrecond`, and `hmgapid service-log relay`. "energy model off: the Android Auto
+library patch isn't in place" means this car's library isn't the US 260507 build.
+
+## Releasing
+
+Releases are built by CI, from a release created in GitHub's UI
+(`.github/workflows/release.yml`):
+
+1. Set `"version"` in `hmgapi-mod/mod.json` (e.g. `0.3.1`) and merge it to `main`.
+2. In GitHub: **Releases → Draft a new release**, tag `v0.3.1` (the same version), publish.
+3. CI checks the tag matches `mod.json`, checks out HMG-API (`HMGAPI_REF` in the
+   workflow, a release tag), runs `test/run.sh`, builds the mod signed with your author
+   key and attaches `egmp-aa-ev-0.3.1.zip` to the release. A failed check leaves the
+   release without the zip; fix it and re-run the workflow.
+
+Repository secret it needs (Settings → Secrets and variables → Actions):
+
+| Secret | What |
+|---|---|
+| `HMGAPI_AUTHOR_KEY` | the contents of your HMG-API author key file (`Signing keygen`, one line). Every version must be signed with the same key: HMG-API only updates a mod from the key that installed it. Keep the file backed up outside GitHub too. |
+
+The mod's id comes with a UUID made from that key (`java -cp ../HMG-API/out/engine-host
+hmgapi.engine.Signing uuid <key file>`); to have HMG-API list it as a trusted author,
+open an issue on HMG-API with the UUID and where the mod is published.
+

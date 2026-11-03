@@ -1,5 +1,7 @@
 # EV log format v2
 
+> **HMG-API mod:** the same logger and format. It starts when the Android Auto app's process starts (HMG-API's hooks, not the smali edits named below), the mod's *EV logs* setting turns it off, and the header's `vin_model` is empty (HMG-API never hands a mod the VIN; `product` says the model). The offload is the mod's `offload` service, which asks HMG-API which drives have the folder.
+
 The format the head unit writes for [ROADMAP item 2](ROADMAP.md#2-ev-logging-for-model-calibration), and that owners submit as a GitHub issue ([EV log submission](https://github.com/willemcvu/egmp-aa-ev-feat/issues/new?template=log-submission.yml), label `ev-log`). `tools/evlog.py` checks, cleans and merges them. EV logs cover driving **and** charging: the head unit logs whenever it is on, with or without Android Auto.
 
 The allowlist of header keys and columns is in [`tools/evlog_schema.json`](../tools/evlog_schema.json), loaded by `tools/evlog.py`. To add a field, add it there (and here); old parsers keep working because unknown columns are ignored.
@@ -14,7 +16,7 @@ v2 is a superset of v1: same header keys plus `sample_s`, same columns plus the 
 - **Buffered writes.** Rows are kept in memory and appended to the file once a minute, and on a clean stop (`GalReceiverService.onDestroy`, Android's shutdown broadcast). If the head unit loses power without a shutdown, up to a minute of rows is lost. If the folder can't be written, up to 256 KB of rows stay in memory (oldest dropped first).
 - **Hard caps.** A file never grows past 4 MB (the log continues in the next file of the same period, with a fresh header). The folder (`/data/data/com.google.android.projection.sink/files/evlog/`) never holds more than **100 MB**: before every write the oldest files (by name: date, then sequence) are deleted until the total after the write fits. The file being written is never deleted to make room for itself.
 - **Size.** A row is about 150–200 bytes, so about 110–150 KB per hour the head unit is on (720 rows), about 3.5 MB per 24 h. 100 MB holds roughly 700 hours.
-- **Copying.** The `evlog-offload` service copies new and grown files to `<usb drive>/egmp-aa-ev-logs/` when a drive with that folder is plugged in. The file being written grows once a minute, so with a drive left in it is copied again after each append. A head-unit pop-up confirms it once per insertion ("N copied … Safe to remove", or "already up to date"). On the 2022 Ioniq 5 the phone and the drive share the one USB data port, so plug the drive in after a drive or a charge. Logs are never deleted by the copy.
+- **Copying.** The offload service (`offload` in the HMG-API mod, `evlog-offload` in the NEMESIS package) copies new and grown files to `<usb drive>/egmp-aa-ev-logs/` when a drive with that folder is plugged in. The file being written grows once a minute, so with a drive left in it is copied again after each append. A head-unit pop-up confirms it once per insertion ("N copied … Safe to remove", or "already up to date"). On the 2022 Ioniq 5 the phone and the drive share the one USB data port, so plug the drive in after a drive or a charge. Logs are never deleted by the copy.
 - **Load.** Two binder reads per second (HEV energy, hscan speed), about 40 per 5 s row (HEV flags, DATC, nav packet every 4 s), one GPS last-fix lookup per row, and a passive BCM listener. Reads shared with the energy-model sender are cached (`EvCar`), so the two don't read the same signal twice. The DATC service writes one debug logcat line per climate read.
 
 ## File
@@ -49,7 +51,7 @@ Lines starting with `# `, each `# key=value`. The first line is exactly `# egmp-
 | `product` | head unit software version | `NEEV.USA.0000.V015.012.260507` |
 | `device` | head unit device name | `wp_daudioplus_neev_us` |
 | `vin_model` | VIN characters 1–8 plus character 10 (maker, model, body, motor, model year). **Never the full VIN**: no check digit (9), plant (11) or serial number (12–17) | `KM8KRDAFN` |
-| `pkg` | logging package and version | `aa.ev.model 0.2.1` |
+| `pkg` | logging package and version | `aa.ev.model 0.2.1` (NEMESIS), `egmp-aa-ev 0.3.0 (HMG-API)` |
 | `model_capacity_wh` | nominal capacity of the model template, Wh | `77400` |
 | `capacity_source` | where `capacity_wh` comes from: `nominal` (new-car value, nothing learned yet) or `bms` (learned from BMS available energy ÷ SOC). Readers should accept other short lower-case values | `bms` |
 | `date` | UTC date the file started, `YYYY-MM-DD`. No time of day. Left out if the clock wasn't set | `2026-01-17` |

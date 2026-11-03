@@ -1,0 +1,56 @@
+{
+  "id": "egmp-aa-ev",
+  "name": "EV routing for Android Auto (E-GMP)",
+  "version": "0.3.0",
+  "hmgapi": ">=1.0.0",
+  "authors": [
+    "willemcvu",
+    "AwsomeFox"
+  ],
+  "license": "AGPL-3.0",
+  "description": "Google Maps EV routing over Android Auto: battery energy, usable capacity and charge curves, EV connectors, automatic battery preconditioning on the way to a DC charger, and EV logs.",
+  "system": {
+    "model": ["NEEV", "NEEV23", "NEEV23SE"],
+    "region": "USA",
+    "firmware": [">=260507"]
+  },
+  "hooks": {
+    "jar": "hooks.jar",
+    "entry": "com.google.android.projection.protocol.HmgApiEntry",
+    "points": {
+      "gpm.sensor_source.init": "change",
+      "gpm.receiver.destroy": "observe",
+      "gpm.receiver_service.disconnected": "observe",
+      "gpm.navigation_status.next_turn": "observe",
+      "gpm.navigation_status.status": "observe"
+    },
+    "native": {
+      "libautoreceiver_infobank.so": ["recipes/ev-sensor-48ee793a.recipe"]
+    }
+  },
+  "projection": {
+    "aa_fuel_types": [10],
+    "aa_ev_connectors": [4, 1]
+  },
+  "vehicle": {
+    "commands": ["conditioning"]
+  },
+  "usb": ["egmp-aa-ev-logs"],
+  "services": [
+    {
+      "name": "relay",
+      "jar": "relay.jar",
+      "class": "dev.egmp.aaev.RelayService",
+      "user": "system"
+    },
+    {
+      "name": "offload",
+      "script": "scripts/offload.sh",
+      "user": "root"
+    }
+  ],
+  "logs": {
+    "tags": ["EvModelSender", "EvDriveLog", "EvLogger", "EvCar", "EvPrecond"],
+    "match": ["[egmp-aa-ev]"]
+  }
+}

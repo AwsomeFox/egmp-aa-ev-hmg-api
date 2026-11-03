@@ -22,6 +22,16 @@ body:
         - other
     validations:
       required: true
+  - type: dropdown
+    id: build
+    attributes:
+      label: Which egmp-aa-ev
+      description: The `pkg` line at the top of a log file.
+      options:
+        - HMG-API mod (egmp-aa-ev)
+        - NEMESIS package (aa.ev.model)
+    validations:
+      required: true
   - type: input
     id: model_year
     attributes:

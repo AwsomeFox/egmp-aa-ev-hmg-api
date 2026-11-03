@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "settings": [
+    {
+      "key": "energy_model",
+      "type": "toggle",
+      "default": true,
+      "title": "Battery data for Google Maps (EV energy model)",
+      "apply": "restart",
+      "description": "Sends Maps the battery's real energy, its learned usable capacity, charge curves and the outside temperature every 5 s during Android Auto, for its arrival charge and charging stops. Needs the Android Auto library patch this mod carries (US 260507 library build)."
+    },
+    {
+      "key": "preconditioning",
+      "type": "toggle",
+      "default": true,
+      "title": "Precondition the battery on the way to a DC fast charger",
+      "apply": "restart",
+      "description": "When Maps (Android Auto) guides to a charging stop above 50 kW within an hour, asks the car to warm or cool the battery, with the real distance and time to it. Off too when the car's own Battery Conditioning setting is off. Needs the route data the Wireless CarPlay + Android Auto mod's turn-by-turn adds."
+    },
+    {
+      "key": "ev_log",
+      "type": "toggle",
+      "default": true,
+      "title": "EV logs",
+      "apply": "restart",
+      "description": "Logs battery, charging, climate and Maps' route plan whenever the head unit is on (no location or time of day). Copied to any USB drive that has an egmp-aa-ev-logs folder."
+    }
+  ]
+}
