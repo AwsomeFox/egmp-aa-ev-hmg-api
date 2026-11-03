@@ -94,7 +94,7 @@ Repository secret it needs (Settings → Secrets and variables → Actions):
 
 | Secret | What |
 |---|---|
-| `HMGAPI_AUTHOR_KEY` | the contents of your HMG-API author key file (`Signing keygen`, one line). Every version must be signed with the same key: HMG-API only updates a mod from the key that installed it. Keep the file backed up outside GitHub too. |
+| `HMGAPI_AUTHOR_KEY` | the contents of your HMG-API author key file (`Signing keygen`, one line; CI derives the `.pub` from it). Every version must be signed with the same key: HMG-API only updates a mod from the key that installed it. Keep the file backed up outside GitHub too. |
 
 The mod's id comes with a UUID made from that key (`java -cp ../HMG-API/out/engine-host
 hmgapi.engine.Signing uuid <key file>`); to have HMG-API list it as a trusted author,

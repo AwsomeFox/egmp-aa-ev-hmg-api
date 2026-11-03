@@ -78,7 +78,10 @@ fi
 
 if [ -n "$1" ]; then
     echo "== signed package"
-    Z=$(sh "$HMGAPI/tools/mkmodpkg.sh" "$REPO/$MOD" "$1" | tail -1)
+    # HMG-API's packer signs with <key> and the <key>.pub beside it, then verifies
+    sh "$HMGAPI/tools/mkmodpkg.sh" "$REPO/$MOD" "$1" > "$B/mkmodpkg.log" 2>&1 || { cat "$B/mkmodpkg.log" >&2; exit 1; }
+    Z=$(tail -1 "$B/mkmodpkg.log")
+    [ -f "$Z" ] || { cat "$B/mkmodpkg.log" >&2; echo "no signed package made" >&2; exit 1; }
     mkdir -p dist
     cp "$Z" "dist/$ID-$VER.zip"
     echo "dist/$ID-$VER.zip"
