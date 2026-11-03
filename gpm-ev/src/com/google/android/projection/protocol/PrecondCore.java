@@ -89,6 +89,48 @@ public final class PrecondCore {
     public static final long CANCEL_CONFIRM_MS = 60 * 1000L;
     public static final int CANCEL_RETRIES = 12;
 
+    /**
+     * The thresholds an owner may change (the HMG-API mod's settings); the
+     * constants above are the defaults, and what the NEMESIS build always uses.
+     * Immutable: a change is a new Config. Out-of-range values are clamped.
+     */
+    public static final class Config {
+        public static final int KW_MAX = 400;
+        public static final int WINDOW_MIN_S = 5 * 60, WINDOW_MAX_S = 180 * 60;
+        public static final int ARRIVAL_MIN_M = 50, ARRIVAL_MAX_M = 2000;
+        public static final int STARTS_MIN = 1, STARTS_MAX = 10;
+
+        /** precondition for charging stops strictly above this power */
+        public final int minDcKw;
+        /** start once the charging stop is at most this far away in time */
+        public final int windowSeconds;
+        /** closer than this to the stop is "arrived": cancel, no start */
+        public final int arrivalMeters;
+        /** at most this many starts per route */
+        public final int maxStartsPerRoute;
+
+        public Config(int minDcKw, int windowSeconds, int arrivalMeters, int maxStartsPerRoute) {
+            this.minDcKw = clamp(minDcKw, 0, KW_MAX);
+            this.windowSeconds = clamp(windowSeconds, WINDOW_MIN_S, WINDOW_MAX_S);
+            this.arrivalMeters = clamp(arrivalMeters, ARRIVAL_MIN_M, ARRIVAL_MAX_M);
+            this.maxStartsPerRoute = clamp(maxStartsPerRoute, STARTS_MIN, STARTS_MAX);
+        }
+
+        static int clamp(int v, int lo, int hi) {
+            return v < lo ? lo : (v > hi ? hi : v);
+        }
+
+        @Override
+        public String toString() {
+            return "chargers > " + minDcKw + " kW, start within " + windowSeconds / 60
+                    + " min, arrived at " + arrivalMeters + " m, " + maxStartsPerRoute
+                    + " start(s) per route";
+        }
+    }
+
+    public static final Config DEFAULT_CONFIG =
+            new Config(MIN_DC_KW, WINDOW_SECONDS, ARRIVAL_METERS, MAX_STARTS_PER_ROUTE);
+
     static final int TX_STATION = 62;
     static final int TX_ROUTE_KM = 65;
     static final int TX_REMAIN_MIN = 66;
@@ -140,10 +182,32 @@ public final class PrecondCore {
     private volatile int pubDepWh = -1;
     private volatile int pubChgS = -1;
 
+    private Config config = DEFAULT_CONFIG;
+
     public PrecondCore(Vehicle vehicle, Journal journal, Logger logger) {
         this.vehicle = vehicle;
         this.journal = journal;
         this.logger = logger;
+    }
+
+    public Config config() {
+        return config;
+    }
+
+    /**
+     * New thresholds (same thread as the rest). The charging stop is picked
+     * again at once, so a new minimum power takes effect on the current route.
+     */
+    public void setConfig(Config c, long now) {
+        Config next = c == null ? DEFAULT_CONFIG : c;
+        if (next.toString().equals(config.toString())) {
+            return;
+        }
+        config = next;
+        logger.log("settings: " + next);
+        waitReason = "";
+        pickTarget(now);
+        publish();
     }
 
     // ---- getters (any thread) -------------------------------------------------
@@ -247,7 +311,7 @@ public final class PrecondCore {
         rem = r;
         if (owned && target != null) {
             NavProto.Remaining t = remainingFor(target);
-            if (t != null && t.meters >= 0 && t.meters < ARRIVAL_METERS) {
+            if (t != null && t.meters >= 0 && t.meters < config.arrivalMeters) {
                 cancelAndLatch("arrived", now);
             }
         }
@@ -296,7 +360,7 @@ public final class PrecondCore {
             return;
         }
         NavProto.Remaining r = remainingFor(target);
-        if (r != null && r.meters >= 0 && r.meters < ARRIVAL_METERS) {
+        if (r != null && r.meters >= 0 && r.meters < config.arrivalMeters) {
             cancelAndLatch("arrived", now);
             return;
         }
@@ -348,15 +412,15 @@ public final class PrecondCore {
             waiting("no distance for target");
             return;
         }
-        if (r.meters < ARRIVAL_METERS) {
+        if (r.meters < config.arrivalMeters) {
             waiting("at the charger");
             return;
         }
-        if (r.seconds > WINDOW_SECONDS) {
-            waiting("more than 60 min away");
+        if (r.seconds > config.windowSeconds) {
+            waiting("more than " + config.windowSeconds / 60 + " min away");
             return;
         }
-        if (startsThisRoute >= MAX_STARTS_PER_ROUTE) {
+        if (startsThisRoute >= config.maxStartsPerRoute) {
             waiting("start limit for this route");
             return;
         }
@@ -448,7 +512,7 @@ public final class PrecondCore {
         NavProto.Destination found = null;
         int kw = -1;
         for (NavProto.Destination d : dests) {
-            if (d.hasStation && d.maxPowerKw > MIN_DC_KW) {
+            if (d.hasStation && d.maxPowerKw > config.minDcKw) {
                 found = d;
                 kw = d.maxPowerKw;
                 break;

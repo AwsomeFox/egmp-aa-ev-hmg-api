@@ -33,9 +33,12 @@ import hmgapi.hook.Points;
  *   library file delta (patch_library.py)         hooks.native recipe
  *   persist.gpm.ev.off                            the mod's switch and settings
  *
- * Settings (settings.json): energy_model, preconditioning, ev_log. A change
- * applies when GPM restarts (HMG-API restarts it on Apply), and turning the
- * model or preconditioning off also stops them at once.
+ * Settings (settings.json): energy_model, preconditioning, ev_log, and the
+ * preconditioning thresholds precond_min_kw, precond_window_min,
+ * precond_arrival_m, precond_max_starts (PrecondCore.Config). The thresholds
+ * apply at once (HMG-API hands every running app a saved change); turning the
+ * model or preconditioning off stops them at once; the rest applies when GPM
+ * restarts.
  */
 public final class HmgApiEntry extends ModEntry {
     static final String GPM = "com.google.android.projection.sink";
@@ -73,6 +76,7 @@ public final class HmgApiEntry extends ModEntry {
             return;
         }
         sMod = mod;
+        Precond.configure(precondConfig(mod));
         if (!Points.complete("gpm")) {
             mod.error("GPM isn't fully mapped on this car: EV routing stays off", null);
             return;
@@ -224,8 +228,19 @@ public final class HmgApiEntry extends ModEntry {
         }
     }
 
+    /** the preconditioning thresholds from the settings (defaults where unset; PrecondCore clamps) */
+    static PrecondCore.Config precondConfig(ModContext mod) {
+        PrecondCore.Config d = PrecondCore.DEFAULT_CONFIG;
+        return new PrecondCore.Config(
+                mod.settingInt("precond_min_kw", d.minDcKw),
+                mod.settingInt("precond_window_min", d.windowSeconds / 60) * 60,
+                mod.settingInt("precond_arrival_m", d.arrivalMeters),
+                mod.settingInt("precond_max_starts", d.maxStartsPerRoute));
+    }
+
     @Override
     public void onSettingsChanged(ModContext mod) {
+        Precond.configure(precondConfig(mod));
         if (!mod.settingBoolean("energy_model", true)) {
             EvModelSender.stop();
         }

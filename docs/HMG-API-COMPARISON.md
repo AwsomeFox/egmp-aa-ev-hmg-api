@@ -19,7 +19,7 @@ the mod has run on a head unit yet.
 | Automatic preconditioning to a DC charger > 50 kW within 1 h | `Precond` + raw HEV writes 62/65/66 on a sha256-verified framework | command `conditioning` (fixed 9 km / 18 min) | `Precond` deciding, HMG-API's command sending (through the relay service), **real distance and minutes** with the HMG-API patch in `hmgapi-mod/hmg-api-patches/` |
 | Maps' route plan (destinations, charging stops, remaining distance/time: 0x8006/0x8007) | Leafia's `NAVDUMP` in `GpmNaviTBTManager` | events `aa_navigation_message`, to a mod's **app** only, from the Wireless mod's library patch | the same messages (event 33) read on `gpm.navigation_status.next_turn`; needs the Wireless CarPlay + Android Auto mod's turn-by-turn |
 | EV logs (1 s energy/speed, 5 s rows, charging, climate, drive mode, altitude, Maps plan) | `EvDriveLog` + root offload script | none | same logger in GPM; offload as a mod service with HMG-API's USB folder (`"usb": ["egmp-aa-ev-logs"]`) |
-| Off switch | `persist.gpm.ev.off=1` | per-mod switch | HMG-API's switch, plus settings `energy_model`, `preconditioning`, `ev_log` |
+| Off switch, settings | `persist.gpm.ev.off=1` | per-mod switch and settings page | HMG-API's switch, plus settings `energy_model`, `preconditioning`, `ev_log` and the preconditioning thresholds (minimum charger power, start window, arrival distance, starts per route), applied at once |
 | Firmware support | Leafia v1.0.5 on US 260507 only (md5-locked) | per-car hook maps (Ioniq 5 US 260507 and 260903 mapped) | US Ioniq 5 on 260507 or newer (`mod.json`), hooks wherever HMG-API has a map; the energy model on each library build the mod has a recipe for (today US 260507) |
 
 ## 2. Car data: what egmp reads and what HMG-API offers as readings
@@ -153,8 +153,9 @@ confirmation) are routing logic, not plumbing; they stay in the mod. The log for
   only while egmp holds the request (recorded in its data folder; cleared when HMG-API
   names another holder), so it never ends Launchpad's or the owner's.
 - **Hooks run only with a verified map**, or with "testing maps" on: the Ioniq 5 maps
-  are `mapped` (260507) and `probed` (260903). `hmgapid engine verify-map` once on the
-  car, or turn on testing maps in the HMG-API app.
+  are `mapped` (260507) and `probed` (260903). In the HMG-API app: Settings → **Check
+  the map on this car** (or a Car Report, which runs the same check), or **Try
+  unchecked maps**. No adb needed.
 - **Energy model only on the US 260507 library build** (`48ee793a...`). On another
   build (e.g. Canada's `a0bea1c4...`, or 260903 if its library changed) the recipe's
   verify regions don't match, nothing is written, sensor 23 isn't offered and the
