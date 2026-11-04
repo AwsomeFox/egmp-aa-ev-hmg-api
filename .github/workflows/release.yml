@@ -22,7 +22,7 @@ permissions:
 
 env:
   # the HMG-API the mod is built and tested against (a release tag)
-  HMGAPI_REF: v1.0.0-beta.6
+  HMGAPI_REF: v1.0.0
 
 jobs:
   hmgapi-mod:

@@ -21,9 +21,8 @@ while it runs and patches its library in memory.
 | `relay.jar` (`service/`) | service `relay` (user `system`): sends Precond's requests as HMG-API's `conditioning` command, which HMG-API answers only for a mod's own service |
 | `scripts/offload.sh` | service `offload` (root): copies EV logs to a USB drive with an `egmp-aa-ev-logs` folder |
 | `settings.json` | `energy_model`, `preconditioning`, `ev_log` (all on), and the preconditioning thresholds `precond_min_kw` (50), `precond_window_min` (60), `precond_arrival_m` (200), `precond_max_starts` (3): `PrecondCore.Config`, applied at once |
-| `hmg-api-patches/` | a change to HMG-API itself: real route values for conditioning, and a mod's own stop no longer blocks its next automatic start (see the comparison doc, 3.1) |
 
-Hook points used (all in HMG-API 1.0.0-beta.6, mapped on both Ioniq 5 maps):
+Hook points used (all in HMG-API 1.0.0, mapped on both Ioniq 5 maps):
 `gpm.sensor_source.init` (change: sensor 23 when the library patch is in place; start
 the sender and preconditioning), `gpm.receiver.destroy` and
 `gpm.receiver_service.disconnected` (stop both), `gpm.navigation_status.next_turn`
@@ -59,7 +58,7 @@ HMGAPI=../HMG-API sh hmgapi-mod/build.sh ~/hmg-keys/egmp.key
 1. **Remove the NEMESIS build first** (NEMESIS Manager → `aa.ev.model` → uninstall,
    reboot), and HMG Leafia Plus: both replace the files HMG-API hooks, and two energy
    models would go to Maps.
-2. HMG-API 1.0.0-beta.6 or newer, with its **Wireless CarPlay + Android Auto** mod
+2. HMG-API 1.0.0 or newer, with its **Wireless CarPlay + Android Auto** mod
    (its turn-by-turn adds Maps' route data, which preconditioning needs).
 3. Hook map: the Ioniq 5 maps aren't checked on a car yet, so HMG-API keeps hooks off
    until it is. In the HMG-API app's **Settings**, tap **Check the map on this car** (hooks

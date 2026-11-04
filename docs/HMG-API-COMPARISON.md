@@ -1,7 +1,7 @@
 # egmp-aa-ev and HMG-API: features and data for EV routing
 
 Date: 2026-11-03. Compares the NEMESIS build of egmp-aa-ev (v0.2.1, `gpm-ev/`,
-`packages/aa-ev-model/`), HMG-API 1.0.0-beta.6 (VysseCodes/HMG-API `e28c10b`) and
+`packages/aa-ev-model/`), HMG-API 1.0.0 (VysseCodes/HMG-API `e999d82`) and
 the HMG-API mod in `hmgapi-mod/` (0.3.0). Everything here is off-car: nothing in
 the mod has run on a head unit yet.
 
@@ -16,7 +16,7 @@ the mod has run on a head unit yet.
 | Energy model (capacity, energy, charge curves, aux/HVAC, cold road load) every 5 s | `EvModelSender` | none ("its energy-model sender" stays the mod's, api-plan) | `EvModelSender`, same model and template |
 | Usable capacity learned from the BMS (energy / SOC) | yes | none | yes (same file in GPM's files dir, so it carries over from the NEMESIS build) |
 | Outside temperature for the aux table and cold road load | nav battery packet | reading `outside_temp` (climate control's) | nav battery packet, as before (same decode, verified against the dash) |
-| Automatic preconditioning to a DC charger > 50 kW within 1 h | `Precond` + raw HEV writes 62/65/66 on a sha256-verified framework | command `conditioning` (fixed 9 km / 18 min) | `Precond` deciding, HMG-API's command sending (through the relay service), **real distance and minutes** with the HMG-API patch in `hmgapi-mod/hmg-api-patches/` |
+| Automatic preconditioning to a DC charger > 50 kW within 1 h | `Precond` + raw HEV writes 62/65/66 on a sha256-verified framework | command `conditioning` (route values since 1.0.0) | `Precond` deciding, HMG-API's command sending (through the relay service), **real distance and minutes** with the HMG-API patch in `hmgapi-mod/hmg-api-patches/` |
 | Maps' route plan (destinations, charging stops, remaining distance/time: 0x8006/0x8007) | Leafia's `NAVDUMP` in `GpmNaviTBTManager` | events `aa_navigation_message`, to a mod's **app** only, from the Wireless mod's library patch | the same messages (event 33) read on `gpm.navigation_status.next_turn`; needs the Wireless CarPlay + Android Auto mod's turn-by-turn |
 | EV logs (1 s energy/speed, 5 s rows, charging, climate, drive mode, altitude, Maps plan) | `EvDriveLog` + root offload script | none | same logger in GPM; offload as a mod service with HMG-API's USB folder (`"usb": ["egmp-aa-ev-logs"]`) |
 | Off switch, settings | `persist.gpm.ev.off=1` | per-mod switch and settings page | HMG-API's switch, plus settings `energy_model`, `preconditioning`, `ev_log` and the preconditioning thresholds (minimum charger power, start window, arrival distance, starts per route), applied at once |
@@ -49,29 +49,35 @@ service, via `hmgapid vehicle`) cover only some of it:
 
 ## 3. Gaps, and what would give both the most for routing
 
-### 3.1 Conditioning route values and the stop latch (patch included)
+### 3.1 Conditioning route values and the stop latch (merged in 1.0.0)
 
-HMG-API's `conditioning` always tells the car "9 km / 18 min to a station". egmp told
-it the real distance and time to Maps' charging stop, every 5 s, because the BMS
-times the heating from them: with a fixed 18 min it heats as if the charger were
-always 18 min away. And any `stop` set the manual-stop latch, so after egmp ended its
-own request at the charger, every later automatic start was refused until someone
-started conditioning by hand.
+Before 1.0.0, HMG-API's `conditioning` always told the car "9 km / 18 min to a
+station", and any `stop` set the manual-stop latch, so after egmp ended its own request
+at the charger every later automatic start was refused until a manual start.
+[VysseCodes/HMG-API#47](https://github.com/VysseCodes/HMG-API/pull/47) (merged in
+1.0.0) added `start|auto-start [<km> <minutes>]` and `route <km> <minutes>` (the
+holder only, 0-2046 km / 0-1022 min, km whatever the car's distance unit: checked on a
+US Ioniq 5 2026-11-03), and the stop of the mod whose automatic request it is no
+longer latches.
 
-`hmgapi-mod/hmg-api-patches/0001-...patch` (HMG-API, `Commands.java` + tests + docs):
-`start|auto-start [<km> <minutes>]`, `route <km> <minutes>` (only the mod conditioning,
-0-2046 / 0-1022 as the navigation sends), the 5 s refresh resends the current values,
-and the stop of the mod whose automatic request it is doesn't latch. 97/97
-`commands-test.sh` checks pass (19 new). Opened as
-[VysseCodes/HMG-API#47](https://github.com/VysseCodes/HMG-API/pull/47); the rest of
-this section is in issues
+1.0.0 also added checks of its own (Launchpad's): a start is refused when the car
+isn't READY, Battery Conditioning is off, the car already conditions on its own, or
+the pack's minimum temperature is 21 °C or more on an Ioniq 5 (20 °C others; a last
+word `warm` sends it anyway); the station event goes once, at the start; and a request
+is stopped if the car's indicator isn't on within 2 minutes (EV6 5), after which
+**automatic starts wait for a manual one**. egmp sends without `warm` (the BMS won't
+heat a warm pack), and a refusal or a timeout cancels for that charging stop
+(RelayTest). The timeout fits a request the car acts on at once, not egmp's, which asks
+up to an hour before the charger and lets the BMS time the heating: one early request
+the BMS holds off on locks automatic preconditioning out until a manual start. An
+HMG-API change (a routed automatic request waits for the car while its route values
+count down, and its own timeout doesn't latch) is the fix; until then a 20-30 minute
+window (`precond_window_min`) makes it less likely.
+
+The rest of this section is in issues
 [#44](https://github.com/VysseCodes/HMG-API/issues/44) (core library recipe and raw
 sender), [#45](https://github.com/VysseCodes/HMG-API/issues/45) (readings) and
 [#46](https://github.com/VysseCodes/HMG-API/issues/46) (hook points).
-
-Without the patch the mod still works on beta.6: the values are ignored (fixed 9/18),
-`route` is refused and treated as "kept", but preconditioning works only until egmp
-cancels once; then it waits for a manual start (RelayTest shows it).
 
 ### 3.2 Readings worth adding to HMG-API
 
@@ -123,7 +129,7 @@ without either (not seen, not ruled out) would race the 5 s sender.
 
 - **Raw sensor-batch sender in core.** api-plan step 4 lists "a raw sensor-batch
   sender (EGMP's energy model)" and "EGMP's three AA library sites as core native
-  recipes". Not done in beta.6: the mod carries both. In core, any mod could add a
+  recipes". Not done in 1.0.0: the mod carries both. In core, any mod could add a
   sensor type safely, and HMG-API could tie `aa_sensors.add` to the recipe being in
   place (today `add` applies even if the library would drop the type).
 - **Navigation messages for hook code.** `aa_navigation_message` goes only to a
