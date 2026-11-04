@@ -87,7 +87,17 @@ jobs:
           rm -f "$RUNNER_TEMP/author.key" "$RUNNER_TEMP/author.key.pub"
           ls -l "dist/egmp-aa-ev-${{ steps.version.outputs.version }}.zip"
 
+      - name: NEMESIS packages
+        # HMG-API's tools/mknemesismod.sh: the signed mod as NEMESIS package hmgapi.egmp-aa-ev
+        # (depends on hmgapi 1.0 or newer; its scripts install it with HMG-API's engine):
+        #   egmp-aa-ev-<v>-nemesis.zip          for a USB stick, as NEMESIS's own downloads
+        #   egmp-aa-ev-<v>-nemesis-package.zip  the package itself (NEMESIS Package Store)
+        run: sh HMG-API/tools/mknemesismod.sh "dist/egmp-aa-ev-${{ steps.version.outputs.version }}.zip" "$PWD/dist"
+
       - name: Attach to the release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${{ steps.tag.outputs.tag }}" "dist/egmp-aa-ev-${{ steps.version.outputs.version }}.zip" --clobber
+          V: ${{ steps.version.outputs.version }}
+        run: |
+          gh release upload "${{ steps.tag.outputs.tag }}" --clobber \
+            "dist/egmp-aa-ev-$V.zip" "dist/egmp-aa-ev-$V-nemesis.zip" "dist/egmp-aa-ev-$V-nemesis-package.zip"
