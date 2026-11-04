@@ -33,11 +33,15 @@ import hmgapi.client.HmgApi;
  * (Owned, kept in the service's data folder across restarts): HMG-API lets any
  * mod stop it, and Precond also cancels after a start that was refused because
  * someone else (Launchpad, the owner) is conditioning, which must not end
- * theirs. A route refusal naming another holder clears it too. HMG-API keeps the guards: one conditioning state for the
- * unit, a manual stop wins over automatic starts, everything stopped when the
- * mod is turned off. An HMG-API whose command takes no route values ignores
- * them and keeps its own fixed ones; one without "route" refuses it, which is
- * answered "ok" here, since the conditioning keeps running either way.
+ * theirs. A route refusal naming another holder (or "not conditioning": HMG-API
+ * stopped it itself) clears it too. HMG-API keeps the guards: one conditioning
+ * state for the unit, a manual stop wins over automatic starts, everything
+ * stopped when the mod is turned off, and from 1.0.0 the car's own checks before
+ * a start (READY, the Battery Conditioning setting, a warm pack) and a stop when
+ * the car's indicator doesn't come on in time. Its refusals go back to Precond
+ * as "err", which cancels for that charging stop. An HMG-API before 1.0.0 without
+ * "route" refuses it, which is answered "ok" here, since the conditioning keeps
+ * running either way.
  */
 public final class RelayService {
     static final String MOD = "egmp-aa-ev";

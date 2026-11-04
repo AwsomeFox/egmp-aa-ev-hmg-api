@@ -10,7 +10,7 @@ This fork runs it as a mod for [HMG-API](https://github.com/VysseCodes/HMG-API),
 ## Requirements
 
 - Hyundai Ioniq 5 (US): NEEV, NEEV23 or NEEV23SE, Gen5W software 260507 or newer
-- [HMG-API](https://github.com/VysseCodes/HMG-API) 1.0.0-beta.6 or newer, installed through [NEMESIS](https://github.com/xwtk/hmg_nemesis)
+- [HMG-API](https://github.com/VysseCodes/HMG-API) 1.0.0 or newer, installed through [NEMESIS](https://github.com/xwtk/hmg_nemesis)
 - HMG-API's **Wireless CarPlay + Android Auto** mod, for preconditioning (its turn-by-turn adds Maps' route data)
 - The energy model needs the US 260507 build of the Android Auto library (see [Limits](#limits))
 
@@ -21,9 +21,10 @@ This fork runs it as a mod for [HMG-API](https://github.com/VysseCodes/HMG-API),
 - **Cold weather:** live outside temperature raises heating and rolling losses in the model.
 - **Charge times:** calibrated on real DC sessions and the car's own estimate, including the slow last 10–20 %.
 - **EV connectors:** Maps is told the car is electric with CCS1 and J1772, for charger filtering.
+- **Live battery data for phone apps:** the battery %, the range the cluster shows and the odometer go to the phone as Android Auto's fuel and odometer data, so apps that read the car's data through Android Auto (A Better Route Planner, for one) show the live battery level. No library patch needed, so it works on any Android Auto library build.
 - **Preconditioning:** when the next stop is a charger over 50 kW within an hour, the car is asked to warm the battery, through HMG-API's reviewed `conditioning` command. The minimum power, the start window, the arrival distance and the starts per route are settings. Off with the mod's setting or the car's own *battery conditioning* setting.
 - **EV logs:** driving and charging, whenever the head unit is on; copied to any USB drive with an `egmp-aa-ev-logs` folder; share them through an [EV log issue](https://github.com/willemcvu/egmp-aa-ev-feat/issues/new?template=log-submission.yml).
-- **Settings** in the HMG-API app: energy model, preconditioning (and its thresholds: chargers faster than 50 kW, start within 60 min, arrived within 200 m, 3 starts per route), EV logs. All on by default; changes apply at once.
+- **Settings** in the HMG-API app: energy model, preconditioning (and its thresholds: chargers faster than 50 kW, start within 60 min, arrived within 200 m, 3 starts per route), live battery data, EV logs. All on by default; the thresholds apply at once, the rest when Android Auto restarts.
 
 ## Install
 
@@ -38,7 +39,7 @@ Updates install the same way. To remove it: HMG-API app → the mod → remove. 
 ### Limits
 
 - **Energy model:** only on the US 260507 build of the Android Auto library (`libautoreceiver_infobank.so`, md5 `48ee793a…`). On another build nothing is patched and the model stays off; fuel type and connectors still reach Maps. Another build needs a recipe ([`tools/mkrecipe.py`](hmgapi-mod/tools/mkrecipe.py)).
-- **Preconditioning with HMG-API beta.6:** HMG-API tells the car a fixed 9 km / 18 min, and after egmp ends its own request, later automatic starts wait for a manual one. Fixed in [VysseCodes/HMG-API#47](https://github.com/VysseCodes/HMG-API/pull/47) (not merged yet).
+- **Preconditioning and HMG-API 1.0's checks:** HMG-API refuses a start when the car isn't READY, Battery Conditioning is off, or the pack is already warm (21 °C / 70 °F on an Ioniq 5), and stops a request if the car's indicator doesn't come on within 2 minutes. After such a timeout, automatic starts wait for a manual one. egmp then cancels for that charging stop, and preconditions again after you start conditioning by hand once.
 - **Ioniq 5 only:** the energy model is the Ioniq 5's.
 
 What HMG-API offers and lacks for EV routing: [docs/HMG-API-COMPARISON.md](docs/HMG-API-COMPARISON.md).

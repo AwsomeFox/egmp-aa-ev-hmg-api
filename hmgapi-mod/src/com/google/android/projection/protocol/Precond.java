@@ -373,8 +373,8 @@ public final class Precond {
      *   Start    (65 km, 66 min, 62 = 2,3) -> conditioning auto-start <km> <min>
      *   Maintain (65 km, 66 min every 5 s) -> conditioning route <km> <min>
      *   Cancel   (65 2047, 66 1023, 62 = 0,0) -> conditioning stop
-     * An HMG-API without route values ignores them (it keeps its fixed
-     * 9 km / 18 min); see docs/HMG-API-COMPARISON.md.
+     * HMG-API 1.0.0 sends the route values as given and checks the car before
+     * a start; see docs/HMG-API-COMPARISON.md.
      */
     static final class HmgVehicle implements PrecondCore.Vehicle {
         private int km = -1;

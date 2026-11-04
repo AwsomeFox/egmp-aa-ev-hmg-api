@@ -6,8 +6,10 @@ import java.util.List;
 /**
  * Host test for RelayService.answer: what the relay service asks HMG-API for,
  * and what it tells GPM, for each request (hmgapi-mod/test/run.sh). The fake
- * answers like HMG-API's Commands (hmgapi.vehicle.Commands) of 1.0.0-beta.6,
- * whose conditioning takes no route values and has no "route".
+ * answers like HMG-API 1.0.0's Commands (hmgapi.vehicle.Commands): route values
+ * and "route" (the holder only), a mod's own automatic stop doesn't block its
+ * next start, a warm pack is refused, and an automatic start the car didn't
+ * take within the activation time blocks automatic starts until a manual one.
  */
 public final class RelayTest {
     static int passed, failed;
@@ -24,7 +26,7 @@ public final class RelayTest {
     static final class FakeHmgApi implements RelayService.Commands {
         final List<String> calls = new ArrayList<String>();
         String holder;   // who conditions (null: nobody)
-        boolean manualStop;
+        boolean auto, manualStop, timedOut, warmPack;
 
         @Override
         public String command(String name, String... a) throws Exception {
@@ -32,16 +34,31 @@ public final class RelayTest {
             if (!"conditioning".equals(name)) throw new Exception("not declared in mod.json (vehicle commands): " + name);
             if ("stop".equals(a[0])) {
                 if (holder == null) return "ok not conditioning";
+                if (!(auto && "egmp-aa-ev".equals(holder))) manualStop = true;
                 holder = null;
-                manualStop = true;
                 return "ok conditioning stopped";
             }
-            boolean auto = "auto-start".equals(a[0]);
-            if (!auto && !"start".equals(a[0])) throw new Exception("refused: conditioning start|auto-start|stop");
-            if (auto && manualStop) throw new Exception("refused: stopped by hand; automatic starts wait for a manual start");
+            if ("route".equals(a[0])) {
+                if (!"egmp-aa-ev".equals(holder)) {
+                    throw new Exception("refused: only the mod conditioning changes its route (" + (holder == null ? "not conditioning" : holder) + ")");
+                }
+                return "ok conditioning route " + a[1] + " km " + a[2] + " min";
+            }
+            boolean isAuto = "auto-start".equals(a[0]);
+            if (!isAuto && !"start".equals(a[0])) throw new Exception("refused: conditioning start|auto-start|stop|route|status");
+            if (isAuto && manualStop) throw new Exception("refused: stopped by hand; automatic starts wait for a manual start");
+            if (isAuto && timedOut) throw new Exception("refused: the car didn't start conditioning last time; automatic starts wait for a manual start");
             if (holder != null) return "ok already conditioning (" + holder + ")";
+            if (warmPack) throw new Exception("refused: the pack is warm (24 °C / 75 °F; this car usually won't heat at 21 °C / 70 °F or warmer); add \"warm\" to send it anyway");
             holder = "egmp-aa-ev";
+            auto = isAuto;
             return "ok conditioning started";
+        }
+
+        /** HMG-API's own tick: the indicator never came on in time */
+        void timeOut() {
+            holder = null;
+            timedOut = true;
         }
     }
 
@@ -62,14 +79,29 @@ public final class RelayTest {
         api.calls.clear();
         r = RelayService.answer(api, own, "route 25 17");
         check("route -> conditioning route: " + api.calls, api.calls.get(0).equals("conditioning route 25 17"));
-        check("an HMG-API without route keeps conditioning: " + r, r.startsWith("ok kept"));
+        check("route answered ok: " + r, r.equals("ok conditioning route 25 km 17 min"));
 
         r = RelayService.answer(api, own, "stop");
         check("stop", r.equals("ok conditioning stopped"));
 
         r = RelayService.answer(api, own, "start 30 20");
-        check("after a stop, beta.6 refuses automatic starts (the latch the HMG-API patch fixes): " + r,
-                r.startsWith("err refused: stopped by hand"));
+        check("after our own stop the next automatic start goes (1.0.0): " + r, r.equals("ok conditioning started"));
+
+        api.timeOut();
+        r = RelayService.answer(api, own, "route 22 15");
+        check("HMG-API stopped it (the car didn't take it in time): the route update is refused: " + r, r.startsWith("err refused: only the mod conditioning"));
+        check("... and it isn't ours any more", !own.owned);
+        api.calls.clear();
+        check("... so Precond's cancel isn't sent", RelayService.answer(api, own, "stop").equals("ok not ours to stop") && api.calls.isEmpty());
+        r = RelayService.answer(api, own, "start 30 20");
+        check("after a timeout automatic starts wait for a manual one: " + r, r.startsWith("err refused: the car didn't start"));
+        check("... and it isn't marked ours", !own.owned);
+
+        FakeHmgApi warm = new FakeHmgApi();
+        warm.warmPack = true;
+        RelayService.Owned own4 = new RelayService.Owned(null);
+        r = RelayService.answer(warm, own4, "start 30 20");
+        check("a warm pack: refused, err to Precond: " + r, r.startsWith("err refused: the pack is warm") && !own4.owned);
 
         FakeHmgApi other = new FakeHmgApi();
         other.holder = "launchpad";
@@ -79,7 +111,7 @@ public final class RelayTest {
         r = RelayService.answer(other, own2, "stop");
         check("... so Precond's cancel after that refusal doesn't stop theirs: " + r, r.equals("ok not ours to stop") && other.calls.isEmpty() && "launchpad".equals(other.holder));
 
-        // with the HMG-API patch: someone took over (the owner stopped ours and started their own)
+        // someone took over (the owner stopped ours and started their own)
         RelayService.Owned own3 = new RelayService.Owned(null);
         own3.set(true);
         RelayService.Commands patched = new RelayService.Commands() {

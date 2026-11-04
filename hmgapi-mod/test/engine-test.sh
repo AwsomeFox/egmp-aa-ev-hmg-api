@@ -60,7 +60,8 @@ for P in NEEV23.USA.0000.V015.012.260507 NEEV.USA.0000.V015.012.260507 NEEV23.US
     eng plan
     has "$P: plan runs" "egmp-aa-ev" "$out"
     hasnt "$P: no mod.json errors, matches the car" "egmp-aa-ev: " "$(echo "$out" | grep -i 'error\|isn.t one\|must be\|needs \|matches none' || true)"
-    hasnt "$P: hooks not refused" "refused" "$out"
+    # (the conditioning command's own description, HMG-API 1.0.0, says when a start is refused)
+    hasnt "$P: hooks not refused" "refused" "$(echo "$out" | grep -v '^vehicle ' || true)"
     hasnt "$P: hooks load" "won't load" "$out"
     has "$P: shares GPM's next-turn callback with the Wireless mod" "gpm.navigation_status.next_turn: " "$out"
     has "$P: conditioning command" "conditioning" "$out"

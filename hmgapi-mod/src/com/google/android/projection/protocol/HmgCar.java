@@ -20,7 +20,7 @@ import hmgapi.hook.Points;
  * only stores the drive mode. Car commands go through HMG-API's reviewed
  * commands from this mod's service instead (Relay).
  *
- * Mapped hook points used (all in HMG-API 1.0.0-beta.6):
+ * Mapped hook points used (all in HMG-API 1.0.0):
  *   framework.car_services.hev / .bcm / .datc     service names
  *   framework.hscan_adapter.service_name          tm_hscan_service
  *   framework.hev_service_stub.as_interface       and the hscan, bcm, datc and

@@ -155,6 +155,29 @@ public final class ModTest {
         check("23 added once", HmgApiEntry.withSensor(out, 23) == out);
     }
 
+    /** LiveData: the fuel and odometer reports Android Auto apps read (CarInfo) */
+    static void testLiveData() throws Exception {
+        final java.util.List<String> sent = new java.util.ArrayList<String>();
+        LiveData.Out out = new LiveData.Out() {
+            public void fuel(int percent, int rangeMeters, boolean low) { sent.add("fuel " + percent + " " + rangeMeters + " " + low); }
+
+            public void odometer(double km) { sent.add("odo " + km); }
+        };
+        LiveData.send(out, 187, 412, 233201);
+        check("93.5% shown as 94%, 412 km as m, odometer 0.1 km: " + sent,
+                sent.equals(java.util.Arrays.asList("fuel 94 412000 false", "odo 23320.1")));
+        sent.clear();
+        LiveData.send(out, 19, -1, -1);
+        check("9.5% (10%): low; range unknown left out (-1), no odometer: " + sent, sent.equals(java.util.Arrays.asList("fuel 10 -1 true")));
+        sent.clear();
+        LiveData.send(out, -1, 300, -1);
+        check("no state of charge: no fuel report: " + sent, sent.isEmpty());
+        check("a range past 999 km is unknown", LiveData.fuel(100, 1500)[1] == -1);
+        check("200 raw is 100%", LiveData.fuel(200, 0)[0] == 100);
+        check("sensors 6 and 5 offered once", java.util.Arrays.equals(
+                HmgApiEntry.withSensor(HmgApiEntry.withSensor(HmgApiEntry.withSensor(new int[] {1, 13}, 6), 5), 6), new int[] {1, 13, 6, 5}));
+    }
+
     static void testNoHmgApi() {
         check("no hook map: not ready", !HmgCar.ready());
         check("HEV read unknown", EvCar.hev(0x19, 0) == -1);
@@ -169,6 +192,7 @@ public final class ModTest {
     public static void main(String[] args) throws Exception {
         testWrites();
         testSensor();
+        testLiveData();
         testNoHmgApi();
         System.out.println("ModTest: " + passed + " passed, " + failed + " failed");
         if (failed > 0) System.exit(1);
