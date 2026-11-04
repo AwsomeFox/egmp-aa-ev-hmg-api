@@ -46,6 +46,14 @@
       "description": "If the car keeps ending the request (1-10; 3 by default)."
     },
     {
+      "key": "live_data",
+      "type": "toggle",
+      "default": true,
+      "title": "Battery level, range and odometer for Android Auto apps",
+      "apply": "restart",
+      "description": "Sends the battery %, the range the cluster shows and the odometer to the phone every 5 s during Android Auto, as Android Auto's fuel and odometer data. Apps that read the car's data, such as A Better Route Planner, show the live battery level. Needs no library patch."
+    },
+    {
       "key": "ev_log",
       "type": "toggle",
       "default": true,

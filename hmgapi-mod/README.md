@@ -20,12 +20,13 @@ while it runs and patches its library in memory.
 | `recipes/*.recipe` | egmp's three Android Auto library patches as HMG-API memory recipes, one per library build (`tools/mkrecipe.py`; today the US 260507 build), clear of the Wireless mod's turn-by-turn recipe. `NativeCheck` reads them itself, so another build is one more recipe here and in `mod.json` |
 | `relay.jar` (`service/`) | service `relay` (user `system`): sends Precond's requests as HMG-API's `conditioning` command, which HMG-API answers only for a mod's own service |
 | `scripts/offload.sh` | service `offload` (root): copies EV logs to a USB drive with an `egmp-aa-ev-logs` folder |
-| `settings.json` | `energy_model`, `preconditioning`, `ev_log` (all on), and the preconditioning thresholds `precond_min_kw` (50), `precond_window_min` (60), `precond_arrival_m` (200), `precond_max_starts` (3): `PrecondCore.Config`, applied at once |
+| `settings.json` | `energy_model`, `preconditioning`, `live_data`, `ev_log` (all on), and the preconditioning thresholds `precond_min_kw` (50), `precond_window_min` (60), `precond_arrival_m` (200), `precond_max_starts` (3): `PrecondCore.Config`, applied at once |
 
 Hook points used (all in HMG-API 1.0.0, mapped on both Ioniq 5 maps):
-`gpm.sensor_source.init` (change: sensor 23 when the library patch is in place; start
-the sender and preconditioning), `gpm.receiver.destroy` and
-`gpm.receiver_service.disconnected` (stop both), `gpm.navigation_status.next_turn`
+`gpm.sensor_source.init` (change: sensor 23 when the library patch is in place, and
+the fuel (6) and odometer (5) sensors for the live battery data; start the senders and
+preconditioning), `gpm.receiver.destroy` and
+`gpm.receiver_service.disconnected` (stop them), `gpm.navigation_status.next_turn`
 (Maps' route messages, event 33), `gpm.navigation_status.status` (guidance state).
 
 ## Build
