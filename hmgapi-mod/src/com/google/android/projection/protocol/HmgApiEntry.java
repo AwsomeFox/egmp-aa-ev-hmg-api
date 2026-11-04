@@ -32,8 +32,10 @@ import hmgapi.hook.Points;
  *   StartReceiver/GalReceiverService -> EvDriveLog GPM's process starting (here)
  *   library file delta (patch_library.py)         hooks.native recipe
  *   persist.gpm.ev.off                            the mod's switch and settings
+ *   (new) battery level, range, odometer          gpm.sensor_source.init: sensors 6 and 5
+ *                                                 offered, LiveData sends them
  *
- * Settings (settings.json): energy_model, preconditioning, ev_log, and the
+ * Settings (settings.json): energy_model, preconditioning, ev_log, live_data, and the
  * preconditioning thresholds precond_min_kw, precond_window_min,
  * precond_arrival_m, precond_max_starts (PrecondCore.Config). The thresholds
  * apply at once (HMG-API hands every running app a saved change); turning the
@@ -62,6 +64,10 @@ public final class HmgApiEntry extends ModEntry {
 
     static boolean precondOn() {
         return on("preconditioning");
+    }
+
+    static boolean liveDataOn() {
+        return on("live_data");
     }
 
     /** The mod's library recipes, while its folder is readable (the zygote runs as root). */
@@ -101,6 +107,10 @@ public final class HmgApiEntry extends ModEntry {
                     if (modelOn() && p.args[2] instanceof int[] && NativeCheck.patched()) {
                         p.args[2] = withSensor((int[]) p.args[2], SENSOR_EV_MODEL);
                     }
+                    if (liveDataOn() && p.args[2] instanceof int[]) {
+                        // types the stock library takes (1..21): no patch needed
+                        p.args[2] = withSensor(withSensor((int[]) p.args[2], LiveData.SENSOR_FUEL), LiveData.SENSOR_ODOMETER);
+                    }
                 } catch (Throwable t) {
                     mod.error("sensor 23", t);
                 }
@@ -118,6 +128,9 @@ public final class HmgApiEntry extends ModEntry {
                     if (modelOn()) {
                         startSender(mod, p.thisObject);
                     }
+                    if (liveDataOn()) {
+                        startLiveData(p.thisObject);
+                    }
                 } catch (Throwable t) {
                     mod.error("session start", t);
                 }
@@ -132,6 +145,7 @@ public final class HmgApiEntry extends ModEntry {
             protected void beforeHookedMethod(Param p) {
                 try {
                     EvModelSender.stop();
+                    LiveData.stop();
                     Precond.stop();
                 } catch (Throwable t) {
                     mod.error("session end", t);
@@ -162,7 +176,8 @@ public final class HmgApiEntry extends ModEntry {
         mod.log("EV routing hooks in " + app.processName + " (energy model "
                 + (mod.settingBoolean("energy_model", true) ? "on" : "off") + ", preconditioning "
                 + (mod.settingBoolean("preconditioning", true) ? "on" : "off") + ", EV log "
-                + (mod.settingBoolean("ev_log", true) ? "on" : "off") + ")");
+                + (mod.settingBoolean("ev_log", true) ? "on" : "off") + ", live data "
+                + (mod.settingBoolean("live_data", true) ? "on" : "off") + ")");
     }
 
     /**
@@ -185,6 +200,42 @@ public final class HmgApiEntry extends ModEntry {
                 return r instanceof Integer ? ((Integer) r).intValue() : 0;
             }
         });
+    }
+
+    /**
+     * The battery level, range and odometer to the phone through GPM's own senders: the
+     * fuel report by its native call (so an unknown range is left out rather than sent
+     * as 0), the odometer by its Java wrapper (km).
+     */
+    static void startLiveData(final Object sensorSource) throws Exception {
+        final Method fuel = declared(sensorSource, "nativeReportFuelData",
+                boolean.class, int.class, boolean.class, int.class, boolean.class, boolean.class);
+        final Method odo = declared(sensorSource, "reportOdometerData", double.class);
+        LiveData.start(new LiveData.Out() {
+            @Override
+            public void fuel(int percent, int rangeMeters, boolean low) throws Exception {
+                fuel.invoke(sensorSource, true, percent, rangeMeters >= 0, Math.max(rangeMeters, 0), true, low);
+            }
+
+            @Override
+            public void odometer(double km) throws Exception {
+                odo.invoke(sensorSource, km);
+            }
+        });
+    }
+
+    /** a method of the sensor source's class (or a superclass), by name */
+    static Method declared(Object o, String name, Class<?>... params) throws NoSuchMethodException {
+        for (Class<?> c = o.getClass(); c != null; c = c.getSuperclass()) {
+            try {
+                Method m = c.getDeclaredMethod(name, params);
+                m.setAccessible(true);
+                return m;
+            } catch (NoSuchMethodException e) {
+                // superclass
+            }
+        }
+        throw new NoSuchMethodException("SensorSource." + name);
     }
 
     /** SENSOR_VEHICLE_ENERGY_MODEL_DATA */
@@ -224,6 +275,7 @@ public final class HmgApiEntry extends ModEntry {
     public void onEnabled(ModContext mod, boolean enabled) {
         if (!enabled) {
             EvModelSender.stop();
+            LiveData.stop();
             Precond.stop();
         }
     }
@@ -243,6 +295,9 @@ public final class HmgApiEntry extends ModEntry {
         Precond.configure(precondConfig(mod));
         if (!mod.settingBoolean("energy_model", true)) {
             EvModelSender.stop();
+        }
+        if (!mod.settingBoolean("live_data", true)) {
+            LiveData.stop();
         }
         if (!mod.settingBoolean("preconditioning", true)) {
             Precond.stop();
