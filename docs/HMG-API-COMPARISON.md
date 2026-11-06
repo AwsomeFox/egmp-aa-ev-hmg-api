@@ -12,7 +12,7 @@ the mod has run on a head unit yet.
 | Fuel type EV (`FUEL_TYPE_ELECTRIC` 10) | smali edit in `SensorSource.init` | `projection.aa_fuel_types` | uses HMG-API's (`mod.json`) |
 | EV connectors (CCS1 4, J1772 1) | smali edit | `projection.aa_ev_connectors` | uses HMG-API's |
 | Sensor 23 offered (vehicle energy model) | smali edit (`nativeRegisterSensor(23)`) | `projection.aa_sensors.add` | own `change` hook on `gpm.sensor_source.init`, **only once the library patch is confirmed in memory** (see 3.6) |
-| Library accepts/answers sensor 23, raw send path | 3-site file delta of the Leafia library | none (the mod's own `hooks.native`) | same 3 sites as an in-memory recipe (`recipes/ev-sensor-48ee793a.recipe`), checked clear of the Wireless mod's |
+| Library accepts/answers sensor 23, raw send path | 3-site file delta of the Leafia library | none (the mod's own `hooks.native`) | same 3 sites as per-build in-memory recipes (`ev-sensor-48ee793a` for Ioniq 5 US 260507, `ev-sensor-dbfe7bd2` for Ioniq 6 US 260903), each checked clear of the matching Wireless mod recipe |
 | Energy model (capacity, energy, charge curves, aux/HVAC, cold road load) every 5 s | `EvModelSender` | none ("its energy-model sender" stays the mod's, api-plan) | `EvModelSender`, same model and template |
 | Usable capacity learned from the BMS (energy / SOC) | yes | none | yes (same file in GPM's files dir, so it carries over from the NEMESIS build) |
 | Outside temperature for the aux table and cold road load | nav battery packet | reading `outside_temp` (climate control's) | nav battery packet, as before (same decode, verified against the dash) |
@@ -20,7 +20,7 @@ the mod has run on a head unit yet.
 | Maps' route plan (destinations, charging stops, remaining distance/time: 0x8006/0x8007) | Leafia's `NAVDUMP` in `GpmNaviTBTManager` | events `aa_navigation_message`, to a mod's **app** only, from the Wireless mod's library patch | the same messages (event 33) read on `gpm.navigation_status.next_turn`; needs the Wireless CarPlay + Android Auto mod's turn-by-turn |
 | EV logs (1 s energy/speed, 5 s rows, charging, climate, drive mode, altitude, Maps plan) | `EvDriveLog` + root offload script | none | same logger in GPM; offload as a mod service with HMG-API's USB folder (`"usb": ["egmp-aa-ev-logs"]`) |
 | Off switch, settings | `persist.gpm.ev.off=1` | per-mod switch and settings page | HMG-API's switch, plus settings `energy_model`, `preconditioning`, `ev_log` and the preconditioning thresholds (minimum charger power, start window, arrival distance, starts per route), applied at once |
-| Firmware support | Leafia v1.0.5 on US 260507 only (md5-locked) | per-car hook maps (Ioniq 5 US 260507 and 260903 mapped) | US Ioniq 5 on 260507 or newer (`mod.json`), hooks wherever HMG-API has a map; the energy model on each library build the mod has a recipe for (today US 260507) |
+| Firmware support | Leafia v1.0.5 on US 260507 only (md5-locked) | per-car hook maps | US Ioniq 5 on 260507 or newer and US Ioniq 6 on 260903 (`mod.json`), hooks wherever HMG-API has a map; the energy model on the Ioniq 5 US 260507 and Ioniq 6 US 260903 library builds |
 
 ## 2. Car data: what egmp reads and what HMG-API offers as readings
 
@@ -158,22 +158,24 @@ confirmation) are routing logic, not plumbing; they stay in the mod. The log for
   `PrecondCore` cancels after a refused start too. The relay service forwards a stop
   only while egmp holds the request (recorded in its data folder; cleared when HMG-API
   names another holder), so it never ends Launchpad's or the owner's.
-- **Hooks run only with a verified map**, or with "testing maps" on: the Ioniq 5 maps
-  are `mapped` (260507) and `probed` (260903). In the HMG-API app: Settings → **Check
-  the map on this car** (or a Car Report, which runs the same check), or **Try
-  unchecked maps**. No adb needed.
-- **Energy model only on the US 260507 library build** (`48ee793a...`). On another
-  build (e.g. Canada's `a0bea1c4...`, or 260903 if its library changed) the recipe's
-  verify regions don't match, nothing is written, sensor 23 isn't offered and the
-  sender doesn't start; fuel type and connectors still go to Maps.
+- **Hooks run only with a verified map**, or with "testing maps" on: the Ioniq 6 US
+  260903 map is car-verified; the Ioniq 5 maps are `mapped` (260507) and `probed`
+  (260903). In the HMG-API app: Settings → **Check the map on this car** (or a Car
+  Report, which runs the same check), or **Try unchecked maps**. The HMG-API build
+  must contain the CEEV map for Ioniq 6. No adb needed.
+- **Energy model on two library builds:** Ioniq 5 US 260507 (`48ee793a...`) and
+  Ioniq 6 US 260903 (`dbfe7bd2...`). On another build the recipes' verify regions do
+  not match, nothing is written, sensor 23 is not offered and the sender does not
+  start; fuel type, connectors and live data still go to Maps.
 - **Preconditioning needs Maps' route data**, which only the Wireless CarPlay +
   Android Auto mod's library patch produces (as Leafia's did for the NEMESIS build).
 - **No VIN in the log header** (HMG-API's rule). The product id stays.
-- **Model list:** Ioniq 5 only (NEEV, NEEV23, NEEV23SE; US; firmware 260507 or newer),
-  because the energy-model template is the Ioniq 5's. A newer firmware needs only
-  HMG-API's map for it, plus a new recipe (`tools/mkrecipe.py --sites ...`) if its
-  Android Auto library changed. An EV6 needs its own
-  template (`tools/build_model_template.py`), then `CVEV` in `mod.json`.
+- **Model list:** Ioniq 5 (NEEV, NEEV23, NEEV23SE; US; firmware 260507 or newer) and
+  Ioniq 6 (CEEV; US 260903). The Ioniq 6 shares the 77.4-kWh E-GMP battery and charge
+  baseline; live BMS energy learns its usable capacity. Until Ioniq 6 logs provide a
+  dedicated fit, its road load uses the conservative Ioniq 5 calibration. A new
+  firmware needs HMG-API's map plus a new recipe (`tools/mkrecipe.py --sites ...`)
+  if its Android Auto library changed.
 
 ## 4. Checks run (off-car)
 
@@ -183,10 +185,10 @@ confirmation) are routing logic, not plumbing; they stay in the mod. The log for
   (including: a stop is never sent for someone else's conditioning);
   HMG-API's script checker on the offload script; offload sandbox test 6; and
   `engine-test.sh`: the built mod through HMG-API's own engine on fake US Ioniq 5 units
-  (NEEV23 and NEEV 260507, NEEV23 260903) with the real maps: no manifest errors, hooks
-  load, every hook and framework point the mod uses is mapped on both Ioniq 5 maps, the
-  three shared GPM points co-exist with the Wireless mod, the recipe parses and is clear
-  of the Wireless mod's recipes.
+  (NEEV23 and NEEV 260507, NEEV23 260903) and, when the checkout has its map, CEEV
+  260903: no manifest errors, hooks load, every hook and framework point the mod uses
+  is mapped, the shared GPM points co-exist with the Wireless mod, and each recipe
+  parses and is clear of the Wireless recipe for the same library build.
 - HMG-API patch: `core/runtime/commands-test.sh` 97/97.
 - Not run: anything on a car; HMG-API's full `tools/test-all.sh` (needs clang/lld and
   qemu for its native parts, untouched by the patch).

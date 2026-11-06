@@ -1,10 +1,11 @@
 #!/bin/sh
 # tools/mkrecipe.py and NativeCheck on synthetic libraries (no car files): the
-# US 260507 recipe's patch lines come out of the tool unchanged; a recipe for a
-# build with the sites elsewhere (--sites/--queue) is refused at the wrong
-# offsets and made at the right ones; NativeCheck, reading the recipes as the
-# zygote does, finds the recipe whose patches are in memory, and none in an
-# unpatched library.  Needs the classes from run.sh (CP).
+# US Ioniq 5 260507 and Ioniq 6 260903 recipes' patch lines come out of the
+# tool unchanged; a recipe for a build with the sites elsewhere
+# (--sites/--queue) is refused at the wrong offsets and made at the right ones;
+# NativeCheck, reading the recipes as the zygote does, finds the recipe whose
+# patches are in memory, and none in an unpatched library. Needs the classes
+# from run.sh (CP).
 set -e
 cd "$(dirname "$0")/../.."
 T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
@@ -18,6 +19,7 @@ def lib(sites, queue):
         b[off:off + len(old)] = old
     return b
 open(T + "/us.so", "wb").write(lib((0x144EC2, 0xBB29E, 0xBB638), 0xB1972))
+open(T + "/ceev.so", "wb").write(lib((0x144E82, 0xB14E6, 0xB18AC), 0xAF50A))
 open(T + "/other.so", "wb").write(lib((0x145002, 0xBB3A2, 0xBB73C), 0xB1A70))
 PY
 fail=0
@@ -28,6 +30,17 @@ mkdir -p "$T/recipes"
 python3 -I $M "$T/us.so" "$T/recipes/ev-sensor-48ee793a.recipe" >/dev/null
 [ "$(grep '^patch' "$T/recipes/ev-sensor-48ee793a.recipe")" = "$(grep '^patch' hmgapi-mod/recipes/ev-sensor-48ee793a.recipe)" ] \
     && ok "US 260507: the shipped recipe's patch lines" || bad "US 260507 patch lines differ from the shipped recipe"
+cat > "$T/aa-tbt-dbfe7bd2.recipe" <<'EOF'
+id aa-tbt-dbfe7bd2
+file /system/lib/libautoreceiver_infobank.so
+verify 0xb3e8a 33 x -
+verify 0xb7f28 36 x -
+verify 0x144eaa 33 x -
+EOF
+python3 -I $M "$T/ceev.so" "$T/recipes/ev-sensor-dbfe7bd2.recipe" --id ev-sensor-dbfe7bd2 \
+    --sites 0x144e82,0xb14e6,0xb18ac --queue 0xaf50a --avoid "$T/aa-tbt-dbfe7bd2.recipe" >/dev/null
+[ "$(grep '^patch' "$T/recipes/ev-sensor-dbfe7bd2.recipe")" = "$(grep '^patch' hmgapi-mod/recipes/ev-sensor-dbfe7bd2.recipe)" ] \
+    && ok "Ioniq 6 US 260903: the shipped recipe's patch lines" || bad "Ioniq 6 US 260903 patch lines differ from the shipped recipe"
 if python3 -I $M "$T/other.so" "$T/x.recipe" >/dev/null 2>&1; then bad "another build at the US offsets was accepted"; else ok "another build at the US offsets: refused"; fi
 if python3 -I $M "$T/other.so" "$T/x.recipe" --sites 0x145002,0xbb3a2,0xbb73c --queue 0xb1a70 >/dev/null 2>&1; then bad "--sites without --id accepted"; else ok "--sites needs its own --id"; fi
 python3 -I $M "$T/other.so" "$T/recipes/ev-sensor-0ther000.recipe" --id ev-sensor-0ther000 \
@@ -39,7 +52,8 @@ if python3 -I $M "$T/other.so" "$T/y.recipe" --id ev-sensor-y --sites 0x145002,0
 python3 -I - "$T" <<'PY'
 import sys
 T = sys.argv[1]
-for so, rec in (("us", "ev-sensor-48ee793a"), ("other", "ev-sensor-0ther000")):
+for so, rec in (("us", "ev-sensor-48ee793a"), ("ceev", "ev-sensor-dbfe7bd2"),
+                ("other", "ev-sensor-0ther000")):
     b = bytearray(open("%s/%s.so" % (T, so), "rb").read())
     for l in open("%s/recipes/%s.recipe" % (T, rec)):
         w = l.split()
@@ -49,7 +63,9 @@ for so, rec in (("us", "ev-sensor-48ee793a"), ("other", "ev-sensor-0ther000")):
 PY
 J="java -cp $CP com.google.android.projection.protocol.NativeCheckTest $T/recipes"
 $J "$T/us.patched" ev-sensor-48ee793a || fail=1
+$J "$T/ceev.patched" ev-sensor-dbfe7bd2 || fail=1
 $J "$T/other.patched" ev-sensor-0ther000 || fail=1
 $J "$T/us.so" none || fail=1
+$J "$T/ceev.so" none || fail=1
 $J "$T/other.so" none || fail=1
 exit $fail

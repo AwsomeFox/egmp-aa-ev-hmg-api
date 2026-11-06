@@ -22,6 +22,10 @@ refuses overlapping recipes on one library). NativeCheck reads the new recipe
 itself: nothing else changes. The recipe holds only hashes of the verify regions and the
 bytes we write (no manufacturer code), in hmgapi.engine.MemRecipe's format:
 
+The Ioniq 6 US 260903 build (md5 dbfe7bd2...) was made with:
+  --id ev-sensor-dbfe7bd2 --sites 0x144e82,0xb14e6,0xb18ac --queue 0xaf50a
+  --avoid <HMG-API>/mods/wireless-carplay-aa/recipes/aa-tbt-dbfe7bd2.recipe
+
   verify <off> <len> <md5 before> <md5 after>
   patch <off> <hex>
 

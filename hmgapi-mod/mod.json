@@ -1,7 +1,7 @@
 {
   "id": "egmp-aa-ev",
   "name": "EV routing for Android Auto (E-GMP)",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "hmgapi": ">=1.0.0",
   "authors": [
     "willemcvu",
@@ -9,11 +9,18 @@
   ],
   "license": "AGPL-3.0",
   "description": "Google Maps EV routing over Android Auto: battery energy, usable capacity and charge curves, EV connectors, automatic battery preconditioning on the way to a DC charger, and EV logs.",
-  "system": {
-    "model": ["NEEV", "NEEV23", "NEEV23SE"],
-    "region": "USA",
-    "firmware": [">=260507"]
-  },
+  "system": [
+    {
+      "model": ["NEEV", "NEEV23", "NEEV23SE"],
+      "region": "USA",
+      "firmware": [">=260507"]
+    },
+    {
+      "model": ["CEEV"],
+      "region": "USA",
+      "firmware": ["260903"]
+    }
+  ],
   "hooks": {
     "jar": "hooks.jar",
     "entry": "com.google.android.projection.protocol.HmgApiEntry",
@@ -25,7 +32,10 @@
       "gpm.navigation_status.status": "observe"
     },
     "native": {
-      "libautoreceiver_infobank.so": ["recipes/ev-sensor-48ee793a.recipe"]
+      "libautoreceiver_infobank.so": [
+        "recipes/ev-sensor-48ee793a.recipe",
+        "recipes/ev-sensor-dbfe7bd2.recipe"
+      ]
     }
   },
   "projection": {

@@ -22,8 +22,9 @@ import java.util.List;
  * The sites come from the recipe files themselves (read in the zygote, where
  * the mod's folder is readable; see HmgApiEntry.zygoteInit), so supporting
  * another library build is one more recipe in recipes/ and mod.json, with no
- * change here. BUILT_IN is the US 260507 recipe's, for a mod loaded live
- * (without a zygote start).
+ * change here. BUILT_IN is the US Ioniq 5 260507 recipe's, for a mod loaded
+ * live (without a zygote start). Normal installed mods load both the Ioniq 5
+ * and Ioniq 6 recipes from their folder in zygoteInit.
  */
 final class NativeCheck {
     private NativeCheck() {}

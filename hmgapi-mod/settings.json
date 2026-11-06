@@ -7,7 +7,7 @@
       "default": true,
       "title": "Battery data for Google Maps (EV energy model)",
       "apply": "restart",
-      "description": "Sends Maps the battery's real energy, its learned usable capacity, charge curves and the outside temperature every 5 s during Android Auto, for its arrival charge and charging stops. Needs the Android Auto library patch this mod carries (US 260507 library build)."
+      "description": "Sends Maps the battery's real energy, its learned usable capacity, charge curves and the outside temperature every 5 s during Android Auto, for its arrival charge and charging stops. Needs an Android Auto library build this mod supports (Ioniq 5 US 260507 or Ioniq 6 US 260903)."
     },
     {
       "key": "preconditioning",
