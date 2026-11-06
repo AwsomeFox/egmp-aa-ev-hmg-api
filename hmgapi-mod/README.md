@@ -15,14 +15,14 @@ while it runs and patches its library in memory.
 
 | Part | What it is |
 |---|---|
-| `mod.json` | id `egmp-aa-ev`; Ioniq 5 (NEEV, NEEV23, NEEV23SE), US, firmware 260507 or newer (hooks run where HMG-API has a map); hook points, the library recipe, Android Auto fuel/connector types, the `conditioning` command, the USB folder, two services |
+| `mod.json` | id `egmp-aa-ev`; Ioniq 5 (NEEV, NEEV23, NEEV23SE), US, firmware 260507 or newer, and Ioniq 6 (CEEV), US 260903 (hooks run where HMG-API has a map); hook points, library recipes, Android Auto fuel/connector types, the `conditioning` command, the USB folder, two services |
 | `hooks.jar` (`src/`) | in GPM: `HmgApiEntry` (the hooks), `EvModelSender`, `Precond`, `EvCar` over `HmgCar` (the car's services by name through HMG-API's hook map), `NativeCheck`, `Relay`; plus NavProto, PrecondCore, EvRowAgg, EvLogger, EvModelTemplate and EvDriveLog shared with the NEMESIS build (`gpm-ev/src`) |
-| `recipes/*.recipe` | egmp's three Android Auto library patches as HMG-API memory recipes, one per library build (`tools/mkrecipe.py`; today the US 260507 build), clear of the Wireless mod's turn-by-turn recipe. `NativeCheck` reads them itself, so another build is one more recipe here and in `mod.json` |
+| `recipes/*.recipe` | egmp's three Android Auto library patches as HMG-API memory recipes, one per library build (`tools/mkrecipe.py`; Ioniq 5 US 260507 and Ioniq 6 US 260903), each clear of the matching Wireless mod turn-by-turn recipe. `NativeCheck` reads them itself, so another build is one more recipe here and in `mod.json` |
 | `relay.jar` (`service/`) | service `relay` (user `system`): sends Precond's requests as HMG-API's `conditioning` command, which HMG-API answers only for a mod's own service |
 | `scripts/offload.sh` | service `offload` (root): copies EV logs to a USB drive with an `egmp-aa-ev-logs` folder |
 | `settings.json` | `energy_model`, `preconditioning`, `live_data`, `ev_log` (all on), and the preconditioning thresholds `precond_min_kw` (50), `precond_window_min` (60), `precond_arrival_m` (200), `precond_max_starts` (3): `PrecondCore.Config`, applied at once |
 
-Hook points used (all in HMG-API 1.0.0, mapped on both Ioniq 5 maps):
+Hook points used (all in HMG-API 1.0.0, mapped on both Ioniq 5 maps and the car-verified Ioniq 6 US 260903 map):
 `gpm.sensor_source.init` (change: sensor 23 when the library patch is in place, and
 the fuel (6) and odometer (5) sensors for the live battery data; start the senders and
 preconditioning), `gpm.receiver.destroy` and
@@ -61,11 +61,12 @@ HMGAPI=../HMG-API sh hmgapi-mod/build.sh ~/hmg-keys/egmp.key
    models would go to Maps.
 2. HMG-API 1.0.0 or newer, with its **Wireless CarPlay + Android Auto** mod
    (its turn-by-turn adds Maps' route data, which preconditioning needs).
-3. Hook map: the Ioniq 5 maps aren't checked on a car yet, so HMG-API keeps hooks off
-   until it is. In the HMG-API app's **Settings**, tap **Check the map on this car** (hooks
-   run once it passes and the head unit restarts), or turn on **Try unchecked maps** (at
-   the next restart; the boot guard turns hooks off if the unit fails to start three
-   times). Making a Car Report runs the same check. No adb needed.
+3. Hook map: the Ioniq 6 US 260903 map is verified; the Ioniq 5 maps still need the
+   on-car check. In the HMG-API app's **Settings**, tap **Check the map on this car**
+   (hooks run once it passes and the head unit restarts), or turn on **Try unchecked
+   maps** (at the next restart; the boot guard turns hooks off if the unit fails to
+   start three times). Making a Car Report runs the same check. Ioniq 6 support needs
+   an HMG-API build containing the CEEV US 260903 map. No adb needed.
 4. Download `egmp-aa-ev-<version>.zip` from the repo's Releases (or build it, above), put
    it in `HMGAPI/updates/` on a USB stick, then **Check USB updates** in the HMG-API app
    (or install it over adb). Until the author key is on HMG-API's trusted list
@@ -76,7 +77,8 @@ HMGAPI=../HMG-API sh hmgapi-mod/build.sh ~/hmg-keys/egmp.key
 What to look at on the car: HMG-API's log for `[egmp-aa-ev]` lines (the native patch
 "applied", "EV routing hooks in ..."), logcat tags `EvModelSender` ("energy model sent")
 and `EvPrecond`, and `hmgapid service-log relay`. "energy model off: the Android Auto
-library patch isn't in place" means this car's library isn't the US 260507 build.
+library patch isn't in place" means this car's library isn't one of the supported
+Ioniq 5 US 260507 or Ioniq 6 US 260903 builds.
 
 ## Releasing
 
@@ -101,4 +103,3 @@ Repository secret it needs (Settings → Secrets and variables → Actions):
 The mod's id comes with a UUID made from that key (`java -cp ../HMG-API/out/engine-host
 hmgapi.engine.Signing uuid <key file>`); to have HMG-API list it as a trusted author,
 open an issue on HMG-API with the UUID and where the mod is published.
-
