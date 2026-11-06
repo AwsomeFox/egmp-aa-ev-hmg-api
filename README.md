@@ -12,7 +12,7 @@ This fork runs it as a mod for [HMG-API](https://github.com/VysseCodes/HMG-API),
 - Hyundai Ioniq 5 (US): NEEV, NEEV23 or NEEV23SE, Gen5W software 260507 or newer
 - Hyundai Ioniq 6 (US): CEEV, Gen5W software 260903
 - [HMG-API](https://github.com/VysseCodes/HMG-API) 1.0.0 or newer, installed through [NEMESIS](https://github.com/xwtk/hmg_nemesis)
-- HMG-API's **Wireless CarPlay + Android Auto** mod, for preconditioning (its turn-by-turn adds Maps' route data)
+- HMG-API's **Wireless CarPlay + Android Auto** mod, 2.1.0 or newer. HMG-API won't load this mod without it: its turn-by-turn adds Maps' route data, which preconditioning needs
 - The energy model needs a supported Android Auto library build: Ioniq 5 US 260507 or Ioniq 6 US 260903 (see [Limits](#limits))
 
 ## Features
@@ -33,7 +33,7 @@ This fork runs it as a mod for [HMG-API](https://github.com/VysseCodes/HMG-API),
 2. Install [HMG-API](https://github.com/VysseCodes/HMG-API/releases) and its Wireless CarPlay + Android Auto mod.
 3. **Let hooks run:** the Ioniq 6 US 260903 map is verified on a car; the Ioniq 5 maps still need the on-car check. In the HMG-API app's **Settings**, tap **Check the map on this car** (hooks run once it passes and the head unit restarts), or turn on **Try unchecked maps** (at the next restart; the boot guard turns hooks off if the unit fails to start three times). No adb needed. Ioniq 6 support requires an HMG-API build that includes the CEEV US 260903 map.
 4. Download `egmp-aa-ev-<version>.zip` from [Releases](../../releases), put it in a folder `HMGAPI/updates/` on a USB stick, plug it in, and tap **Check USB updates** in the HMG-API app.
-   **Or through NEMESIS:** unzip `egmp-aa-ev-<version>-nemesis.zip` onto an empty USB stick and plug it in, then confirm in NEMESIS. It installs as NEMESIS package `hmgapi.egmp-aa-ev` (needs HMG-API 1.0 or newer), and HMG-API's engine does the install, so it's the same mod either way. NEMESIS Manager can then update or uninstall it.
+   **Or through NEMESIS:** unzip `egmp-aa-ev-<version>-nemesis.zip` onto an empty USB stick and plug it in, then confirm in NEMESIS. It installs as NEMESIS package `hmgapi.egmp-aa-ev` (needs HMG-API 1.0 or newer and its Wireless CarPlay + Android Auto mod), and HMG-API's engine does the install, so it's the same mod either way. NEMESIS Manager can then update or uninstall it.
 5. The first time it preconditions, HMG-API asks on screen to allow `conditioning` for this mod: allow it.
 
 Updates install the same way. To remove it: HMG-API app → the mod → remove. Details, hook points and logs to check: [hmgapi-mod/README.md](hmgapi-mod/README.md).

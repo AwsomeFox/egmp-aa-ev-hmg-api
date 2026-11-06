@@ -8,7 +8,8 @@
     "AwsomeFox"
   ],
   "license": "AGPL-3.0",
-  "description": "Google Maps EV routing over Android Auto: battery energy, usable capacity and charge curves, EV connectors, automatic battery preconditioning on the way to a DC charger, and EV logs.",
+  "description": "Needs HMG-API's Wireless CarPlay + Android Auto mod. Google Maps EV routing over Android Auto: battery and range, charge curves, EV plugs, battery preconditioning for DC chargers.",
+  "requires": ["wireless-carplay-aa >=2.1.0"],
   "system": [
     {
       "model": ["NEEV", "NEEV23", "NEEV23SE"],
