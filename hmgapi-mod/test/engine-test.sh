@@ -1,10 +1,11 @@
 #!/bin/sh
 # The built mod (build/mod/egmp-aa-ev, from hmgapi-mod/build.sh) through HMG-API's
-# own engine on a desktop JVM, on a fake head unit that says it is a US Ioniq 5
-# on 260507 (then 260903) and has HMG-API's real hook maps: the mod.json is
-# valid, every hook point it declares is mapped and planned, its services,
-# command, USB folder and Android Auto settings are taken, and its library
-# recipe parses and stays clear of the Wireless mod's.
+# own engine on a desktop JVM, on fake US Ioniq 5 units (260507 and 260903) and,
+# when that map is present in the HMG-API checkout, an Ioniq 6 on 260903. The
+# test uses HMG-API's real hook maps: the mod.json is valid, every hook point it
+# declares is mapped and planned, its services, command, USB folder and Android
+# Auto settings are taken, and each library recipe parses and stays clear of
+# the Wireless mod's recipe for the same library build.
 #   HMGAPI=<HMG-API checkout> sh hmgapi-mod/test/engine-test.sh
 set -e
 cd "$(dirname "$0")/../.."
@@ -29,8 +30,8 @@ unit() {   # unit <ro.build.product>: a fake head unit with the maps and the mod
     cp -r "$MOD" "$R/data/hmgapi/mods/egmp-aa-ev"
     # next to HMG-API's own Wireless CarPlay + Android Auto mod, as on a car
     cp -r "$HMGAPI/mods/wireless-carplay-aa" "$R/data/hmgapi/mods/wireless-carplay-aa"
-    # the Ioniq 5 maps aren't checked on a car yet: an owner turns on "testing
-    # maps" (or runs hmgapid engine verify-map) before hooks run there
+    # Testing maps lets this off-car fixture exercise maps that are not marked
+    # verified yet (the CEEV 260903 map itself is car-verified).
     mkdir -p "$R/data/hmgapi/settings/allow" && touch "$R/data/hmgapi/settings/allow/testing_maps"
     # Each map is tied to the md5s of the stock files it was made from. The fake
     # unit gets a stand-in for each, and its copy of the maps those stand-ins'
@@ -55,7 +56,11 @@ PY
 }
 eng() { set +e; out=$(HMGAPI_ROOT=$R HMGAPI_HOST=1 HMGAPI_PRODUCT=$P java -cp "$CP" hmgapi.engine.Engine "$@" 2>&1); rc=$?; set -e; }
 
-for P in NEEV23.USA.0000.V015.012.260507 NEEV.USA.0000.V015.012.260507 NEEV23.USA.0000.V016.010.260903; do
+PRODUCTS="NEEV23.USA.0000.V015.012.260507 NEEV.USA.0000.V015.012.260507 NEEV23.USA.0000.V016.010.260903"
+if [ -f "$HMGAPI/maps/hyundai/ceev/usa/260903/car.json" ]; then
+    PRODUCTS="$PRODUCTS CEEV.USA.0000.V016.010.260903"
+fi
+for P in $PRODUCTS; do
     unit $P
     eng plan
     has "$P: plan runs" "egmp-aa-ev" "$out"
@@ -75,8 +80,10 @@ done
 sys() { HMGAPI_ROOT=$T/none HMGAPI_PRODUCT=$1 java -cp "$CP" hmgapi.engine.SystemCheck "$MOD" 2>&1 || true; }
 has "a newer firmware (261201): for this car" "ok: egmp-aa-ev supports this unit" "$(sys NEEV23.USA.0000.V017.001.261201)"
 has "NEEV23SE 260507: for this car" "ok: egmp-aa-ev supports this unit" "$(sys NEEV23SE.USA.0000.V015.012.260507)"
+has "Ioniq 6 US 260903: for this car" "ok: egmp-aa-ev supports this unit" "$(sys CEEV.USA.0000.V016.010.260903)"
+has "Ioniq 6 US newer firmware: needs a matching build" "needs firmware 260903" "$(sys CEEV.USA.0000.V017.001.261201)"
 has "older than 260507: not for this car" "needs firmware >=260507 (this unit: 250101)" "$(sys NEEV23.USA.0000.V014.005.250101)"
-has "an EV6: not for this car (its energy model is the Ioniq 5's)" "needs model" "$(sys CVEV.USA.0000.V015.012.260507)"
+has "a Kia EV6: not a supported product" "needs model" "$(sys CVEV.USA.0000.V015.012.260507)"
 has "Canada: not for this car" "needs region USA" "$(sys NEEV.CAN.0000.V015.010.260206)"
 P=NEEV23.USA.0000.V017.001.261201
 unit $P
@@ -84,7 +91,11 @@ eng plan
 has "$P: no map yet, so its hooks are off" "egmp-aa-ev won't load" "$out"
 
 # every hook point the mod declares is in each car's map (the "all hooks are there" check)
-for m in "$HMGAPI"/maps/hyundai/neev/usa/260507 "$HMGAPI"/maps/hyundai/neev23/usa/260903; do
+MAPS="$HMGAPI/maps/hyundai/neev/usa/260507 $HMGAPI/maps/hyundai/neev23/usa/260903"
+if [ -f "$HMGAPI/maps/hyundai/ceev/usa/260903/car.json" ]; then
+    MAPS="$MAPS $HMGAPI/maps/hyundai/ceev/usa/260903"
+fi
+for m in $MAPS; do
     r=$(python3 - "$MOD/mod.json" "$m" <<'PY'
 import glob, json, sys
 mod = json.load(open(sys.argv[1]))
@@ -130,8 +141,20 @@ public class R {
 }
 J
 javac -cp "$CP" -d "$CP" "$T/R.java"
-set +e; r=$(java -cp "$CP" R "$MOD/recipes/ev-sensor-48ee793a.recipe" "$HMGAPI"/mods/wireless-carplay-aa/recipes/aa-tbt-*.recipe 2>&1); rc=$?; set -e
-has "recipe parses (4 verify, 3 patch)" "4 verify, 3 patch" "$r"
-has "recipe clear of the Wireless mod's" "clear of aa-tbt-48ee793a" "$r"
-[ $rc -eq 0 ] || { echo "FAIL  recipe check: $r"; fail=1; }
+for ours in "$MOD"/recipes/ev-sensor-*.recipe; do
+    suffix=${ours##*/ev-sensor-}; suffix=${suffix%.recipe}
+    wireless="$HMGAPI/mods/wireless-carplay-aa/recipes/aa-tbt-$suffix.recipe"
+    set +e
+    if [ -f "$wireless" ]; then
+        r=$(java -cp "$CP" R "$ours" "$wireless" 2>&1); rc=$?
+    else
+        r=$(java -cp "$CP" R "$ours" 2>&1); rc=$?
+    fi
+    set -e
+    has "recipe ev-sensor-$suffix parses (4 verify, 3 patch)" "4 verify, 3 patch" "$r"
+    if [ -f "$wireless" ]; then
+        has "recipe ev-sensor-$suffix clear of the matching Wireless recipe" "clear of aa-tbt-$suffix" "$r"
+    fi
+    [ $rc -eq 0 ] || { echo "FAIL  recipe check: $r"; fail=1; }
+done
 exit $fail

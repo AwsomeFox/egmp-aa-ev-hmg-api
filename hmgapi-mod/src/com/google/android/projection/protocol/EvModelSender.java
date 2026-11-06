@@ -11,7 +11,8 @@ import android.util.Log;
  * connection is torn down (gpm.receiver.destroy,
  * gpm.receiver_service.disconnected). It sends through a Sink: GPM's own
  * SensorSource.nativeReportDiagnosticsData, which HMG-API's in-memory library
- * patch (recipes/ev-sensor-48ee793a.recipe) turns into a raw queueOutgoing.
+ * patch (the matching recipes/ev-sensor-*.recipe) turns into a raw
+ * queueOutgoing.
  * Nothing in GPM's files is changed.
  * Every PERIOD_MS it builds a SensorBatch message from EvModelTemplate (a
  * single warm-pack model: for road-trip planning the car preconditions on the
