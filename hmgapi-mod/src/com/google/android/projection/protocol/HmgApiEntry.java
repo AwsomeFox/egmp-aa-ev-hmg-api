@@ -58,6 +58,34 @@ public final class HmgApiEntry extends ModEntry {
         return on("ev_log");
     }
 
+    /** this Android Auto session's EvCar.notAnEvWeFit() == null (set when GPM's sensors start) */
+    static volatile boolean sEvFits;
+    private static String sNotEvLogged;
+
+    /**
+     * Whether this car is an EV the energy model fits (EvCar.notAnEvWeFit), logged when
+     * the answer changes. Off: no sensor 23 and no live battery %, so Maps gets nothing
+     * that could be wrong for the car; preconditioning and the logs aren't affected.
+     */
+    static boolean evFits(ModContext mod) {
+        String why;
+        try {
+            why = EvCar.notAnEvWeFit();
+        } catch (Throwable t) {
+            why = "check failed: " + t;
+        }
+        String key = why == null ? "" : why;
+        if (!key.equals(sNotEvLogged)) {
+            sNotEvLogged = key;
+            if (why == null) {
+                mod.log("EV check: battery state of charge and pack size fit the energy model");
+            } else {
+                mod.error("energy model and live battery data off on this car: " + why, null);
+            }
+        }
+        return why == null;
+    }
+
     static boolean modelOn() {
         return on("energy_model");
     }
@@ -104,10 +132,11 @@ public final class HmgApiEntry extends ModEntry {
             @Override
             protected void beforeHookedMethod(Param p) {
                 try {
-                    if (modelOn() && p.args[2] instanceof int[] && NativeCheck.patched()) {
+                    sEvFits = evFits(mod);
+                    if (sEvFits && modelOn() && p.args[2] instanceof int[] && NativeCheck.patched()) {
                         p.args[2] = withSensor((int[]) p.args[2], SENSOR_EV_MODEL);
                     }
-                    if (liveDataOn() && p.args[2] instanceof int[]) {
+                    if (sEvFits && liveDataOn() && p.args[2] instanceof int[]) {
                         // types the stock library takes (1..21): no patch needed
                         p.args[2] = withSensor(withSensor((int[]) p.args[2], LiveData.SENSOR_FUEL), LiveData.SENSOR_ODOMETER);
                     }
@@ -125,10 +154,10 @@ public final class HmgApiEntry extends ModEntry {
                     if (precondOn()) {
                         Precond.onSessionStart(app.context);
                     }
-                    if (modelOn()) {
+                    if (sEvFits && modelOn()) {
                         startSender(mod, p.thisObject);
                     }
-                    if (liveDataOn()) {
+                    if (sEvFits && liveDataOn()) {
                         startLiveData(p.thisObject);
                     }
                 } catch (Throwable t) {

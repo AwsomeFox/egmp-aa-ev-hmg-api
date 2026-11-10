@@ -35,6 +35,14 @@ The model assumed the new-car 77.4 kWh. At ~105k miles the real usable capacity 
 
 Use the EV logs (item 2) to correct the model on the car: compare predicted and actual energy use per drive and adjust road load / aux power, so the model follows the actual car, season and tyres without manual recalibration. Start offline (the analysis tool refits the tables from submitted logs), then consider a slow on-car correction with tight bounds.
 
+## 5. More cars (0.6.0: every E-GMP car HMG-API maps)
+
+0.6.0 installs on every E-GMP model HMG-API can map (Ioniq 5, EV6, Ioniq 6), any region and firmware; HMG-API's map decides whether hooks run, the library recipe whether the energy model can, and an EV check (a battery SOC and a 50-90 kWh pack) whether it should. The EV6 US 260507 has the Ioniq 5's Android Auto library build (`48ee793a`), so it gets the full feature set with the Ioniq 5 model.
+
+- **Library recipes for the other builds:** the Canadian cars (`a0bea1c4`, which the Wireless mod already has a recipe for) and the Ioniq 5 US 260903 (build unknown; a Car Report shows it). Each needs one copy of the stock library (kept private) and `tools/mkrecipe.py`; the library keeps its C++ symbol names, so `mkrecipe.py` could find the three sites itself.
+- **Per-variant starting models:** road load from the EPA test-car list (target coefficients for every Ioniq 5, EV6, Ioniq 6, GV60 variant), picked by the pack's nominal size (HEV `BMS_EVENERGYCAPA`), the product code and the VIN's model characters; charge curves for the 58 and 84 kWh packs.
+- **Sensor 26 (`RAW_EV_TRIP_SETTINGS`):** one opaque blob in the same sensor batch as 23, read by Maps. Needs a fresh Maps decompile to recover its layout, then one byte in each recipe (accept types up to 26) and the same raw send.
+
 ## To verify (existing features)
 
 - Supercharger charge times: does Maps use the 250 kW table row for Tesla stations?

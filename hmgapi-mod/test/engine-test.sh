@@ -1,7 +1,7 @@
 #!/bin/sh
 # The built mod (build/mod/egmp-aa-ev, from hmgapi-mod/build.sh) through HMG-API's
-# own engine on a desktop JVM, on fake US Ioniq 5 units (260507 and 260903) and,
-# when that map is present in the HMG-API checkout, an Ioniq 6 on 260903. The
+# own engine on a desktop JVM, on fake US Ioniq 5 units (260507 and 260903) and
+# every other E-GMP unit (EV6, Canadian cars, Ioniq 6) whose map the HMG-API checkout has. The
 # test uses HMG-API's real hook maps: the mod.json is valid, every hook point it
 # declares is mapped and planned, its services, command, USB folder and Android
 # Auto settings are taken, and each library recipe parses and stays clear of
@@ -57,9 +57,12 @@ PY
 eng() { set +e; out=$(HMGAPI_ROOT=$R HMGAPI_HOST=1 HMGAPI_PRODUCT=$P java -cp "$CP" hmgapi.engine.Engine "$@" 2>&1); rc=$?; set -e; }
 
 PRODUCTS="NEEV23.USA.0000.V015.012.260507 NEEV.USA.0000.V015.012.260507 NEEV23.USA.0000.V016.010.260903"
-if [ -f "$HMGAPI/maps/hyundai/ceev/usa/260903/car.json" ]; then
-    PRODUCTS="$PRODUCTS CEEV.USA.0000.V016.010.260903"
-fi
+# and every other E-GMP car whose map this HMG-API checkout has
+for e in "kia/ev6/usa/260507 CVEV.USA.0000.V015.012.260507" "kia/ev6/can/260206 CVEV.CAN.0000.V015.010.260206" \
+         "hyundai/neev/can/260206 NEEV.CAN.0000.V015.010.260206" "hyundai/ceev/usa/260903 CEEV.USA.0000.V016.010.260903"; do
+    set -- $e
+    [ -f "$HMGAPI/maps/$1/car.json" ] && PRODUCTS="$PRODUCTS $2"
+done
 for P in $PRODUCTS; do
     unit $P
     eng plan
@@ -74,27 +77,27 @@ for P in $PRODUCTS; do
     has "$P: offload service" "offload" "$out"
     echo "$out" > "$T/plan-$P.txt"
 done
-# which cars the mod is for (mod.json "system"), by HMG-API's own check: a firmware
-# newer than any map still matches (its hooks are just off until HMG-API has that
-# map); an older one, or another model, doesn't
+# which cars the mod is for (mod.json "system"), by HMG-API's own check: every E-GMP
+# model HMG-API can map (Ioniq 5, EV6, Ioniq 6), any region and firmware. Whether it
+# runs is then up to HMG-API's map for that unit (hooks off without one), the library
+# recipe for its Android Auto library build (no energy model without one), and the
+# mod's own EV check (EvCar.notAnEvWeFit). Any other model, gas cars included, isn't
 sys() { HMGAPI_ROOT=$T/none HMGAPI_PRODUCT=$1 java -cp "$CP" hmgapi.engine.SystemCheck "$MOD" 2>&1 || true; }
-has "a newer firmware (261201): for this car" "ok: egmp-aa-ev supports this unit" "$(sys NEEV23.USA.0000.V017.001.261201)"
-has "NEEV23SE 260507: for this car" "ok: egmp-aa-ev supports this unit" "$(sys NEEV23SE.USA.0000.V015.012.260507)"
-has "Ioniq 6 US 260903: for this car" "ok: egmp-aa-ev supports this unit" "$(sys CEEV.USA.0000.V016.010.260903)"
-has "Ioniq 6 US newer firmware: needs a matching build" "needs firmware 260903" "$(sys CEEV.USA.0000.V017.001.261201)"
-has "older than 260507: not for this car" "needs firmware >=260507 (this unit: 250101)" "$(sys NEEV23.USA.0000.V014.005.250101)"
-has "a Kia EV6: not a supported product" "needs model" "$(sys CVEV.USA.0000.V015.012.260507)"
-has "Canada: not for this car" "needs region USA" "$(sys NEEV.CAN.0000.V015.010.260206)"
+for P in NEEV23.USA.0000.V017.001.261201 NEEV23SE.USA.0000.V015.012.260507 CEEV.USA.0000.V016.010.260903 \
+         CEEV.USA.0000.V017.001.261201 NEEV23.USA.0000.V014.005.250101 CVEV.USA.0000.V015.012.260507 \
+         CVEV.CAN.0000.V015.010.260206 NEEV.CAN.0000.V015.010.260206; do
+    has "$P: for this car" "ok: egmp-aa-ev supports this unit" "$(sys $P)"
+done
+has "a Kia K5 (gas): not for this car" "needs model" "$(sys DL3.USA.0000.V015.012.260507)"
+has "a K5 Hybrid: not for this car" "needs model" "$(sys DL3HEV.USA.0000.V015.012.260507)"
 P=NEEV23.USA.0000.V017.001.261201
 unit $P
 eng plan
 has "$P: no map yet, so its hooks are off" "egmp-aa-ev won't load" "$out"
 
 # every hook point the mod declares is in each car's map (the "all hooks are there" check)
-MAPS="$HMGAPI/maps/hyundai/neev/usa/260507 $HMGAPI/maps/hyundai/neev23/usa/260903"
-if [ -f "$HMGAPI/maps/hyundai/ceev/usa/260903/car.json" ]; then
-    MAPS="$MAPS $HMGAPI/maps/hyundai/ceev/usa/260903"
-fi
+# every car this HMG-API checkout has a map for (the mod installs on all of them)
+MAPS=$(for c in "$HMGAPI"/maps/*/*/*/*/car.json; do dirname "$c"; done)
 for m in $MAPS; do
     r=$(python3 - "$MOD/mod.json" "$m" <<'PY'
 import glob, json, sys

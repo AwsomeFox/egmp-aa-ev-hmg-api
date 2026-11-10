@@ -20,7 +20,7 @@ the mod has run on a head unit yet.
 | Maps' route plan (destinations, charging stops, remaining distance/time: 0x8006/0x8007) | Leafia's `NAVDUMP` in `GpmNaviTBTManager` | events `aa_navigation_message`, to a mod's **app** only, from the Wireless mod's library patch | the same messages (event 33) read on `gpm.navigation_status.next_turn`; needs the Wireless CarPlay + Android Auto mod's turn-by-turn |
 | EV logs (1 s energy/speed, 5 s rows, charging, climate, drive mode, altitude, Maps plan) | `EvDriveLog` + root offload script | none | same logger in GPM; offload as a mod service with HMG-API's USB folder (`"usb": ["egmp-aa-ev-logs"]`) |
 | Off switch, settings | `persist.gpm.ev.off=1` | per-mod switch and settings page | HMG-API's switch, plus settings `energy_model`, `preconditioning`, `ev_log` and the preconditioning thresholds (minimum charger power, start window, arrival distance, starts per route), applied at once |
-| Firmware support | Leafia v1.0.5 on US 260507 only (md5-locked) | per-car hook maps | US Ioniq 5 on 260507 or newer and US Ioniq 6 on 260903 (`mod.json`), hooks wherever HMG-API has a map; the energy model on the Ioniq 5 US 260507 and Ioniq 6 US 260903 library builds |
+| Firmware support | Leafia v1.0.5 on US 260507 only (md5-locked) | per-car hook maps | every E-GMP model HMG-API can map (Ioniq 5, EV6, Ioniq 6; `mod.json`), hooks wherever HMG-API has a map, the energy model only where a recipe matches and the EV check passes; the energy model on the Ioniq 5 US 260507 and Ioniq 6 US 260903 library builds |
 
 ## 2. Car data: what egmp reads and what HMG-API offers as readings
 

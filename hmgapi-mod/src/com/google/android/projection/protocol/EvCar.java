@@ -74,6 +74,7 @@ final class EvCar {
         {0x23, "TARGET_SOC_QUICK"},
         {0x28, "FAST_CHARGING"},
         {0x31, "ENERGYMAP_1000MS"},
+        {0x35, "BMS_EVENERGYCAPA"},
         {0x42, "DATC_CLMTPWRSUM_W"},
         {0x43, "XEV_BATHEATPWRMONCON_W"},
         {0x44, "XEV_BATHEATPWRSUM_WH"},
@@ -328,6 +329,61 @@ final class EvCar {
             return -1;
         }
         return raw;
+    }
+
+    // ---- is this an EV the model fits? -------------------------------------------
+
+    /**
+     * Pack sizes the energy model is built for (2 Wh steps): E-GMP's 58 to 84 kWh
+     * packs (Ioniq 5, Ioniq 6, EV6, GV60), with room either side. Outside it (an EV9's
+     * 99.8 kWh, a small pack on another platform) the Ioniq 5 model would promise
+     * range the car doesn't have, so the model stays off.
+     */
+    static final int PACK_MIN_RAW = 25000;   // 50 kWh
+    static final int PACK_MAX_RAW = 45000;   // 90 kWh
+
+    /**
+     * Why the energy model shouldn't run on this car, or null if it can. Before sensor 23
+     * (and the live battery %) is offered to the phone. egmp installs on every E-GMP model
+     * HMG-API can map, and "Install anyway" puts it on others, so the car has to show it's
+     * an EV with a pack the model fits:
+     *  - a display SOC (HEV DISPLAY_SOC, 0.5 % steps) above 0: a car without a traction
+     *    battery has none, and a gas car must never look electric to Maps;
+     *  - the pack's nominal size (HEV BMS_EVENERGYCAPA) within PACK_MIN_RAW..PACK_MAX_RAW,
+     *    or, where the car doesn't give one, the size its remaining energy and SOC imply.
+     * Reads go through hev() (cached, a failure is never cached), so the next session tries again.
+     */
+    static String notAnEvWeFit() {
+        int soc = hev(0x19, 2000);
+        if (soc <= 0 || soc > 200) {
+            return soc < 0 ? "no battery state of charge (HEV service unreachable)" : "no battery state of charge (" + soc + ")";
+        }
+        int nominal = hev(0x35, 60000);
+        if (nominal > 0 && nominal < HEV_INVALID16) {
+            return packFits(nominal) ? null : "pack " + kwh(nominal) + " kWh nominal, the model is for 50-90 kWh";
+        }
+        int energy = energyRaw(2000, HEV_INVALID16 - 1);
+        if (energy <= 0 || soc < 20) {
+            return null;   // no size to check (low SOC reads too coarse): the learned capacity is capped anyway
+        }
+        int implied = (int) ((long) energy * 200 / soc);
+        return packFits(implied) ? null : "pack about " + kwh(implied) + " kWh (energy / SOC), the model is for 50-90 kWh";
+    }
+
+    /** host tests: put a reading in the HEV cache as if just read */
+    static void cacheHev(int flag, int value) {
+        synchronized (CACHE_LOCK) {
+            sHevVal[flag] = value;
+            sHevAt[flag] = now();
+        }
+    }
+
+    static boolean packFits(int raw) {
+        return raw >= PACK_MIN_RAW && raw <= PACK_MAX_RAW;
+    }
+
+    private static String kwh(int raw) {
+        return String.valueOf(Math.round(raw * 2 / 100.0) / 10.0);
     }
 
     // ---- DATC (climate) --------------------------------------------------------
