@@ -27,7 +27,7 @@ ok() { echo "ok    $1"; }
 bad() { echo "FAIL  $1"; fail=1; }
 M=hmgapi-mod/tools/mkrecipe.py
 mkdir -p "$T/recipes"
-python3 -I $M "$T/us.so" "$T/recipes/ev-sensor-48ee793a.recipe" >/dev/null
+python3 -I $M "$T/us.so" "$T/recipes/ev-sensor-48ee793a.recipe" --max-type 26 >/dev/null
 [ "$(grep '^patch' "$T/recipes/ev-sensor-48ee793a.recipe")" = "$(grep '^patch' hmgapi-mod/recipes/ev-sensor-48ee793a.recipe)" ] \
     && ok "US 260507: the shipped recipe's patch lines" || bad "US 260507 patch lines differ from the shipped recipe"
 cat > "$T/aa-tbt-dbfe7bd2.recipe" <<'EOF'
@@ -62,8 +62,8 @@ for so, rec in (("us", "ev-sensor-48ee793a"), ("ceev", "ev-sensor-dbfe7bd2"),
     open("%s/%s.patched" % (T, so), "wb").write(b)
 PY
 J="java -cp $CP com.google.android.projection.protocol.NativeCheckTest $T/recipes"
-$J "$T/us.patched" ev-sensor-48ee793a || fail=1
-$J "$T/ceev.patched" ev-sensor-dbfe7bd2 || fail=1
+$J "$T/us.patched" ev-sensor-48ee793a 26 || fail=1
+$J "$T/ceev.patched" ev-sensor-dbfe7bd2 23 || fail=1
 $J "$T/other.patched" ev-sensor-0ther000 || fail=1
 $J "$T/us.so" none || fail=1
 $J "$T/ceev.so" none || fail=1
