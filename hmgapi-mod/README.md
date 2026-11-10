@@ -23,7 +23,8 @@ while it runs and patches its library in memory.
 | `settings.json` | `energy_model`, `preconditioning`, `live_data`, `ev_log` (all on), and the preconditioning thresholds `precond_min_kw` (50), `precond_window_min` (60), `precond_arrival_m` (200), `precond_max_starts` (3): `PrecondCore.Config`, applied at once |
 
 Hook points used (all in HMG-API 1.0.0, mapped on every HMG-API map: Ioniq 5 and EV6 in the US and Canada, Ioniq 5 US 260903, and the Ioniq 6 US 260903 map):
-`gpm.sensor_source.init` (change: sensor 23 when the library patch is in place, and
+`gpm.sensor_source.init` (change: sensor 23 when the library patch is in place, sensor
+26 (the battery % curve, `SocCurve`) where that build's recipe lets the library take it, and
 the fuel (6) and odometer (5) sensors for the live battery data, both only when the EV
 check passes: a battery state of charge, and a 50-90 kWh pack by its nominal size or
 energy / SOC (`EvCar.notAnEvWeFit`); start the senders and

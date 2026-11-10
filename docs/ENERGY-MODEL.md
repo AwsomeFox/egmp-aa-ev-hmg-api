@@ -190,6 +190,32 @@ Explored and parked:
 - **Nav battery packet layout** (`BATTERY_INFO_RX`, 11 bytes): [0]=SOC in 0.5% steps ✓, [1]=min cell temp °C ✓, [2..3]=`EV_AVLBL_ENRG` big-endian uint16 tracking SOC (~7202 units at 24% — units unconfirmed; 2 Wh ⇒ 60 kWh full, conflicts with 77.4; maybe power, maybe display-buffered SOC), [6]=`VCU_DTE_BASE` 76 ≈ cluster km, [9]/[10] vary (status?). Pin units down with a drive/charge capture where SOC moves. *(Resolved, see [DATA-SOURCES.md](DATA-SOURCES.md) §1.1: [2..3] is the BMS remaining usable energy in 2 Wh steps, already degraded, so the "conflict" with 77.4 was the real capacity loss; byte 6 is the outside temperature and DTE is bytes 8–9.)*
 - **Regen (negative-x) drivetrain points**: shipped as an experiment (sint32 allows it, Ford omits it); validate downhill predictions on a hilly drive.
 
+## Battery % curve (sensor 26, 2026-11-10)
+
+Maps doesn't take the car's state of charge from sensor 23: it shows **energy ÷ capacity** (`1.3` / `1.4`). On E-GMP the BMS energy (`ENERGYMAP`) reaches 0 near **display 2 %**, so Maps read up to 2 points under the dash, most near empty, where its arrival % and 0 % checks matter. Maps has a second sensor for exactly this.
+
+**From the code (Google Maps 26.44.06):**
+- The car-sensor dispatcher (`pyi`) registers handlers for its sensor types 1, 2, 6, 7, 10, 11, 14, 17, 18, 23, 24 and 25. Type 23 is parsed straight from the bytes as the energy model; 25 is decoded by `CarSensorEvent.c()` as `cdpz`:
+  ```
+  cdpz { 1: cdqu { 1: int32, 2: int32, 4: repeated cdqt { 3: float raw %, 4: float shown % } } }
+  ```
+- `avqa` keeps the points only if 0 < raw < 100, 0 ≤ shown ≤ 100, raw rising and shown not falling (fields 1 and 2 aren't read).
+- `ayzm.K(energy, capacity, curve)` takes raw % = energy × 100 ÷ capacity and maps it through the points, linear between them, with (0, 0) and (100, 100) assumed at the ends. Every battery percent Maps shows goes through it: the current level, arrival at stops and the destination, and its "arrives at 0 %" checks.
+
+**On the wire it's field 26, wrapped.** Maps' sensor numbers aren't Android Auto's (Maps' 11, driving status, is the wire's 13). Tested on a US Ioniq 5 with a curve that adds 20 points, so the effect is obvious in Maps:
+
+| SensorBatch field, contents | Maps' battery % |
+|---|---|
+| 25, `cdpz` | unchanged |
+| 25, `{1: cdpz}` | unchanged |
+| **26, `{1: cdpz}`** | **20 points higher** |
+
+Field 26 is what Open Android Auto calls `RAW_EV_TRIP_SETTINGS {1: bytes}`; the phone asks for it as soon as the head unit offers it. The Android Auto library only parses requests for types it accepts, so the recipe raises `SensorType_IsValid` to 26 (`cmp r0,#25`, `tools/mkrecipe.py --max-type 26`); with only 23 accepted, a request for 26 logs `Failed to parse proto … SensorSource.cpp:209`.
+
+**What the mod sends** (`SocCurve`, every 5 s after the model, as its own `0x8003` message): 13 points (raw 1, 5, 10, 20 … 90, 95, 99 %) on the line through (raw 0, shown 2 %) and the car's current (energy ÷ capacity, display SOC), clamped to 0–100 and never falling. It's offered only where the recipe in memory takes type 26 (`NativeCheck.maxSensorType`): the US 260507 build today. The Ioniq 6 US 260903 recipe still stops at 23 until it's regenerated from that library with `--max-type 26`. Setting `battery_curve`.
+
+**Open:** the 2 % zero point comes from the BMS energy reaching 0 near display 2 %; low-SOC log rows (energy and display SOC together) would pin it down per car.
+
 ## Next steps
 1. ~~Recover the real schema from Google Maps~~ (done, see above).
 2. ~~Write the generator~~ (done: `tools/build_ioniq5_model.py`; shipped values below are its constants, verified accepted by Maps on the car 2026-10-28).

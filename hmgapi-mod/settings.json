@@ -10,6 +10,14 @@
       "description": "Sends Maps the battery's real energy, its learned usable capacity, charge curves and the outside temperature every 5 s during Android Auto, for its arrival charge and charging stops. Needs an Android Auto library build this mod supports (Ioniq 5 US 260507 or Ioniq 6 US 260903)."
     },
     {
+      "key": "battery_curve",
+      "type": "toggle",
+      "default": true,
+      "title": "Maps' battery % matches the car's",
+      "apply": "restart",
+      "description": "Sends Maps how the car's battery % relates to the battery's energy (Android Auto sensor 26), so the percentages Maps shows (now, on arrival, at charging stops) match the dash. On E-GMP the energy runs out at about 2% on the dash, so without it Maps reads up to 2 points low near empty. Needs the energy model on and a library build whose recipe takes sensor 26 (Ioniq 5 US 260507)."
+    },
+    {
       "key": "preconditioning",
       "type": "toggle",
       "default": true,

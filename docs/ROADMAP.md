@@ -6,6 +6,10 @@ Planned additions, roughly in priority order. Each links to what we already know
 
 HMG Leafia Plus is archived; its successor HMG-API hooks the car's apps while they run instead of replacing their files. `hmgapi-mod/` is this project as an HMG-API mod: the energy model, preconditioning and logs, with firmware support through HMG-API's hook maps (US Ioniq 5 260507 or newer, and US Ioniq 6 260903). Next: test the complete mod on both cars, collect Ioniq 6 logs to replace the conservative Ioniq 5 road-load baseline, and add a recipe for each other Android Auto library build. See [HMG-API-COMPARISON](HMG-API-COMPARISON.md).
 
+## 0.1 Maps' battery % matches the dash (done, 0.7.0)
+
+Android Auto sensor 26 carries a curve from Maps' own battery % (energy ÷ capacity) to the car's. Found in Maps' code and confirmed on the car (2026-11-10); details in [ENERGY-MODEL](ENERGY-MODEL.md#battery--curve-sensor-26-2026-11-10). Next: the Ioniq 6 recipe with sensor 26, and the 2 % zero point from low-SOC logs.
+
 ## 1. Automatic battery preconditioning (done)
 
 When Google Maps on Android Auto is guiding to a DC fast charger, ask the car to precondition the battery, as the car's own navigation does. No buttons.
