@@ -187,6 +187,30 @@ public final class ModTest {
         check("no VIN", EvCar.vinModel().isEmpty());
         check("flag falls back to its 260507 number", HmgCar.flag("ENERGYMAP_1000MS", 0x31) == 0x31);
         check("relay down: ping false", !Relay.ping());
+        check("no car: the energy model stays off", EvCar.notAnEvWeFit() != null);
+    }
+
+    static void testEvCheck() {
+        check("58 kWh fits", EvCar.packFits(29000));
+        check("77.4 kWh fits", EvCar.packFits(38700));
+        check("84 kWh fits", EvCar.packFits(42000));
+        check("99.8 kWh (EV9) doesn't", !EvCar.packFits(49900));
+        check("42 kWh doesn't", !EvCar.packFits(21000));
+        EvCar.cacheHev(0x19, 0);
+        check("no state of charge (not an EV): off", EvCar.notAnEvWeFit() != null);
+        EvCar.cacheHev(0x19, 92);
+        EvCar.cacheHev(0x35, 38700);
+        check("Ioniq 5, 77.4 kWh nominal at 46%: on", EvCar.notAnEvWeFit() == null);
+        EvCar.cacheHev(0x35, 49900);
+        String why = EvCar.notAnEvWeFit();
+        check("99.8 kWh nominal: off, and says why: " + why, why != null && why.contains("99.8 kWh"));
+        EvCar.cacheHev(0x35, 0xffff);
+        EvCar.cacheHev(0x31, 14462);
+        check("no nominal size, energy / SOC = 62.9 kWh: on", EvCar.notAnEvWeFit() == null);
+        EvCar.cacheHev(0x31, 23000);
+        check("no nominal size, energy / SOC = 100 kWh: off", EvCar.notAnEvWeFit() != null);
+        EvCar.cacheHev(0x19, 10);
+        check("no nominal size, SOC 5%: too coarse to size, on", EvCar.notAnEvWeFit() == null);
     }
 
     public static void main(String[] args) throws Exception {
@@ -194,6 +218,7 @@ public final class ModTest {
         testSensor();
         testLiveData();
         testNoHmgApi();
+        testEvCheck();
         System.out.println("ModTest: " + passed + " passed, " + failed + " failed");
         if (failed > 0) System.exit(1);
     }

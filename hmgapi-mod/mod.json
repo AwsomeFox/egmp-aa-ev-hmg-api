@@ -1,7 +1,7 @@
 {
   "id": "egmp-aa-ev",
   "name": "EV routing for Android Auto (E-GMP)",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "hmgapi": ">=1.0.0",
   "authors": [
     "willemcvu",
@@ -10,18 +10,9 @@
   "license": "AGPL-3.0",
   "description": "Needs HMG-API's Wireless CarPlay + Android Auto mod. Google Maps EV routing over Android Auto: battery and range, charge curves, EV plugs, battery preconditioning for DC chargers.",
   "requires": ["wireless-carplay-aa >=2.1.0"],
-  "system": [
-    {
-      "model": ["NEEV", "NEEV23", "NEEV23SE"],
-      "region": "USA",
-      "firmware": [">=260507"]
-    },
-    {
-      "model": ["CEEV"],
-      "region": "USA",
-      "firmware": ["260903"]
-    }
-  ],
+  "system": {
+    "model": ["NEEV", "NEEV23", "NEEV23SE", "CVEV", "CEEV"]
+  },
   "hooks": {
     "jar": "hooks.jar",
     "entry": "com.google.android.projection.protocol.HmgApiEntry",

@@ -1,6 +1,6 @@
 # egmp-aa-ev-feat (HMG-API)
 
-Real EV routing in Google Maps on Android Auto for Hyundai Ioniq 5 and Ioniq 6 Gen5W head units: battery % on arrival, charging stops, realistic charge times, and automatic battery preconditioning on the way to a fast charger.
+Real EV routing in Google Maps on Android Auto for E-GMP cars with Gen5W head units (Hyundai Ioniq 5 and Ioniq 6, Kia EV6): battery % on arrival, charging stops, realistic charge times, and automatic battery preconditioning on the way to a fast charger.
 
 This fork runs it as a mod for [HMG-API](https://github.com/VysseCodes/HMG-API), the successor of the archived HMG Leafia Plus: nothing on the head unit is changed, and firmware support comes from HMG-API's per-car hook maps. The original NEMESIS + Leafia package is still here ([below](#legacy-nemesis--leafia-package)).
 
@@ -9,11 +9,10 @@ This fork runs it as a mod for [HMG-API](https://github.com/VysseCodes/HMG-API),
 
 ## Requirements
 
-- Hyundai Ioniq 5 (US): NEEV, NEEV23 or NEEV23SE, Gen5W software 260507 or newer
-- Hyundai Ioniq 6 (US): CEEV, Gen5W software 260903
+- An E-GMP car HMG-API has a hook map for: Hyundai Ioniq 5 (NEEV, NEEV23, NEEV23SE), Kia EV6 (CVEV) or Hyundai Ioniq 6 (CEEV), any region and software. Today HMG-API maps the Ioniq 5 and EV6 in the US (260507) and Canada (260206) and the Ioniq 5 US 260903; the Ioniq 6 US 260903 runs with its own map. Another car: HMG-API's "Map this car from its files", then **Install anyway…**
 - [HMG-API](https://github.com/VysseCodes/HMG-API) 1.0.0 or newer, installed through [NEMESIS](https://github.com/xwtk/hmg_nemesis)
 - HMG-API's **Wireless CarPlay + Android Auto** mod, 2.1.0 or newer. HMG-API won't load this mod without it: its turn-by-turn adds Maps' route data, which preconditioning needs
-- The energy model needs a supported Android Auto library build: Ioniq 5 US 260507 or Ioniq 6 US 260903 (see [Limits](#limits))
+- The energy model needs a supported Android Auto library build: US 260507 (Ioniq 5 and EV6) or Ioniq 6 US 260903 (see [Limits](#limits)). Elsewhere preconditioning and the EV logs still run
 
 ## Features
 
@@ -21,6 +20,7 @@ This fork runs it as a mod for [HMG-API](https://github.com/VysseCodes/HMG-API),
 - **Real capacity:** usable capacity is learned from the BMS, not assumed from the new-car 77.4 kWh.
 - **Cold weather:** live outside temperature raises heating and rolling losses in the model.
 - **Charge times:** calibrated on real DC sessions and the car's own estimate, including the slow last 10–20 %.
+- **Only on an EV it fits:** before anything goes to Maps, the mod checks the car reports a battery state of charge and a pack of 50–90 kWh (its nominal size, or the size its energy and charge imply). Otherwise the energy model and live battery data stay off, and HMG-API's log says why, so a car the model doesn't fit (an EV9's 99.8 kWh pack, a car without a traction battery) never gets a wrong range.
 - **EV connectors:** Maps is told the car is electric with CCS1 and J1772, for charger filtering.
 - **Live battery data for phone apps:** the battery %, the range the cluster shows and the odometer go to the phone as Android Auto's fuel and odometer data, so apps that read the car's data through Android Auto (A Better Route Planner, for one) show the live battery level. No library patch needed, so it works on any Android Auto library build.
 - **Preconditioning:** when the next stop is a charger over 50 kW within an hour, the car is asked to warm the battery, through HMG-API's reviewed `conditioning` command. The minimum power, the start window, the arrival distance and the starts per route are settings. Off with the mod's setting or the car's own *battery conditioning* setting.
@@ -31,7 +31,7 @@ This fork runs it as a mod for [HMG-API](https://github.com/VysseCodes/HMG-API),
 
 1. **Remove the NEMESIS versions first:** in NEMESIS Manager (press NAV three times), uninstall `aa.ev.model` and HMG Leafia Plus, then reboot. They replace the Android Auto files HMG-API expects stock, and two energy models would go to Maps.
 2. Install [HMG-API](https://github.com/VysseCodes/HMG-API/releases) and its Wireless CarPlay + Android Auto mod.
-3. **Let hooks run:** the Ioniq 6 US 260903 map is verified on a car; the Ioniq 5 maps still need the on-car check. In the HMG-API app's **Settings**, tap **Check the map on this car** (hooks run once it passes and the head unit restarts), or turn on **Try unchecked maps** (at the next restart; the boot guard turns hooks off if the unit fails to start three times). No adb needed. Ioniq 6 support requires an HMG-API build that includes the CEEV US 260903 map.
+3. **Let hooks run:** the EV6 US 260507 and Ioniq 6 US 260903 maps are verified on a car; the others still need the on-car check. In the HMG-API app's **Settings**, tap **Check the map on this car** (hooks run once it passes and the head unit restarts), or turn on **Try unchecked maps** (at the next restart; the boot guard turns hooks off if the unit fails to start three times). No adb needed. Ioniq 6 support requires an HMG-API build that includes the CEEV US 260903 map.
 4. Download `egmp-aa-ev-<version>.zip` from [Releases](../../releases), put it in a folder `HMGAPI/updates/` on a USB stick, plug it in, and tap **Check USB updates** in the HMG-API app.
    **Or through NEMESIS:** unzip `egmp-aa-ev-<version>-nemesis.zip` onto an empty USB stick and plug it in, then confirm in NEMESIS. It installs as NEMESIS package `hmgapi.egmp-aa-ev` (needs HMG-API 1.0 or newer and its Wireless CarPlay + Android Auto mod), and HMG-API's engine does the install, so it's the same mod either way. NEMESIS Manager can then update or uninstall it.
 5. The first time it preconditions, HMG-API asks on screen to allow `conditioning` for this mod: allow it.
@@ -40,8 +40,9 @@ Updates install the same way. To remove it: HMG-API app → the mod → remove. 
 
 ### Limits
 
-- **Energy model library builds:** Ioniq 5 US 260507 (`libautoreceiver_infobank.so`, md5 `48ee793a…`) and Ioniq 6 US 260903 (md5 `dbfe7bd2…`). On another build nothing is patched and the model stays off; fuel type, connectors and live battery data still reach Maps. Another build needs a recipe ([`tools/mkrecipe.py`](hmgapi-mod/tools/mkrecipe.py)).
+- **Energy model library builds:** US 260507, Ioniq 5 and EV6 (`libautoreceiver_infobank.so`, md5 `48ee793a…`), and Ioniq 6 US 260903 (md5 `dbfe7bd2…`). On another build (the Canadian cars' `a0bea1c4…`, and possibly the Ioniq 5 US 260903) nothing is patched and the model stays off; fuel type, connectors and live battery data still reach Maps, and preconditioning and the logs run. Another build needs a recipe ([`tools/mkrecipe.py`](hmgapi-mod/tools/mkrecipe.py)).
 - **Preconditioning and HMG-API 1.0's checks:** HMG-API refuses a start when the car isn't READY, Battery Conditioning is off, or the pack is already warm (21 °C / 70 °F on an Ioniq 5), and stops a request if the car's indicator doesn't come on within 2 minutes. After such a timeout, automatic starts wait for a manual one. egmp then cancels for that charging stop, and preconditions again after you start conditioning by hand once.
+- **EV6 calibration:** the EV6 uses the Ioniq 5 model: the same 77.4-kWh E-GMP pack and 800 V charging, with its usable capacity learned from the BMS. Its road load is close to the Ioniq 5's (a little more efficient), so arrival % should be slightly conservative. EV6 logs would let us tune it.
 - **Ioniq 6 calibration:** the Ioniq 6 initially uses the same 77.4-kWh E-GMP battery and charging model as the Ioniq 5. Live BMS energy immediately teaches it the car's usable capacity. Its Ioniq 5 road-load calibration is conservative for the more aerodynamic Ioniq 6; Ioniq 6 EV logs are needed to tune arrival-energy predictions precisely.
 
 What HMG-API offers and lacks for EV routing: [docs/HMG-API-COMPARISON.md](docs/HMG-API-COMPARISON.md).
