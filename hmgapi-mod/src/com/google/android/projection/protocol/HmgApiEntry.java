@@ -94,6 +94,10 @@ public final class HmgApiEntry extends ModEntry {
         return on("preconditioning");
     }
 
+    static boolean batteryCurveOn() {
+        return on("battery_curve");
+    }
+
     static boolean liveDataOn() {
         return on("live_data");
     }
@@ -135,6 +139,12 @@ public final class HmgApiEntry extends ModEntry {
                     sEvFits = evFits(mod);
                     if (sEvFits && modelOn() && p.args[2] instanceof int[] && NativeCheck.patched()) {
                         p.args[2] = withSensor((int[]) p.args[2], SENSOR_EV_MODEL);
+                        // the battery % curve, where this build's recipe lets the library take it
+                        boolean curve = batteryCurveOn() && NativeCheck.maxSensorType() >= SocCurve.SENSOR;
+                        if (curve) {
+                            p.args[2] = withSensor((int[]) p.args[2], SocCurve.SENSOR);
+                        }
+                        EvModelSender.setBatteryCurve(curve);
                     }
                     if (sEvFits && liveDataOn() && p.args[2] instanceof int[]) {
                         // types the stock library takes (1..21): no patch needed

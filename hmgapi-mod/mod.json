@@ -1,7 +1,7 @@
 {
   "id": "egmp-aa-ev",
   "name": "EV routing for Android Auto (E-GMP)",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "hmgapi": ">=1.0.0",
   "authors": [
     "willemcvu",

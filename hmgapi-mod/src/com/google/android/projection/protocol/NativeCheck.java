@@ -42,12 +42,12 @@ final class NativeCheck {
         }
     }
 
-    /** recipes/ev-sensor-48ee793a.recipe's patch lines */
+    /** recipes/ev-sensor-48ee793a.recipe's patch lines (types up to 26: the energy model and the battery % curve) */
     static final Recipe BUILT_IN = new Recipe("ev-sensor-48ee793a (built in)");
 
     static {
         BUILT_IN.offsets.add(0x144ec2L);
-        BUILT_IN.bytes.add("1628");
+        BUILT_IN.bytes.add("1928");
         BUILT_IN.offsets.add(0xbb29eL);
         BUILT_IN.bytes.add("4ff00007");
         BUILT_IN.offsets.add(0xbb638L);
@@ -142,6 +142,32 @@ final class NativeCheck {
             why.append(miss);
         }
         return null;
+    }
+
+    /**
+     * The highest sensor type the library in memory accepts, from the recipe in place:
+     * its SensorType_IsValid patch is cmp r0,#n (2 bytes, "nn28"), types 1..n+1. 0 if no
+     * recipe is in place; 23 for a recipe without that patch.
+     */
+    static int maxSensorType() {
+        if (!patched()) {
+            return 0;
+        }
+        for (Recipe r : recipes()) {
+            if (r.id.equals(sOk)) {
+                return maxSensorType(r);
+            }
+        }
+        return 23;
+    }
+
+    static int maxSensorType(Recipe r) {
+        for (String b : r.bytes) {
+            if (b.length() == 4 && b.endsWith("28")) {
+                return Integer.parseInt(b.substring(0, 2), 16) + 1;
+            }
+        }
+        return 23;
     }
 
     static boolean patched() {
