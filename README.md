@@ -25,7 +25,7 @@ This fork runs it as a mod for [HMG-API](https://github.com/VysseCodes/HMG-API),
 - **EV connectors:** Maps is told the car is electric with CCS1 and J1772, for charger filtering.
 - **Live battery data for phone apps:** the battery %, the range the cluster shows and the odometer go to the phone as Android Auto's fuel and odometer data, so apps that read the car's data through Android Auto (A Better Route Planner, for one) show the live battery level. No library patch needed, so it works on any Android Auto library build.
 - **Preconditioning:** when the next stop is a charger over 50 kW within an hour, the car is asked to warm the battery, through HMG-API's reviewed `conditioning` command. The minimum power, the start window, the arrival distance and the starts per route are settings. Off with the mod's setting or the car's own *battery conditioning* setting.
-- **EV logs:** driving and charging, whenever the head unit is on; copied to any USB drive with an `egmp-aa-ev-logs` folder; share them through an [EV log issue](https://github.com/willemcvu/egmp-aa-ev-feat/issues/new?template=log-submission.yml).
+- **EV logs:** driving and charging, whenever the head unit is on; copied to any USB drive with an `egmp-aa-ev-logs` folder; share them through an [EV log issue](https://github.com/AwsomeFox/egmp-aa-ev-hmg-api/issues/new?template=log-submission.yml).
 - **Settings** in the HMG-API app: energy model, battery % curve, preconditioning (and its thresholds: chargers faster than 50 kW, start within 60 min, arrived within 200 m, 3 starts per route), live battery data, EV logs. All on by default; the thresholds apply at once, the rest when Android Auto restarts.
 
 ## Install
@@ -56,7 +56,7 @@ To collect and share them:
 
 1. Make a folder named `egmp-aa-ev-logs` at the top level of any FAT32/exFAT USB drive.
 2. With the car on, plug the drive into the USB data port. Within about 20 seconds a pop-up says how many logs were copied ("… Safe to remove"). Turn logging off with the mod's *EV logs* setting.
-3. Open an [EV log issue](https://github.com/willemcvu/egmp-aa-ev-feat/issues/new?template=log-submission.yml) and drag the `egmp-*.csv` files from that folder into it. Issues are public.
+3. Open an [EV log issue](https://github.com/AwsomeFox/egmp-aa-ev-hmg-api/issues/new?template=log-submission.yml) and drag the `egmp-*.csv` files from that folder into it. Issues are public.
 
 Logs from different cars, climates and battery ages are what improve the energy model most. Format details: [LOGGING](docs/LOGGING.md).
 
