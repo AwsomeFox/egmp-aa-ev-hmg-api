@@ -2,7 +2,7 @@
 
 > **HMG-API mod:** the same logger and format. It starts when the Android Auto app's process starts (HMG-API's hooks, not the smali edits named below), the mod's *EV logs* setting turns it off, and the header's `vin_model` is empty (HMG-API never hands a mod the VIN; `product` says the model). The offload is the mod's `offload` service, which asks HMG-API which drives have the folder.
 
-The format the head unit writes for [ROADMAP item 2](ROADMAP.md#2-ev-logging-for-model-calibration), and that owners submit as a GitHub issue ([EV log submission](https://github.com/willemcvu/egmp-aa-ev-feat/issues/new?template=log-submission.yml), label `ev-log`). `tools/evlog.py` checks, cleans and merges them. EV logs cover driving **and** charging: the head unit logs whenever it is on, with or without Android Auto.
+The format the head unit writes for [ROADMAP item 2](ROADMAP.md#2-ev-logging-for-model-calibration), and that owners submit as a GitHub issue ([EV log submission](https://github.com/AwsomeFox/egmp-aa-ev-hmg-api/issues/new?template=log-submission.yml), label `ev-log`). `tools/evlog.py` checks, cleans and merges them. EV logs cover driving **and** charging: the head unit logs whenever it is on, with or without Android Auto.
 
 The allowlist of header keys and columns is in [`tools/evlog_schema.json`](../tools/evlog_schema.json), loaded by `tools/evlog.py`. To add a field, add it there (and here); old parsers keep working because unknown columns are ignored.
 
@@ -179,4 +179,4 @@ sh tools/test_evlog.sh                     # tests
 
 `merge` uses the file name as the session id when it follows the naming pattern, otherwise `session<N>`.
 
-Owners submit logs through the issue form `.github/ISSUE_TEMPLATE/log-submission.yml` ([open one](https://github.com/willemcvu/egmp-aa-ev-feat/issues/new?template=log-submission.yml)), attaching the files from the drive as they are; the issue is public. The logger only writes allowlisted fields, so cleaning is a check on submissions rather than a step owners need.
+Owners submit logs through the issue form `.github/ISSUE_TEMPLATE/log-submission.yml` ([open one](https://github.com/AwsomeFox/egmp-aa-ev-hmg-api/issues/new?template=log-submission.yml)), attaching the files from the drive as they are; the issue is public. The logger only writes allowlisted fields, so cleaning is a check on submissions rather than a step owners need.
