@@ -211,7 +211,7 @@ public final class ScaleTest {
 
         List<Object[]> t0 = tables(tmpl);
         List<Object[]> t1 = tables(msg);
-        check(t0.size() == t1.size() && t1.size() == 13, "8.1 row count" + c);
+        check(t0.size() == t1.size() && t1.size() == 16, "8.1 row count" + c);
         double k = capWh / (double) REF;
         for (int r = 0; r < t1.size(); r++) {
             long charger = ((Long) t1.get(r)[0]).longValue();
@@ -300,10 +300,23 @@ public final class ScaleTest {
         double bulk = minutes(msg, 350000, cap, 10, 80);
         check(Math.abs(bulk - 14.17) < 0.3, "10->80% on 350 kW ~14.2 min, got " + bulk);
 
-        // Supercharger row keeps flat-to-90%: same minutes per SOC% below 90
-        double sc1 = minutes(msg, 250000, cap, 10, 50);
-        double sc2 = minutes(msg, 250000, cap, 50, 90);
-        check(Math.abs(sc1 - sc2) < 0.2, "250 kW row flat to 90% SOC: " + sc1 + " vs " + sc2);
+        // Supercharger rows (250 kW V3, 325 kW "V3.5"): ~500 V, boost-limited
+        // flat 97 kW charger-side (x 0.95 into the pack) to 90% SOC.
+        double flat = 0.40 * cap / (97000 * 0.95) * 60;  // minutes per 40% SOC
+        for (long sc : new long[] {250000, 325000}) {
+            double sc1 = minutes(msg, sc, cap, 10, 50);
+            double sc2 = minutes(msg, sc, cap, 50, 90);
+            System.out.printf("%d kW Supercharger: 10->80%% %.2f min%n",
+                    sc / 1000, minutes(msg, sc, cap, 10, 80));
+            check(Math.abs(sc1 - sc2) < 0.2, sc + " row flat to 90% SOC: " + sc1 + " vs " + sc2);
+            check(Math.abs(sc1 - flat) < 0.2, sc + " row at 97 kW: " + sc1 + " vs " + flat);
+        }
+        // the 800 V rows bracketing them stay on the full-speed curve
+        double full = minutes(msg, 350000, cap, 10, 80);
+        for (long br : new long[] {330000, 320000, 260000, 240000}) {
+            double m = minutes(msg, br, cap, 10, 80);
+            check(Math.abs(m - full) < 0.05, br + " row = 350 kW row: " + m + " vs " + full);
+        }
 
         // the largest capacity the sender accepts (CAP_MAX_WH): no overflow
         checkScaled(tmpl, EvModelSender.scaleTemplate(tmpl, 90000), 90000);

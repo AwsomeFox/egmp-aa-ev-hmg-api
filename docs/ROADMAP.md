@@ -49,5 +49,6 @@ Use the EV logs (item 2) to correct the model on the car: compare predicted and 
 
 ## To verify (existing features)
 
-- Supercharger charge times: does Maps use the 250 kW table row for Tesla stations?
+- Supercharger charge times: does Maps use the 250 and 325 kW table rows for Tesla stations (V3 and "V3.5"), and the full-speed curve for 500 kW V4 cabinets? Does it interpolate between rows or snap to the nearest? See [ENERGY-MODEL](ENERGY-MODEL.md#tesla-superchargers-2026-11-11).
+- `1.12` (`{enum 0–4, uint32}`): does `{k, 97000}` for any k change Maps' DC charge times? Its enum is too small to be a connector type, so a per-connector limit is unlikely.
 - Cold model on a real winter trip: does Maps add the stop the warm model missed at ~26 °F? (Outside temperature itself is confirmed: raw × 0.5 − 40 °C matches the dash.)
