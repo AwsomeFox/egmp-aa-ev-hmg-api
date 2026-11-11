@@ -20,8 +20,9 @@ docs/ENERGY-MODEL.md:
             driving heater 3.0 kW at -6.7 C, 6.5 kW at -24.4 C, 400 W mild,
             950 W at 45 C
   block 8   charge-time tables per charger power, integrated from block 4
-            with AC limits (10.9 kW onboard, 1.44 kW L1); the 250 kW row is
-            Tesla Supercharger (500 V, boost-limited flat 105 kW to 90%).
+            with AC limits (10.9 kW onboard, 1.44 kW L1); the 250 and 325 kW
+            rows are Tesla Superchargers (~500 V cabinets, boost-limited flat
+            97 kW to 90%).
             Each point is (Wh still needed to reach full, seconds to full),
             descending, like Ford's DC rows - NOT (energy, seconds from empty)
   omitted   1.5, 1.8-1.12, 6, 9, 10 (the Ford sample works without them)
@@ -166,20 +167,30 @@ AUX_TABLE = [
     (35.0, 700), (40.0, 850), (45.0, 950),
 ]
 
-# Tesla Superchargers: in the US they're all listed at exactly 250 kW, and
-# little else is. They run at ~500 V, so the 800 V pack charges through the
-# car's boost converter: owner-measured flat 105 kW from 0 to 90%, no thermal
-# step-down or pause, then the normal taper. Maps keys the time tables by
-# charger power only (no voltage), so the 250 kW row carries this profile.
-SUPERCHARGER_W = 250000
-SUPERCHARGER_FLAT_W = 105000
+# Tesla Superchargers. Google Maps lists them by cabinet:
+#   250 kW  V3 cabinet (V3 posts, and V4 posts on a V3 cabinet)
+#   325 kW  V4 posts on an upgraded V3 cabinet ("V3.5")
+#   500 kW  V4 cabinet (up to 1000 V)
+# The 250 and 325 kW sites run at ~500 V, so a pre-2025 E-GMP pack (800 V)
+# charges through the car's boost converter: flat ~97 kW from 0 to 90%, no
+# thermal step-down or pause, then the normal taper. Owners report a 96-97 kW
+# peak (the first fit used one owner's 105 kW; the lower figure keeps Tesla
+# stops conservative, and a pessimistic Tesla row also steers Maps toward
+# 800 V stations). Only the 500 kW V4 cabinet charges the pack at full
+# speed, so it stays on the 800 V profile (it is above the 350 kW row).
+# Maps keys the time tables by charger power only (no voltage, no network),
+# so the boost limit has to live in those rows.
+SUPERCHARGERS_W = (250000, 325000)
+SUPERCHARGER_FLAT_W = 97000
 SUPERCHARGER_FLAT_TO_WH = 69660  # 90%
 
 # Charger powers for the time tables (DC + 10.9 kW AC + 1.44 kW L1).
-# 260/240 kW are ordinary 800 V rows bracketing the Supercharger row, so a
-# non-Tesla station near 250 kW isn't matched or interpolated onto it.
-CHARGERS_W = [350000, 260000, SUPERCHARGER_W, 240000, 200000, 175000,
-              150000, 125000, 100000, 50000, 25000, 10900, 1440]
+# 260/240 and 330/320 kW are ordinary 800 V rows bracketing the Supercharger
+# rows, so a non-Tesla station near 250 or 325 kW isn't matched or
+# interpolated onto them.
+CHARGERS_W = [350000, 330000, 325000, 320000, 260000, 250000, 240000,
+              200000, 175000, 150000, 125000, 100000, 50000, 25000, 10900,
+              1440]
 # 8.1 grid: GRID_WH = 0.5% of capacity, each cell integrated in GRID_SLICES
 # midpoint slices (the curve has knees at 53% and 80-81%). Rows list headroom
 # (in grid cells) every 5% from 100% down to 10%, every 1% below that, and a
@@ -217,7 +228,7 @@ def interp_curve(energy_wh: float) -> float:
 
 def charger_power(charger_w: int, energy_wh: float) -> float:
     """Charger-side power at this energy on this charger."""
-    if charger_w == SUPERCHARGER_W:
+    if charger_w in SUPERCHARGERS_W:
         if energy_wh < SUPERCHARGER_FLAT_TO_WH:
             return float(SUPERCHARGER_FLAT_W)
         return min(SUPERCHARGER_FLAT_W, interp_curve(energy_wh))
