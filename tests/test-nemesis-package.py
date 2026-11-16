@@ -26,7 +26,7 @@ def main():
    hook(stage,'preinstall.sh',1);(data/'uninstall.sh').touch();hook(stage,'preinstall.sh')
    installed=root/'data/nemesis/apps'/pid;installed.parent.mkdir(parents=True);shutil.copytree(stage,installed);shutil.rmtree(stage)
    if wireless:
-    w=data/'mods/wireless-carplay-aa';w.mkdir();(w/'mod.json').write_text('{"id":"wireless-carplay-aa","version":"2.1.0"}');(w/'patches.json').write_text('{"changes":[]}')
+    w=data/'mods/wireless-carplay-aa';w.mkdir();(w/'mod.json').write_text('{"id":"wireless-carplay-aa","version":"2.2.0"}');(w/'patches.json').write_text('{"changes":[]}')
    hook(installed,'postinstall.sh',0 if wireless else 1);mod=data/'mods'/mid;active=system/'etc/carplay.ev-routing/profile.json'
    if not wireless:
     assert not mod.exists();assert snapshot()==original;print('PASS absent wireless: apply refused, new mod removed, original system intact');continue

@@ -27,12 +27,15 @@ public final class EvRouting extends ModEntry {
         } finally {in.close();}
         identityApi=identityApi(mod);
         identityContribution=vehicleIdentity(new JSONObject(profile));
-        identityApi.registerVehicle("egmp-carplay-ev-routing",identityContribution);
+        if(identityApi!=null)identityApi.registerVehicle(mod.id,identityContribution);
     }
     private static CarPlayIdentification identityApi(ModContext mod) {
         Object published=mod.use("wireless-carplay-aa",CarPlayIdentification.SERVICE);
-        if(!(published instanceof CarPlayIdentification))
-            throw new IllegalStateException("wireless-carplay-aa did not publish "+CarPlayIdentification.SERVICE);
+        if(!(published instanceof CarPlayIdentification)){
+            mod.log("CarPlayEV: wireless-carplay-aa did not publish "+CarPlayIdentification.SERVICE
+                +"; continuing without the vehicle identity contribution");
+            return null;
+        }
         return (CarPlayIdentification)published;
     }
     private static CarPlayIdentification.VehicleIdentity vehicleIdentity(JSONObject profile) throws Exception {
@@ -75,9 +78,9 @@ public final class EvRouting extends ModEntry {
     public void onEnabled(ModContext mod,boolean enabled) throws Throwable {
         if(enabled){
             if(identityApi!=null && identityContribution!=null)
-                identityApi.registerVehicle("egmp-carplay-ev-routing",identityContribution);
+                identityApi.registerVehicle(mod.id,identityContribution);
         }else{
-            if(identityApi!=null)identityApi.removeVehicle("egmp-carplay-ev-routing");
+            if(identityApi!=null)identityApi.removeVehicle(mod.id);
             if(runningMod==mod)stop();
         }
         // Re-enable requires service restart so a new stock listener can register.

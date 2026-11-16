@@ -1,6 +1,6 @@
 # Installation through HMG-API
 
-Requires official HMG-API **1.0.0-beta.6 or newer**, a checked car map, and its enabled/applied **Wireless CarPlay + Android Auto** mod. HMG-API itself may be installed through NEMESIS. Confirm ordinary CarPlay works first. Uninstall older Leafia-based EV extensions and Leafia before migrating.
+Requires official HMG-API **1.0.0-beta.6 or newer**, a checked car map, and its enabled/applied **Wireless CarPlay + Android Auto 2.2.0-rc.4 or newer** mod. HMG-API itself may be installed through NEMESIS. Confirm ordinary CarPlay works first. Uninstall older Leafia-based EV extensions and Leafia before migrating.
 
 ## USB
 

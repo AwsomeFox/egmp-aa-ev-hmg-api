@@ -15,7 +15,7 @@ The existing signed **0.4.0** native mod stays the payload. The store package us
 
 Requires **NEMESIS 1.16.3 or newer** for dependency resolution and `!id` conflicts; preparation was checked against 1.16.7.
 
-The package ID is **`hmgapi.egmp-carplay-ev-routing`**, matching HMG-API’s own NEMESIS sync. Dependencies are HMG-API **1.0+** and its Wireless CarPlay + Android Auto package **2.1.0+**. The old experimental `carplay.ev-routing` wrapper conflicts and must be uninstalled first. The native mod ID and signing key are unchanged.
+The package ID is **`hmgapi.egmp-carplay-ev-routing`**, matching HMG-API’s own NEMESIS sync. Dependencies are HMG-API **1.0+** and its Wireless CarPlay + Android Auto package **2.2.0+**. The old experimental `carplay.ev-routing` wrapper conflicts and must be uninstalled first. The native mod ID and signing key are unchanged.
 
 HMG-API’s generator supplies all install/update/remove scripts unchanged. Our only descriptor adjustment declares the wireless dependency and old-wrapper conflict. Both profiles remain inside one signed payload; HMG-API selects one active profile at Apply.
 
@@ -31,7 +31,7 @@ This verifies the published ZIP’s SHA256, signature, author UUID, ID and versi
 
 ## After the hold is lifted and dependencies are in the store
 
-1. Confirm the store offers `hmgapi` **1.0+** and `hmgapi.wireless-carplay-aa` **2.1.0+** under those exact IDs. Verify compatibility for our listed cars. Store packaging support by itself does not establish that the listings are live.
+1. Confirm the store offers `hmgapi` **1.0+** and `hmgapi.wireless-carplay-aa` **2.2.0+** under those exact IDs. Verify compatibility for our listed cars. Store packaging support by itself does not establish that the listings are live.
 2. Test the prepared wrapper through NEMESIS on the HU. Native v0.4.0 is already HU-tested; the official wrapper has only been tested off the car so far.
 3. Publish the two prepared NEMESIS downloads alongside the existing native mod release, with their separate checksums. Keep the existing native mod/source assets intact.
 4. Upload **the `-nemesis-package.zip`** at [the NEMESIS submission portal](https://portal.xwtk.cloud/nemesis/), give the repository URL and choose **Submit for approval**. Review ID, version, dependencies, compatibility and SHA256. Do not upload the USB layout or source ZIP as the store package.
