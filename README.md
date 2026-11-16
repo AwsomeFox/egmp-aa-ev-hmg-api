@@ -11,7 +11,9 @@ This fork runs it as a mod for [HMG-API](https://github.com/VysseCodes/HMG-API),
 
 - An E-GMP car HMG-API has a hook map for: Hyundai Ioniq 5 (NEEV, NEEV23, NEEV23SE), Kia EV6 (CVEV) or Hyundai Ioniq 6 (CEEV), any region and software. Today HMG-API maps the Ioniq 5 and EV6 in the US (260507) and Canada (260206) and the Ioniq 5 US 260903; the Ioniq 6 US 260903 runs with its own map. Another car: HMG-API's "Map this car from its files", then **Install anyway…**
 - [HMG-API](https://github.com/VysseCodes/HMG-API) 1.0.0 or newer, installed through [NEMESIS](https://github.com/xwtk/hmg_nemesis)
-- HMG-API's **Wireless CarPlay + Android Auto** mod, 2.1.0 or newer. HMG-API won't load this mod without it: its turn-by-turn adds Maps' route data, which preconditioning needs
+- For preconditioning, HMG-API's **Wireless CarPlay + Android Auto** mod, 2.1.0 or newer: its Android Auto library patch hands over Maps' route data, which preconditioning needs. Two builds:
+  - **`egmp-aa-ev`**: everything, preconditioning included. Needs the Wireless mod (HMG-API won't load it without).
+  - **`egmp-aa-ev-standalone`**: everything but preconditioning, without the Wireless mod: wired Android Auto, or the car's own wireless Android Auto. Install one or the other (each refuses the other).
 - The energy model needs a supported Android Auto library build: US 260507 (Ioniq 5 and EV6) or Ioniq 6 US 260903 (see [Limits](#limits)). Elsewhere preconditioning and the EV logs still run
 
 ## Features
@@ -31,11 +33,11 @@ This fork runs it as a mod for [HMG-API](https://github.com/VysseCodes/HMG-API),
 ## Install
 
 1. **Remove the NEMESIS versions first:** in NEMESIS Manager (press NAV three times), uninstall `aa.ev.model` and HMG Leafia Plus, then reboot. They replace the Android Auto files HMG-API expects stock, and two energy models would go to Maps.
-2. Install [HMG-API](https://github.com/VysseCodes/HMG-API/releases) and its Wireless CarPlay + Android Auto mod.
+2. Install [HMG-API](https://github.com/Open-HMG/HMG-API/releases), and for the full build its Wireless CarPlay + Android Auto mod.
 3. **Let hooks run:** the EV6 US 260507 and Ioniq 6 US 260903 maps are verified on a car; the others still need the on-car check. In the HMG-API app's **Settings**, tap **Check the map on this car** (hooks run once it passes and the head unit restarts), or turn on **Try unchecked maps** (at the next restart; the boot guard turns hooks off if the unit fails to start three times). No adb needed. Ioniq 6 support requires an HMG-API build that includes the CEEV US 260903 map.
-4. Download `egmp-aa-ev-<version>.zip` from [Releases](../../releases), put it in a folder `HMGAPI/updates/` on a USB stick, plug it in, and tap **Check USB updates** in the HMG-API app.
-   **Or through NEMESIS:** unzip `egmp-aa-ev-<version>-nemesis.zip` onto an empty USB stick and plug it in, then confirm in NEMESIS. It installs as NEMESIS package `hmgapi.egmp-aa-ev` (needs HMG-API 1.0 or newer and its Wireless CarPlay + Android Auto mod), and HMG-API's engine does the install, so it's the same mod either way. NEMESIS Manager can then update or uninstall it.
-5. The first time it preconditions, HMG-API asks on screen to allow `conditioning` for this mod: allow it.
+4. Download `egmp-aa-ev-<version>.zip` (or `egmp-aa-ev-standalone-<version>.zip`, without the Wireless mod) from [Releases](../../releases), put it in a folder `HMGAPI/updates/` on a USB stick, plug it in, and tap **Check USB updates** in the HMG-API app.
+   **Or through NEMESIS:** unzip `egmp-aa-ev-<version>-nemesis.zip` onto an empty USB stick and plug it in, then confirm in NEMESIS. It installs as NEMESIS package `hmgapi.egmp-aa-ev` (needs HMG-API 1.0 or newer and its Wireless CarPlay + Android Auto mod), or `hmgapi.egmp-aa-ev-standalone`, and HMG-API's engine does the install, so it's the same mod either way. NEMESIS Manager can then update or uninstall it.
+5. (Full build) The first time it preconditions, HMG-API asks on screen to allow `conditioning` for this mod: allow it.
 
 Updates install the same way. To remove it: HMG-API app → the mod → remove. Details, hook points and logs to check: [hmgapi-mod/README.md](hmgapi-mod/README.md).
 
@@ -75,16 +77,18 @@ Logs from different cars, climates and battery ages are what improve the energy 
 
 ## Building and releasing
 
-The HMG-API mod builds from this repo alone, with an [HMG-API](https://github.com/Open-HMG/HMG-API) checkout next to it, and for the tests the [Wireless CarPlay + Android Auto](https://github.com/Open-HMG/hmgapi-wireless-cp-aa) mod's repo (its own repo from HMG-API 1.1.0). No car files:
+The HMG-API mod builds from this repo with the [HMG-API mod SDK](https://github.com/Open-HMG/HMG-API/blob/main/tools/sdk/README.txt) that [`hmgapi-sdk.json`](hmgapi-sdk.json) pins (a release and its SHA-256, the pin HMG-API's reusable mod workflow uses). [`hmgapi-mod/sdk.sh`](hmgapi-mod/sdk.sh) fetches and checks it, with HMG-API's hook maps for the tests, into `.hmgapi/`. The tests also want the [Wireless CarPlay + Android Auto](https://github.com/Open-HMG/hmgapi-wireless-cp-aa) mod's repo next to this one. No car files:
 
 ```sh
-HMGAPI=../HMG-API sh hmgapi-mod/build.sh                       # build/mod/egmp-aa-ev/
-HMGAPI=../HMG-API WIRELESS=../hmgapi-wireless-cp-aa/wireless-carplay-aa \
-  sh hmgapi-mod/test/run.sh                                     # every off-car test
-HMGAPI=../HMG-API sh hmgapi-mod/build.sh ~/hmg-keys/<key>      # + dist/egmp-aa-ev-<version>.zip, signed
+sh hmgapi-mod/build.sh                                         # build/mod/egmp-aa-ev{,-standalone}/
+WIRELESS=../hmgapi-wireless-cp-aa/wireless-carplay-aa \
+  sh hmgapi-mod/test/run.sh                                     # every off-car test, both builds
+sh hmgapi-mod/build.sh ~/hmg-keys/<key>                        # + dist/<id>-<version>.zip, signed
 ```
 
-**Releases** are built by CI ([`.github/workflows/release.yml`](.github/workflows/release.yml)): set `"version"` in `hmgapi-mod/mod.json`, merge, then create a release in GitHub's UI with the tag `v<version>`. CI checks the tag matches, runs the tests, builds the mod signed with the `HMGAPI_AUTHOR_KEY` secret (your HMG-API author key file's contents) and attaches `egmp-aa-ev-<version>.zip` to the release. More: [hmgapi-mod/README.md](hmgapi-mod/README.md#releasing).
+Both builds come from the same sources: [`hmgapi-mod/variants.py`](hmgapi-mod/variants.py) makes the standalone one's `mod.json` and `settings.json` (no `requires`, conditioning command, relay service or preconditioning settings). To move to a newer HMG-API, change `hmgapi-sdk.json` (and `WIRELESS_REF` in both workflows); CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) builds and tests every push and pull request.
+
+**Releases** are built by CI ([`.github/workflows/release.yml`](.github/workflows/release.yml)): set `"version"` in `hmgapi-mod/mod.json`, merge, then create a release in GitHub's UI with the tag `v<version>`. CI checks the tag matches, runs the tests, builds both mods signed with the `HMGAPI_AUTHOR_KEY` secret (your HMG-API author key file's contents) and attaches each one's zip and NEMESIS packages to the release. More: [hmgapi-mod/README.md](hmgapi-mod/README.md#releasing).
 
 ## Legacy: NEMESIS + Leafia package
 

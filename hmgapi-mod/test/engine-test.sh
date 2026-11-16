@@ -6,39 +6,39 @@
 # declares is mapped and planned, its services, command, USB folder and Android
 # Auto settings are taken, and each library recipe parses and stays clear of
 # the Wireless mod's recipe for the same library build.
-#   HMGAPI=<HMG-API checkout> [WIRELESS=<the Wireless mod's folder>] sh hmgapi-mod/test/engine-test.sh
-# WIRELESS: from HMG-API 1.1.0 the Wireless CarPlay + Android Auto mod lives in its own repo
-# (Open-HMG/hmgapi-wireless-cp-aa); default ../hmgapi-wireless-cp-aa/wireless-carplay-aa, or
-# the HMG-API checkout's mods/wireless-carplay-aa where it still has one (1.0.x).
+# Both builds (hmgapi-mod/variants.py): egmp-aa-ev, beside the Wireless mod it requires, and
+# egmp-aa-ev-standalone, alone (no Wireless, no preconditioning). Then the two together:
+# HMG-API refuses that (their "conflicts").
+#   HMGAPI_SDK=<unpacked mod SDK> HMGAPI_MAPS=<HMG-API's maps/> WIRELESS=<the Wireless mod's folder> \
+#     sh hmgapi-mod/test/engine-test.sh
+# (hmgapi-mod/sdk.sh sets the first two; WIRELESS defaults to ../hmgapi-wireless-cp-aa/wireless-carplay-aa)
 set -e
 cd "$(dirname "$0")/../.."
 REPO=$PWD
-HMGAPI=${HMGAPI:-$REPO/../HMG-API}
-HMGAPI=$(cd "$HMGAPI" && pwd)
-MOD=$REPO/build/mod/egmp-aa-ev
-if [ -z "$WIRELESS" ]; then
-    WIRELESS=$HMGAPI/mods/wireless-carplay-aa
-    [ -f "$WIRELESS/mod.json" ] || WIRELESS=$REPO/../hmgapi-wireless-cp-aa/wireless-carplay-aa
-fi
+[ -f "${HMGAPI_SDK:-/nonexistent}/lib/hmgapi-engine.jar" ] || { echo "no mod SDK (HMGAPI_SDK; eval \"\$(sh hmgapi-mod/sdk.sh)\")"; exit 1; }
+[ -d "${HMGAPI_MAPS:-/nonexistent}" ] || { echo "no hook maps (HMGAPI_MAPS: HMG-API's maps/ at the SDK's commit; hmgapi-mod/sdk.sh)"; exit 1; }
+WIRELESS=${WIRELESS:-$REPO/../hmgapi-wireless-cp-aa/wireless-carplay-aa}
 [ -f "$WIRELESS/mod.json" ] || { echo "no Wireless mod at $WIRELESS (set WIRELESS to its folder in Open-HMG/hmgapi-wireless-cp-aa)"; exit 1; }
 WIRELESS=$(cd "$WIRELESS" && pwd)
-[ -f "$MOD/hooks.jar" ] || { echo "build the mod first: sh hmgapi-mod/build.sh"; exit 1; }
-CP=$(mktemp -d); T=$(mktemp -d)
-trap 'rm -rf "$CP" "$T"' EXIT
-javac --release 8 -Xlint:-options -nowarn -d "$CP" "$HMGAPI"/core/runtime/java/hmgapi/engine/*.java
+FULL=$REPO/build/mod/egmp-aa-ev
+SOLO=$REPO/build/mod/egmp-aa-ev-standalone
+[ -f "$FULL/hooks.jar" ] && [ -f "$SOLO/hooks.jar" ] || { echo "build the mods first: sh hmgapi-mod/build.sh"; exit 1; }
+CP=$HMGAPI_SDK/lib/hmgapi-engine.jar
+T=$(mktemp -d); D=$(mktemp -d)
+trap 'rm -rf "$T" "$D"' EXIT
 fail=0
 has() { case "$3" in *"$2"*) echo "ok    $1" ;; *) echo "FAIL  $1: wanted [$2] in:"; echo "$3" | sed 's/^/        /'; fail=1 ;; esac; }
 hasnt() { case "$3" in *"$2"*) echo "FAIL  $1: [$2] in:"; echo "$3" | sed 's/^/        /'; fail=1 ;; *) echo "ok    $1" ;; esac; }
 
-unit() {   # unit <ro.build.product>: a fake head unit with the maps and the mod
-    R=$T/$1; rm -rf "$R"
+unit() {   # unit <ro.build.product> <mod folder>...: a fake head unit with the maps and those mods
+    R=$T/$1; rm -rf "$R"; P1=$1; shift
     mkdir -p "$R/system/lib" "$R/system/app" "$R/data/hmgapi/mods" "$R/data/hmgapi/settings"
-    printf 'ro.build.product=%s\nro.build.version.release=4.4.2\n' "$1" > "$R/system/build.prop"
-    cp -r "$HMGAPI/maps" "$R/data/hmgapi/maps"
-    python3 -c 'import glob,json,sys; [print(p["id"]) for f in sorted(glob.glob(sys.argv[1]+"/core/hookpoints/*.json")) for p in json.load(open(f))["points"]]' "$HMGAPI" > "$R/data/hmgapi/maps/points.txt"
-    cp -r "$MOD" "$R/data/hmgapi/mods/egmp-aa-ev"
-    # next to HMG-API's own Wireless CarPlay + Android Auto mod, as on a car
-    cp -r "$WIRELESS" "$R/data/hmgapi/mods/wireless-carplay-aa"
+    printf 'ro.build.product=%s\nro.build.version.release=4.4.2\n' "$P1" > "$R/system/build.prop"
+    cp -r "$HMGAPI_MAPS" "$R/data/hmgapi/maps"
+    cp "$HMGAPI_SDK/points.txt" "$R/data/hmgapi/maps/points.txt"
+    for m in "$@"; do
+        cp -r "$m" "$R/data/hmgapi/mods/$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["id"])' "$m/mod.json")"
+    done
     # Testing maps lets this off-car fixture exercise maps that are not marked
     # verified yet (the CEEV 260903 map itself is car-verified).
     mkdir -p "$R/data/hmgapi/settings/allow" && touch "$R/data/hmgapi/settings/allow/testing_maps"
@@ -63,51 +63,78 @@ for cj in glob.glob(R + "/data/hmgapi/maps/*/*/*/*/car.json"):
     json.dump(car, open(cj, "w"), indent=2)
 PY
 }
-eng() { set +e; out=$(HMGAPI_ROOT=$R HMGAPI_HOST=1 HMGAPI_PRODUCT=$P java -cp "$CP" hmgapi.engine.Engine "$@" 2>&1); rc=$?; set -e; }
+eng() { set +e; out=$(HMGAPI_ROOT=$R HMGAPI_HOST=1 HMGAPI_PRODUCT=$P1 java -cp "$CP" hmgapi.engine.Engine "$@" 2>&1); rc=$?; set -e; }
 
 PRODUCTS="NEEV23.USA.0000.V015.012.260507 NEEV.USA.0000.V015.012.260507 NEEV23.USA.0000.V016.010.260903"
-# and every other E-GMP car whose map this HMG-API checkout has
+# and every other E-GMP car whose map the SDK's HMG-API has
 for e in "kia/ev6/usa/260507 CVEV.USA.0000.V015.012.260507" "kia/ev6/can/260206 CVEV.CAN.0000.V015.010.260206" \
          "hyundai/neev/can/260206 NEEV.CAN.0000.V015.010.260206" "hyundai/ceev/usa/260903 CEEV.USA.0000.V016.010.260903"; do
     set -- $e
-    [ -f "$HMGAPI/maps/$1/car.json" ] && PRODUCTS="$PRODUCTS $2"
+    [ -f "$HMGAPI_MAPS/$1/car.json" ] && PRODUCTS="$PRODUCTS $2"
 done
-for P in $PRODUCTS; do
-    unit $P
-    eng plan
-    has "$P: plan runs" "egmp-aa-ev" "$out"
-    hasnt "$P: no mod.json errors, matches the car" "egmp-aa-ev: " "$(echo "$out" | grep -i 'error\|isn.t one\|must be\|needs \|matches none' || true)"
-    # (the conditioning command's own description, HMG-API 1.0.0, says when a start is refused)
-    hasnt "$P: hooks not refused" "refused" "$(echo "$out" | grep -v '^vehicle ' || true)"
-    hasnt "$P: hooks load" "won't load" "$out"
-    has "$P: shares GPM's next-turn callback with the Wireless mod" "gpm.navigation_status.next_turn: " "$out"
-    has "$P: conditioning command" "conditioning" "$out"
-    has "$P: relay service" "relay" "$out"
-    has "$P: offload service" "offload" "$out"
-    echo "$out" > "$T/plan-$P.txt"
-done
-# which cars the mod is for (mod.json "system"), by HMG-API's own check: every E-GMP
-# model HMG-API can map (Ioniq 5, EV6, Ioniq 6), any region and firmware. Whether it
-# runs is then up to HMG-API's map for that unit (hooks off without one), the library
-# recipe for its Android Auto library build (no energy model without one), and the
-# mod's own EV check (EvCar.notAnEvWeFit). Any other model, gas cars included, isn't
-sys() { HMGAPI_ROOT=$T/none HMGAPI_PRODUCT=$1 java -cp "$CP" hmgapi.engine.SystemCheck "$MOD" 2>&1 || true; }
-for P in NEEV23.USA.0000.V017.001.261201 NEEV23SE.USA.0000.V015.012.260507 CEEV.USA.0000.V016.010.260903 \
-         CEEV.USA.0000.V017.001.261201 NEEV23.USA.0000.V014.005.250101 CVEV.USA.0000.V015.012.260507 \
-         CVEV.CAN.0000.V015.010.260206 NEEV.CAN.0000.V015.010.260206; do
-    has "$P: for this car" "ok: egmp-aa-ev supports this unit" "$(sys $P)"
-done
-has "a Kia K5 (gas): not for this car" "needs model" "$(sys DL3.USA.0000.V015.012.260507)"
-has "a K5 Hybrid: not for this car" "needs model" "$(sys DL3HEV.USA.0000.V015.012.260507)"
-P=NEEV23.USA.0000.V017.001.261201
-unit $P
-eng plan
-has "$P: no map yet, so its hooks are off" "egmp-aa-ev won't load" "$out"
 
-# every hook point the mod declares is in each car's map (the "all hooks are there" check)
-# every car this HMG-API checkout has a map for (the mod installs on all of them)
-MAPS=$(for c in "$HMGAPI"/maps/*/*/*/*/car.json; do dirname "$c"; done)
-for m in $MAPS; do
+cat > "$D/R.java" <<'J'
+import hmgapi.engine.MemRecipe;
+import java.nio.file.*;
+public class R {
+    public static void main(String[] a) throws Exception {
+        MemRecipe ours = MemRecipe.parse(new String(Files.readAllBytes(Paths.get(a[0]))));
+        System.out.println("recipe " + ours.id + ": " + ours.verifies.size() + " verify, " + ours.patchAt.size() + " patch");
+        for (int i = 1; i < a.length; i++) {
+            MemRecipe o = MemRecipe.parse(new String(Files.readAllBytes(Paths.get(a[i]))));
+            for (long[] x : ours.regions()) for (long[] y : o.regions())
+                if (x[0] < y[1] && y[0] < x[1]) { System.out.println("OVERLAP with " + o.id + " at 0x" + Long.toHexString(x[0])); System.exit(1); }
+            System.out.println("clear of " + o.id);
+        }
+    }
+}
+J
+javac -cp "$CP" -d "$D" "$D/R.java"
+
+# check_mod <mod folder> <full|standalone>
+check_mod() {
+    MOD=$1; KIND=$2
+    ID=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["id"])' "$MOD/mod.json")
+    echo "=== $ID"
+    for P in $PRODUCTS; do
+        if [ $KIND = full ]; then unit $P "$MOD" "$WIRELESS"; else unit $P "$MOD"; fi
+        eng plan
+        has "$P: plan runs" "$ID" "$out"
+        hasnt "$P: no mod.json errors, matches the car" "$ID: " "$(echo "$out" | grep -i 'error\|isn.t one\|must be\|needs \|matches none' || true)"
+        # (the conditioning command's own description says when a start is refused)
+        hasnt "$P: hooks not refused" "refused" "$(echo "$out" | grep -v '^vehicle ' || true)"
+        hasnt "$P: hooks load" "won't load" "$out"
+        has "$P: offload service" "offload" "$out"
+        if [ $KIND = full ]; then
+            has "$P: shares GPM's next-turn callback with the Wireless mod" "gpm.navigation_status.next_turn: " "$out"
+            has "$P: conditioning command" "conditioning" "$out"
+            has "$P: relay service" "relay" "$out"
+        else
+            hasnt "$P: no Wireless mod needed" "wireless-carplay-aa" "$out"
+            hasnt "$P: no conditioning command" "conditioning" "$out"
+            hasnt "$P: no relay service" "relay" "$out"
+        fi
+        echo "$out" > "$T/plan-$ID-$P.txt"
+    done
+    # which cars the mod is for (mod.json "system"), by HMG-API's own check: every E-GMP
+    # model HMG-API can map (Ioniq 5, EV6, Ioniq 6), any region and firmware. Whether it
+    # runs is then up to HMG-API's map for that unit (hooks off without one), the library
+    # recipe for its Android Auto library build (no energy model without one), and the
+    # mod's own EV check (EvCar.notAnEvWeFit). Any other model, gas cars included, isn't
+    for P in NEEV23.USA.0000.V017.001.261201 NEEV23SE.USA.0000.V015.012.260507 CEEV.USA.0000.V016.010.260903 \
+             CEEV.USA.0000.V017.001.261201 NEEV23.USA.0000.V014.005.250101 CVEV.USA.0000.V015.012.260507 \
+             CVEV.CAN.0000.V015.010.260206 NEEV.CAN.0000.V015.010.260206; do
+        has "$P: for this car" "ok: $ID supports this unit" "$(sys $P)"
+    done
+    has "a Kia K5 (gas): not for this car" "needs model" "$(sys DL3.USA.0000.V015.012.260507)"
+    has "a K5 Hybrid: not for this car" "needs model" "$(sys DL3HEV.USA.0000.V015.012.260507)"
+    P=NEEV23.USA.0000.V017.001.261201
+    if [ $KIND = full ]; then unit $P "$MOD" "$WIRELESS"; else unit $P "$MOD"; fi
+    eng plan
+    has "$P: no map yet, so its hooks are off" "$ID won't load" "$out"
+
+    # every hook point the mod declares is in each car's map (the "all hooks are there" check)
+    for m in $(for c in "$HMGAPI_MAPS"/*/*/*/*/car.json; do dirname "$c"; done); do
     r=$(python3 - "$MOD/mod.json" "$m" <<'PY'
 import glob, json, sys
 mod = json.load(open(sys.argv[1]))
@@ -130,43 +157,40 @@ gone = [p for p in want if p not in have or p in missing]
 print("missing: " + " ".join(gone) if gone else "all %d mapped" % len(want))
 PY
 )
-    has "${m#$HMGAPI/maps/}: every point the mod uses is mapped" "all " "$r"
-done
+        has "${m#$HMGAPI_MAPS/}: every point the mod uses is mapped" "all " "$r"
+    done
 
-echo "--- plan on NEEV23 260507:"; sed 's/^/    /' "$T/plan-NEEV23.USA.0000.V015.012.260507.txt"
-
-# the recipe: parses, and no region overlaps the Wireless mod's recipes
-cat > "$T/R.java" <<'J'
-import hmgapi.engine.MemRecipe;
-import java.nio.file.*;
-public class R {
-    public static void main(String[] a) throws Exception {
-        MemRecipe ours = MemRecipe.parse(new String(Files.readAllBytes(Paths.get(a[0]))));
-        System.out.println("recipe " + ours.id + ": " + ours.verifies.size() + " verify, " + ours.patchAt.size() + " patch");
-        for (int i = 1; i < a.length; i++) {
-            MemRecipe o = MemRecipe.parse(new String(Files.readAllBytes(Paths.get(a[i]))));
-            for (long[] x : ours.regions()) for (long[] y : o.regions())
-                if (x[0] < y[1] && y[0] < x[1]) { System.out.println("OVERLAP with " + o.id + " at 0x" + Long.toHexString(x[0])); System.exit(1); }
-            System.out.println("clear of " + o.id);
-        }
-    }
+    # the recipes: parse, and no region overlaps the Wireless mod's recipe for that library build
+    for ours in "$MOD"/recipes/ev-sensor-*.recipe; do
+        suffix=${ours##*/ev-sensor-}; suffix=${suffix%.recipe}
+        wireless="$WIRELESS/recipes/aa-tbt-$suffix.recipe"
+        set +e
+        if [ -f "$wireless" ]; then r=$(java -cp "$CP:$D" R "$ours" "$wireless" 2>&1); rc=$?
+        else r=$(java -cp "$CP:$D" R "$ours" 2>&1); rc=$?
+        fi
+        set -e
+        has "recipe ev-sensor-$suffix parses (4 verify, 3 patch)" "4 verify, 3 patch" "$r"
+        [ -f "$wireless" ] && has "recipe ev-sensor-$suffix clear of the matching Wireless recipe" "clear of aa-tbt-$suffix" "$r"
+        [ $rc -eq 0 ] || { echo "FAIL  recipe check: $r"; fail=1; }
+    done
 }
-J
-javac -cp "$CP" -d "$CP" "$T/R.java"
-for ours in "$MOD"/recipes/ev-sensor-*.recipe; do
-    suffix=${ours##*/ev-sensor-}; suffix=${suffix%.recipe}
-    wireless="$WIRELESS/recipes/aa-tbt-$suffix.recipe"
-    set +e
-    if [ -f "$wireless" ]; then
-        r=$(java -cp "$CP" R "$ours" "$wireless" 2>&1); rc=$?
-    else
-        r=$(java -cp "$CP" R "$ours" 2>&1); rc=$?
-    fi
-    set -e
-    has "recipe ev-sensor-$suffix parses (4 verify, 3 patch)" "4 verify, 3 patch" "$r"
-    if [ -f "$wireless" ]; then
-        has "recipe ev-sensor-$suffix clear of the matching Wireless recipe" "clear of aa-tbt-$suffix" "$r"
-    fi
-    [ $rc -eq 0 ] || { echo "FAIL  recipe check: $r"; fail=1; }
-done
+sys() { HMGAPI_ROOT=$T/none HMGAPI_PRODUCT=$1 java -cp "$CP" hmgapi.engine.SystemCheck "$MOD" 2>&1 || true; }
+
+check_mod "$FULL" full
+check_mod "$SOLO" standalone
+
+echo "=== both"
+P=NEEV23.USA.0000.V015.012.260507
+unit $P "$FULL" "$SOLO" "$WIRELESS"
+eng plan
+# HMG-API (1.1.0) checks "conflicts" only for mods that change files, so this plan
+# doesn't refuse it yet: HmgApiEntry.standDown keeps the standalone build off instead
+# (ModTest). Both declare the other, so it's refused here once HMG-API checks it.
+has "both builds declare the other in conflicts" "egmp-aa-ev egmp-aa-ev-standalone" "$(python3 -c 'import json,sys; print(" ".join(sorted(c for f in sys.argv[1:] for c in json.load(open(f))["conflicts"])))' "$FULL/mod.json" "$SOLO/mod.json")"
+unit $P "$SOLO" "$WIRELESS"
+eng plan
+# (the fake unit has no Wi-Fi chip, so the Wireless mod itself reports it doesn't fit: not a conflict)
+hasnt "standalone beside the Wireless mod: no conflict" "conflict" "$out"
+
+echo "--- plan on NEEV23 260507:"; sed 's/^/    /' "$T/plan-egmp-aa-ev-NEEV23.USA.0000.V015.012.260507.txt"
 exit $fail

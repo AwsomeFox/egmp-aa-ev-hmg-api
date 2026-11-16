@@ -35,26 +35,28 @@ preconditioning), `gpm.receiver.destroy` and
 ## Build
 
 Needs a JDK, the Android SDK (build-tools and a platform `android.jar`; `ANDROID_HOME`)
-and an HMG-API checkout (`HMGAPI`, default `../HMG-API`). No car files.
+and the HMG-API mod SDK `hmgapi-sdk.json` pins (`sh hmgapi-mod/sdk.sh` fetches it, with HMG-API's
+hook maps for the tests; or set `HMGAPI_SDK` and `HMGAPI_MAPS`). No car files.
 
 ```bash
-HMGAPI=../HMG-API sh hmgapi-mod/build.sh
+sh hmgapi-mod/build.sh
 ```
 
 ```bash
-HMGAPI=../HMG-API WIRELESS=../hmgapi-wireless-cp-aa/wireless-carplay-aa sh hmgapi-mod/test/run.sh
+WIRELESS=../hmgapi-wireless-cp-aa/wireless-carplay-aa sh hmgapi-mod/test/run.sh
 ```
 
-The first gives `build/mod/egmp-aa-ev/`. With your HMG-API author key it also signs the
-package, `dist/egmp-aa-ev-<version>.zip`. Make a key once, keep it private and backed up
+The first gives `build/mod/egmp-aa-ev/` and `build/mod/egmp-aa-ev-standalone/` (no Wireless mod,
+no preconditioning; [`variants.py`](variants.py)). With your HMG-API author key it also signs the
+packages, `dist/<id>-<version>.zip`. Make a key once, keep it private and backed up
 (a lost key means owners must remove the mod before installing a new one):
 
 ```bash
-java -cp ../HMG-API/out/engine-host hmgapi.engine.Signing keygen ~/hmg-keys/egmp.key
+java -cp "$HMGAPI_SDK/lib/hmgapi-engine.jar" hmgapi.engine.Signing keygen ~/hmg-keys/egmp.key
 ```
 
 ```bash
-HMGAPI=../HMG-API sh hmgapi-mod/build.sh ~/hmg-keys/egmp.key
+sh hmgapi-mod/build.sh ~/hmg-keys/egmp.key
 ```
 
 ## Install (on a car with HMG-API)
