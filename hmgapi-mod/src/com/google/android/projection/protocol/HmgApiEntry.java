@@ -259,7 +259,7 @@ public final class HmgApiEntry extends ModEntry {
         });
         mod.log("EV routing hooks in " + app.processName + " (energy model "
                 + (mod.settingBoolean("energy_model", true) ? "on" : "off") + ", preconditioning "
-                + (mod.settingBoolean("preconditioning", true) ? "on" : "off") + ", EV log "
+                + (precondOn() ? "on" : "off") + ", EV log "
                 + (mod.settingBoolean("ev_log", true) ? "on" : "off") + ", live data "
                 + (mod.settingBoolean("live_data", true) ? "on" : "off") + ")");
     }
