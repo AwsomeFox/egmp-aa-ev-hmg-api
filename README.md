@@ -75,11 +75,12 @@ Logs from different cars, climates and battery ages are what improve the energy 
 
 ## Building and releasing
 
-The HMG-API mod builds from this repo alone, with an [HMG-API](https://github.com/VysseCodes/HMG-API) checkout next to it (no car files):
+The HMG-API mod builds from this repo alone, with an [HMG-API](https://github.com/Open-HMG/HMG-API) checkout next to it, and for the tests the [Wireless CarPlay + Android Auto](https://github.com/Open-HMG/hmgapi-wireless-cp-aa) mod's repo (its own repo from HMG-API 1.1.0). No car files:
 
 ```sh
 HMGAPI=../HMG-API sh hmgapi-mod/build.sh                       # build/mod/egmp-aa-ev/
-HMGAPI=../HMG-API sh hmgapi-mod/test/run.sh                    # every off-car test
+HMGAPI=../HMG-API WIRELESS=../hmgapi-wireless-cp-aa/wireless-carplay-aa \
+  sh hmgapi-mod/test/run.sh                                     # every off-car test
 HMGAPI=../HMG-API sh hmgapi-mod/build.sh ~/hmg-keys/<key>      # + dist/egmp-aa-ev-<version>.zip, signed
 ```
 

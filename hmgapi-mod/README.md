@@ -42,7 +42,7 @@ HMGAPI=../HMG-API sh hmgapi-mod/build.sh
 ```
 
 ```bash
-HMGAPI=../HMG-API sh hmgapi-mod/test/run.sh
+HMGAPI=../HMG-API WIRELESS=../hmgapi-wireless-cp-aa/wireless-carplay-aa sh hmgapi-mod/test/run.sh
 ```
 
 The first gives `build/mod/egmp-aa-ev/`. With your HMG-API author key it also signs the

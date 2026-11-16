@@ -21,8 +21,11 @@ permissions:
   contents: write
 
 env:
-  # the HMG-API the mod is built and tested against (a release tag)
-  HMGAPI_REF: v1.0.1
+  # the HMG-API the mod is built and tested against (a release tag), and the Wireless
+  # CarPlay + Android Auto mod it's tested beside: from HMG-API 1.1.0 that mod lives in its
+  # own repo. Move both together, to the versions an HMG-API release ships.
+  HMGAPI_REF: v1.1.0-rc.2
+  WIRELESS_REF: v2.2.0-rc.3
 
 jobs:
   hmgapi-mod:
@@ -38,9 +41,15 @@ jobs:
 
       - uses: actions/checkout@v4
         with:
-          repository: VysseCodes/HMG-API
+          repository: Open-HMG/HMG-API
           ref: ${{ env.HMGAPI_REF }}
           path: HMG-API
+
+      - uses: actions/checkout@v4
+        with:
+          repository: Open-HMG/hmgapi-wireless-cp-aa
+          ref: ${{ env.WIRELESS_REF }}
+          path: hmgapi-wireless-cp-aa
 
       - uses: actions/setup-java@v4
         with:
@@ -65,6 +74,7 @@ jobs:
       - name: Build and test
         env:
           HMGAPI: ${{ github.workspace }}/HMG-API
+          WIRELESS: ${{ github.workspace }}/hmgapi-wireless-cp-aa/wireless-carplay-aa
         run: |
           sh hmgapi-mod/build.sh
           sh hmgapi-mod/test/run.sh

@@ -6,13 +6,22 @@
 # declares is mapped and planned, its services, command, USB folder and Android
 # Auto settings are taken, and each library recipe parses and stays clear of
 # the Wireless mod's recipe for the same library build.
-#   HMGAPI=<HMG-API checkout> sh hmgapi-mod/test/engine-test.sh
+#   HMGAPI=<HMG-API checkout> [WIRELESS=<the Wireless mod's folder>] sh hmgapi-mod/test/engine-test.sh
+# WIRELESS: from HMG-API 1.1.0 the Wireless CarPlay + Android Auto mod lives in its own repo
+# (Open-HMG/hmgapi-wireless-cp-aa); default ../hmgapi-wireless-cp-aa/wireless-carplay-aa, or
+# the HMG-API checkout's mods/wireless-carplay-aa where it still has one (1.0.x).
 set -e
 cd "$(dirname "$0")/../.."
 REPO=$PWD
 HMGAPI=${HMGAPI:-$REPO/../HMG-API}
 HMGAPI=$(cd "$HMGAPI" && pwd)
 MOD=$REPO/build/mod/egmp-aa-ev
+if [ -z "$WIRELESS" ]; then
+    WIRELESS=$HMGAPI/mods/wireless-carplay-aa
+    [ -f "$WIRELESS/mod.json" ] || WIRELESS=$REPO/../hmgapi-wireless-cp-aa/wireless-carplay-aa
+fi
+[ -f "$WIRELESS/mod.json" ] || { echo "no Wireless mod at $WIRELESS (set WIRELESS to its folder in Open-HMG/hmgapi-wireless-cp-aa)"; exit 1; }
+WIRELESS=$(cd "$WIRELESS" && pwd)
 [ -f "$MOD/hooks.jar" ] || { echo "build the mod first: sh hmgapi-mod/build.sh"; exit 1; }
 CP=$(mktemp -d); T=$(mktemp -d)
 trap 'rm -rf "$CP" "$T"' EXIT
@@ -29,7 +38,7 @@ unit() {   # unit <ro.build.product>: a fake head unit with the maps and the mod
     python3 -c 'import glob,json,sys; [print(p["id"]) for f in sorted(glob.glob(sys.argv[1]+"/core/hookpoints/*.json")) for p in json.load(open(f))["points"]]' "$HMGAPI" > "$R/data/hmgapi/maps/points.txt"
     cp -r "$MOD" "$R/data/hmgapi/mods/egmp-aa-ev"
     # next to HMG-API's own Wireless CarPlay + Android Auto mod, as on a car
-    cp -r "$HMGAPI/mods/wireless-carplay-aa" "$R/data/hmgapi/mods/wireless-carplay-aa"
+    cp -r "$WIRELESS" "$R/data/hmgapi/mods/wireless-carplay-aa"
     # Testing maps lets this off-car fixture exercise maps that are not marked
     # verified yet (the CEEV 260903 map itself is car-verified).
     mkdir -p "$R/data/hmgapi/settings/allow" && touch "$R/data/hmgapi/settings/allow/testing_maps"
@@ -146,7 +155,7 @@ J
 javac -cp "$CP" -d "$CP" "$T/R.java"
 for ours in "$MOD"/recipes/ev-sensor-*.recipe; do
     suffix=${ours##*/ev-sensor-}; suffix=${suffix%.recipe}
-    wireless="$HMGAPI/mods/wireless-carplay-aa/recipes/aa-tbt-$suffix.recipe"
+    wireless="$WIRELESS/recipes/aa-tbt-$suffix.recipe"
     set +e
     if [ -f "$wireless" ]; then
         r=$(java -cp "$CP" R "$ours" "$wireless" 2>&1); rc=$?
