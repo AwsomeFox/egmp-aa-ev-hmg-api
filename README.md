@@ -27,8 +27,9 @@ This fork runs it as a mod for [HMG-API](https://github.com/VysseCodes/HMG-API),
 - **EV connectors:** Maps is told the car is electric with CCS1 and J1772, for charger filtering.
 - **Live battery data for phone apps:** the battery %, the range the cluster shows and the odometer go to the phone as Android Auto's fuel and odometer data, so apps that read the car's data through Android Auto (A Better Route Planner, for one) show the live battery level. No library patch needed, so it works on any Android Auto library build.
 - **Preconditioning:** when the next stop is a charger over 50 kW within an hour, the car is asked to warm the battery, through HMG-API's reviewed `conditioning` command. The minimum power, the start window, the arrival distance and the starts per route are settings. Off with the mod's setting or the car's own *battery conditioning* setting.
+- **Learns your car:** steady highway drives (10 km at 60 km/h or more) teach the model this car's real road load, between 0.7× and 1.3× the shipped one, used from the next Android Auto session. Needs EV logs on; turning the setting off forgets it.
 - **EV logs:** driving and charging, whenever the head unit is on; copied to any USB drive with an `egmp-aa-ev-logs` folder; share them through an [EV log issue](https://github.com/AwsomeFox/egmp-aa-ev-hmg-api/issues/new?template=log-submission.yml).
-- **Settings** in the HMG-API app: energy model, battery % curve, preconditioning (and its thresholds: chargers faster than 50 kW, start within 60 min, arrived within 200 m, 3 starts per route), live battery data, EV logs. All on by default; the thresholds apply at once, the rest when Android Auto restarts.
+- **Settings** in the HMG-API app: energy model, battery % curve, preconditioning (and its thresholds: chargers faster than 50 kW, start within 60 min, arrived within 200 m, 3 starts per route), live battery data, learning this car's highway consumption, EV logs. All on by default; the thresholds apply at once, the rest when Android Auto restarts.
 
 ## Install
 

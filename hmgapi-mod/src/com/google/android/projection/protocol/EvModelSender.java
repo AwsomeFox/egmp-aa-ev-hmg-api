@@ -26,7 +26,8 @@ import android.util.Log;
  *    (aux/HVAC table lookup) and road load A (cold penalty,
  *    EvModelTemplate.COLD_*)
  *  - the product id (ro.build.product) picks the road load for this model
- *    (EvModelTemplate.CAR_*, e.g. the EV6's), patched into A and C
+ *    (EvModelTemplate.CAR_*, e.g. the EV6's), patched into A and C, times
+ *    the scale RoadLearn has learned on this car (read once per session)
  *  - EV_AVLBL_ENRG / HEV 0x31 (BMS available energy, 2 Wh steps): current
  *    energy, and usable capacity learned as the energy at 100% display (see
  *    learnCapacity); the charge curve and charge-time tables are rescaled to
@@ -112,6 +113,9 @@ public final class EvModelSender {
             if (sRunning) {
                 return;
             }
+            sScale = RoadLearn.scale();
+            Log.i(TAG, "road load scale " + sScale + " (learned from "
+                    + RoadLearn.samples() + " highway stretches)");
             sRunning = true;
             sThread = new Thread(new Runnable() {
                 @Override
@@ -206,9 +210,9 @@ public final class EvModelSender {
         }
         pickRoadLoad();
         float roadA = coldRoadLoadA(outOk ? Math.round(outC)
-                : Integer.MIN_VALUE);
+                : Integer.MIN_VALUE) * sScale;
         writeFloatLe(msg, EvModelTemplate.ROAD_A_OFFSET, roadA);
-        writeFloatLe(msg, EvModelTemplate.ROAD_C_OFFSET, sBaseC);
+        writeFloatLe(msg, EvModelTemplate.ROAD_C_OFFSET, sBaseC * sScale);
         int rc = sSource.send(msg);
         if (sBatteryCurve) {
             sendBatteryCurve(wh, cap, halfPct);
@@ -264,18 +268,31 @@ public final class EvModelSender {
 
     // ---- road load per model -------------------------------------------------
 
-    private static float sBaseA = Float.NaN;  // this model's A and C, set once
-    private static float sBaseC = EvModelTemplate.ROAD_C_N;
+    private static volatile float sBaseA = Float.NaN;  // this model's A and C, set once
+    private static volatile float sBaseC = EvModelTemplate.ROAD_C_N;
+    private static volatile float sScale = 1f;  // RoadLearn's, fixed for the session
+
+    /** This model's road load A (N) before the learned scale and the cold penalty. Any thread. */
+    static float baseRoadA() {
+        pickRoadLoad();
+        return sBaseA;
+    }
+
+    /** This model's road load C (N/(m/s)^2) before the learned scale. Any thread. */
+    static float baseRoadC() {
+        pickRoadLoad();
+        return sBaseC;
+    }
 
     /** Once: the road load for this model from the product id. */
-    private static void pickRoadLoad() {
+    private static synchronized void pickRoadLoad() {
         if (!Float.isNaN(sBaseA)) {
             return;
         }
         String product = EvDriveLog.prop("ro.build.product");
         int i = carIndex(product);
-        sBaseA = i < 0 ? EvModelTemplate.ROAD_A_N : EvModelTemplate.CAR_ROAD_A_N[i];
         sBaseC = i < 0 ? EvModelTemplate.ROAD_C_N : EvModelTemplate.CAR_ROAD_C_N[i];
+        sBaseA = i < 0 ? EvModelTemplate.ROAD_A_N : EvModelTemplate.CAR_ROAD_A_N[i];
         Log.i(TAG, "road load for " + EvLogger.productShort(product) + ": A="
                 + sBaseA + "N, C=" + sBaseC + (i < 0 ? " (default)" : ""));
     }

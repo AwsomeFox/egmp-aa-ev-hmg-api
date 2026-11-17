@@ -273,7 +273,9 @@ public final class EvDriveLog {
     /** One row into the buffer. Crash-proof: a failure only loses the row. */
     private static void logRow(long now) {
         try {
-            String row = EvLogger.csvRow(buildRow(now));
+            Object[] values = buildRow(now);
+            learn(now, values);
+            String row = EvLogger.csvRow(values);
             updateHeader();
             synchronized (LOCK) {
                 if (sLogger != null) {
@@ -283,6 +285,36 @@ public final class EvDriveLog {
         } catch (Throwable t) {
             logFailure(t);
         }
+    }
+
+    private static final int COL_ENERGY = column("energy_wh");
+    private static final int COL_ODO = column("odo_delta_km");
+    private static final int COL_SPEED_AVG = column("speed_avg_kph");
+    private static final int COL_OUT_C = column("out_temp_c");
+    private static final int COL_HVAC = column("hvac_raw");
+    private static final int COL_CHG_STS = column("chg_sts_raw");
+    private static final int COL_FAST = column("fast_charging_raw");
+
+    static int column(String name) {
+        for (int i = 0; i < COLUMNS.length; i++) {
+            if (COLUMNS[i].equals(name)) {
+                return i;
+            }
+        }
+        throw new IllegalStateException("no column " + name);
+    }
+
+    /** The row's driving values to RoadLearn (on-car road load learning). */
+    static void learn(long now, Object[] v) {
+        boolean charging = num(v[COL_CHG_STS], 0) >= 1 || num(v[COL_FAST], 0) >= 1;
+        RoadLearn.row(now / 1000, (int) num(v[COL_ENERGY], -1), num(v[COL_ODO], Float.NaN),
+                num(v[COL_SPEED_AVG], Float.NaN), num(v[COL_OUT_C], Float.NaN),
+                (int) num(v[COL_HVAC], -1), charging,
+                EvModelSender.baseRoadA(), EvModelSender.baseRoadC());
+    }
+
+    private static float num(Object o, float unknown) {
+        return o instanceof Number ? ((Number) o).floatValue() : unknown;
     }
 
     /** Values for one row, in COLUMNS order (null = unknown). */
@@ -421,6 +453,8 @@ public final class EvDriveLog {
         EvLogger.header(h, "pkg", PKG);
         EvLogger.header(h, "model_capacity_wh", String.valueOf(EvModelTemplate.CAPACITY_WH));
         EvLogger.header(h, "capacity_source", capacitySource);
+        EvLogger.header(h, "road_scale", String.valueOf(RoadLearn.scale()));
+        EvLogger.header(h, "road_scale_n", String.valueOf(RoadLearn.samples()));
         EvLogger.header(h, "date", date);
         EvLogger.header(h, "period_s", String.valueOf(ROW_MS / 1000));
         EvLogger.header(h, "sample_s", String.valueOf(SAMPLE_MS / 1000));

@@ -32,6 +32,8 @@ v2 is a superset of v1: same header keys plus `sample_s`, same columns plus the 
 # pkg=aa.ev.model 0.2.1
 # model_capacity_wh=77400
 # capacity_source=bms
+# road_scale=1.0
+# road_scale_n=0
 # date=2026-01-17
 # period_s=5
 # sample_s=1
@@ -54,6 +56,8 @@ Lines starting with `# `, each `# key=value`. The first line is exactly `# egmp-
 | `pkg` | logging package and version | `aa.ev.model 0.2.1` (NEMESIS), `egmp-aa-ev 0.3.0 (HMG-API)` |
 | `model_capacity_wh` | nominal capacity of the model template, Wh | `77400` |
 | `capacity_source` | where `capacity_wh` comes from: `nominal` (new-car value, nothing learned yet) or `bms` (learned from BMS available energy: the energy at 100 % display, energy × (100 − 2.3) ÷ (SOC − 2.3)). Readers should accept other short lower-case values | `bms` |
+| `road_scale` | the scale on the model's road load learned on this car (`RoadLearn`; 1 = as shipped, 0.7–1.3). Applies from the next Android Auto session. Optional | `0.94` |
+| `road_scale_n` | how many 10 km highway stretches `road_scale` was learned from. Optional | `12` |
 | `date` | UTC date the file started, `YYYY-MM-DD`. No time of day. Left out if the clock wasn't set | `2026-01-17` |
 | `period_s` | row period, s | `5` |
 | `sample_s` | *v2*: sampling period inside a row, s | `1` |

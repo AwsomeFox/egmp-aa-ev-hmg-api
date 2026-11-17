@@ -20,6 +20,10 @@ final class EvModelTemplate {
     static final String[] CAR_PREFIX = {"CV"};
     static final float[] CAR_ROAD_A_N = {180.0f};
     static final float[] CAR_ROAD_C_N = {0.4f};
+    // drivetrain loss (3.7): spin W + W per m/s, plus a fraction of wheel power
+    static final float DL_SPIN_W = 300.0f;
+    static final float DL_SPIN_W_PER_MPS = 40.0f;
+    static final float DL_FRACTION = 0.06f;
     // display SOC (%) at which the BMS energy reaches 0
     static final float ENERGY_ZERO_PCT = 2.3f;
     // extra road load A vs outside temp (C), linear between, clamped

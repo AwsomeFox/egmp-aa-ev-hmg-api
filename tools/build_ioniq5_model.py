@@ -107,7 +107,9 @@ CAR_ROAD_LOAD = [
 DL_SPEEDS_MPS = [0.0, 5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0]
 DL_POWERS_W = [-150000, -100000, -50000, -20000,
                0, 10000, 25000, 50000, 75000, 100000, 150000, 191000]
-DL_SPIN = lambda v: 300 + 40 * v
+DL_SPIN_W = 300.0          # spin/inverter loss at standstill, W
+DL_SPIN_W_PER_MPS = 40.0   # and its growth with speed
+DL_SPIN = lambda v: DL_SPIN_W + DL_SPIN_W_PER_MPS * v
 DL_FRACTION = 0.06
 
 # Max DC charge power vs absolute battery energy (reference pack; the head
@@ -585,6 +587,10 @@ def main() -> int:
         "    static final String[] CAR_PREFIX = {%s};\n"
         "    static final float[] CAR_ROAD_A_N = {%s};\n"
         "    static final float[] CAR_ROAD_C_N = {%s};\n"
+        "    // drivetrain loss (3.7): spin W + W per m/s, plus a fraction of wheel power\n"
+        "    static final float DL_SPIN_W = %rf;\n"
+        "    static final float DL_SPIN_W_PER_MPS = %rf;\n"
+        "    static final float DL_FRACTION = %rf;\n"
         "    // display SOC (%%) at which the BMS energy reaches 0\n"
         "    static final float ENERGY_ZERO_PCT = %rf;\n"
         "    // extra road load A vs outside temp (C), linear between, clamped\n"
@@ -602,7 +608,8 @@ def main() -> int:
         "}\n"
         % (CAPACITY_WH, cap_off, CAPACITY_WIDTH, energy_off, ENERGY_WIDTH,
            PLACEHOLDER_WH, temp_off, model_rev, a_off, ROAD_LOAD[0], c_off, ROAD_LOAD[2],
-           car_p, car_a, car_c, ENERGY_ZERO_PCT, cold_t, cold_a,
+           car_p, car_a, car_c, DL_SPIN_W, DL_SPIN_W_PER_MPS, DL_FRACTION,
+           ENERGY_ZERO_PCT, cold_t, cold_a,
            SCALE_WIDTH, scale_java, lines[0], concat)
     )
     print(f"wrote {OUT_TXT.relative_to(ROOT)}, {OUT_MODEL.relative_to(ROOT)}, "

@@ -112,7 +112,7 @@ All of that gap as heater power (block 7, time-based) would be ~20 kW at −24 �
 - **Block 7 (time-based)**: driving heater power, assumed 3.0 kW at −6.7 °C and 6.5 kW at −24.4 °C, 500 W at 10 °C, ~400 W electronics floor when mild, A/C above 24 °C. Maps looks it up server-side by `1.7`, which the sender patches from the live outside temp.
 - **Road load A (distance-based)**: cold tyres, denser air, drivetrain and battery losses. `COLD_DELTA_A` is solved so the anchors come out exact: +156 N at −6.7 °C, +483 N at −24.4 °C, 0 at 10 °C and above, linear between, clamped at −35 °C (+679 N). `EvModelSender` patches A (float at `ROAD_A_OFFSET`) from the live outside temp, with 3 °C hysteresis because Maps re-routes when A moves ≥ 50 N. Unknown temp keeps the last value, or the warm A.
 
-Result at 26 °F: ~2.6–2.75 mi/kWh at 55–60 mph (was ~3.4), so that trip now needs ~90 kWh and gets a charging stop. Mild weather is unchanged (3.1 mi/kWh at 65 mph, 50–70 °F). The heater split is an assumption; more cold trips (mi/kWh, average speed, climate share from the energy screen) at different temperatures would pin it down. Outside temp is decoded as raw × 0.5 − 40 °C (Hyundai's own DATC decode, [DATA-SOURCES.md](DATA-SOURCES.md) §2), confirmed against the dash on 2026-10-29 (48 °F); raw 0xFE/0xFF is invalid.
+Result at 26 °F: ~2.6–2.75 mi/kWh at 55–60 mph (was ~3.4), so that trip now needs ~90 kWh and gets a charging stop. Mild weather is unchanged (3.1 mi/kWh at 65 mph, 50–70 °F). The heater split is an assumption; more cold trips (mi/kWh, average speed, climate share from the energy screen) at different temperatures would pin it down. Outside temp is decoded as raw × 0.5 − 40 °C (Hyundai's own DATC decode, [DATA-SOURCES.md](DATA-SOURCES.md) §2), confirmed against the dash on 2026-10-29 (48 °F); raw 0xFE/0xFF is invalid, and so is raw 0 (−40 °C): the packet holds 0 at every boot until the sensor is read.
 
 ### Drivetrain efficiency (blocks 3 and 5)
 The sheet uses a flat 0.9, battery to wheel. In the Maps model that's split between block 3 (drivetrain loss vs speed and wheel power) and block 5 (battery I²R). Don't put 10% in both. Suggested start: block 3 ≈ 7–8% of wheel power plus a few hundred W of fixed spin/inverter loss that grows with speed (Ford's map has 450 W at 0 m/s rising to 2.7 kW at 36 m/s, with zero wheel power), and block 5 with R ≈ 0.1 Ω at ~650 V. Both should then be calibrated so the total matches about 0.9 at highway load.
@@ -250,6 +250,32 @@ Not changed:
 - The old estimate, energy ÷ SOC, read 1.6 % low at 60 % and 7 % low at 30 %. The EV6's learned capacity swung from 61.5 to 64.6 kWh between sessions.
 - A sample is now energy × (100 − 2.3) ÷ (SOC − 2.3): the energy at 100 % display. That is 63.4 kWh on the EV6, 82 % of 77.4. The car's own health index reads 92–93 %, so it is not usable capacity.
 - The BMS energy dropped 1.6 kWh at ~13 % while parked (a recalibration). Low-SOC readings can jump.
+
+## On-car learning (road load)
+
+`RoadLearn` (gpm-ev/src, both builds) learns one number per car: a scale on the model's wheel power, A and C together.
+- **Input:** EvDriveLog hands it each 5 s log row, so it needs EV logs on.
+- **Stretches:** a stretch is 10 km of driving with no charging and no gap over 30 s. One at an average of 60 km/h or more gives a sample: (energy used − drivetrain spin − measured climate) ÷ (the model's wheel power × 1.06).
+- **Speed:** the model's wheel power uses the logged speed scaled to the odometer distance. The display speed reads a few percent high, and v³ would carry that into the scale.
+- **Rejected samples:** a sample outside 0.4–2.0 is a bad stretch, such as a BMS energy jump, and is dropped.
+- **Scale:** (20 + sum of samples) ÷ (20 + n), clamped to 0.7–1.3. The shipped model counts as 20 stretches at 1.0.
+- **Storage:** kept in GPM's files dir as `road_scale`.
+- **Use:** the sender reads it once per Android Auto session and sends A × scale (cold penalty included) and C × scale, so a route never re-plans because of it.
+- **Visibility:** the log header shows `road_scale` and `road_scale_n`.
+- **Setting:** `model_learning`; turning it off deletes the file.
+
+Why one number: highway data can't separate A from C (see "Field findings (2026-11-17)"), and one scale is stable after a few stretches.
+
+Altitude isn't used. GPS altitude is often missing, and filtering out hilly stretches halved the data for no gain. Up and down cancel over many stretches.
+
+Replaying the 2022 EV6's logs (`EV_LOGS=<folder> sh gpm-ev/test/run.sh`):
+- **From the Ioniq 5 values:** the scale settled at 0.84–0.89 after the first long day. The second day's highway energy went from +10 % to −1 % off.
+- **From the EV6's own values:** it stays at 1.006 after 78 stretches, so learning doesn't fight the per-model defaults.
+- **City drives** never qualify.
+
+Not learned yet:
+- **Aux power by outside temperature (block 7):** needs patch points for its values.
+- **The DC plateau (4.1/8.1) and AC rates:** they need to tell when the charger, not the car, was the limit. The 8.1 tables would also have to be integrated again on the head unit.
 
 ## Next steps
 1. ~~Recover the real schema from Google Maps~~ (done, see above).
