@@ -261,17 +261,18 @@ public final class ScaleTest {
                 "deterministic");
 
         // 28 -> 100%. Reference-pack physics scaled by k = 0.8127 (same power
-        // at the same SOC): 175 kW 47.19 min x k = 38.35; 200 kW 46.35 x k =
-        // 37.67. Maps showed 16 min with the old (from-empty, unscaled)
-        // tables; 28.5 / 32.9 with the 2022-23 top end.
+        // at the same SOC): 175 kW 39.67 min, 200 kW 39.01 with the 135 kW
+        // 53-80% plateau (38.35 / 37.67 at 160 kW). Maps showed 16 min with
+        // the old (from-empty, unscaled) tables; 28.5 / 32.9 with the
+        // 2022-23 top end.
         double m175 = minutes(msg, 175000, cap, 28, 100);
         double m200 = minutes(msg, 200000, cap, 28, 100);
         double old175 = minutes(tmpl, 175000, cap, 28, 100);
         double old200 = minutes(tmpl, 200000, cap, 28, 100);
         System.out.printf("28->100%% at %d Wh: 175 kW %.1f min (unscaled %.1f), 200 kW %.1f min (unscaled %.1f)%n",
                 cap, m175, old175, m200, old200);
-        check(Math.abs(m175 - 38.35) < 0.3, "28->100% on 175 kW ~38.4 min, got " + m175);
-        check(Math.abs(m200 - 37.67) < 0.3, "28->100% on 200 kW ~37.7 min, got " + m200);
+        check(Math.abs(m175 - 39.67) < 0.3, "28->100% on 175 kW ~39.7 min, got " + m175);
+        check(Math.abs(m200 - 39.01) < 0.3, "28->100% on 200 kW ~39.0 min, got " + m200);
         // and the taper: 80 -> 100% (reference 31.9 min on any charger
         // >= ~60 kW: the taper is below the charger limit)
         double t175 = minutes(msg, 175000, cap, 80, 100);
@@ -296,9 +297,39 @@ public final class ScaleTest {
         double b2 = minutes(msg, 150000, cap, 90, 100);
         check(Math.abs(b1 - a1) < 0.1 && Math.abs(b2 - a2) < 0.1,
                 "150 kW top end = 350 kW top end: " + b1 + " / " + b2);
-        // bulk unchanged: 10->80% on 350 kW = 17.43 min reference x k
+        // bulk: 10->80% on 350 kW = 19.02 min reference x k (135 kW from 53%)
         double bulk = minutes(msg, 350000, cap, 10, 80);
-        check(Math.abs(bulk - 14.17) < 0.3, "10->80% on 350 kW ~14.2 min, got " + bulk);
+        check(Math.abs(bulk - 15.46) < 0.3, "10->80% on 350 kW ~15.5 min, got " + bulk);
+        // a 2022 EV6's stop (issue #13): 45.6 -> 82.9% on 350 kW at 61.7 kWh
+        // took 12.8 min; the model says ~10.7 (9.4 with the 160 kW plateau)
+        byte[] ev6 = EvModelSender.scaleTemplate(tmpl, 61700);
+        double e6 = minutes(ev6, 350000, 61700, 45.6, 82.9);
+        check(Math.abs(e6 - 10.74) < 0.3, "EV6 45.6->82.9% on 350 kW ~10.7 min, got " + e6);
+        // AC: 10.9 kW row at 0.89 (a 2022 EV6: 40 -> 99.5% in 249 min at 64 kWh)
+        byte[] ac = EvModelSender.scaleTemplate(tmpl, 64000);
+        double acm = minutes(ac, 10900, 64000, 40, 99.5);
+        check(Math.abs(acm - 236) < 3, "AC 10.9 kW 40->99.5% ~236 min, got " + acm);
+
+        // capacity = energy at 100% display: the BMS energy reaches 0 at
+        // display ENERGY_ZERO_PCT. A 2022 EV6 (fit: 649 Wh/% x (SOC - 2.32))
+        // has 63.4 kWh at 100%; energy / SOC alone gave 62.4 at 60%, 59.7 at 30%.
+        float zero = EvModelTemplate.ENERGY_ZERO_PCT;
+        check(zero == 2.3f, "energy is 0 at display 2.3%");
+        for (int half : new int[] {60, 120, 200}) {
+            int wh = Math.round(649f * (half / 2f - 2.32f));
+            float c = EvModelSender.capacitySample(wh, half);
+            check(Math.abs(c - 63400) < 150, "capacity from " + half / 2 + "% = 63.4 kWh, got " + c);
+        }
+        check(EvModelSender.capacitySample(1000, 4) < 0, "no sample at or under the zero point");
+
+        // road load per model from the product id
+        check(EvModelSender.carIndex("CVEV.USA.0000.V015.012.260507") >= 0, "EV6 has its own road load");
+        int i6 = EvModelSender.carIndex("CVEV.USA.0000.V015.012.260507");
+        check(EvModelTemplate.CAR_ROAD_A_N[i6] == 180f && EvModelTemplate.CAR_ROAD_C_N[i6] == 0.4f,
+                "EV6: A 180 N, C 0.40");
+        check(EvModelSender.carIndex("NEEV23.USA.0000.V015.012.260507") < 0, "Ioniq 5: the template's");
+        check(EvModelSender.carIndex("CEEV.USA.0000.V016.010.260903") < 0, "Ioniq 6: the template's");
+        check(EvModelSender.carIndex("") < 0 && EvModelSender.carIndex(null) < 0, "unknown product: the template's");
 
         // Supercharger rows (250 kW V3, 325 kW "V3.5"): ~500 V, boost-limited
         // flat 97 kW charger-side (x 0.95 into the pack) to 90% SOC.

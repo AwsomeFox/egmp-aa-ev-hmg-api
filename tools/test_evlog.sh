@@ -96,11 +96,17 @@ mkdir "$T/logs"
 cp tools/testdata/sample-ev-log.csv "$T/logs/egmp-NEEV-20260117-001.csv"
 cp "$T/dirty.csv" "$T/logs/Trip to 1600 Amphitheatre.csv"
 $PY tools/evlog.py merge "$T/logs" "$T/merged.csv" > /dev/null
-[ "$(wc -l < "$T/merged.csv")" = 40 ] || fail "merged row count $(wc -l < "$T/merged.csv")"
+[ "$(wc -l < "$T/merged.csv" | tr -d " ")" = 40 ] || fail "merged row count $(wc -l < "$T/merged.csv")"
 head -1 "$T/merged.csv" | grep -q "^session,product,device,vin_model," || fail "merged header"
 grep -q "^egmp-NEEV-20260117-001," "$T/merged.csv" || fail "session id from standard name"
 grep -q "^session1," "$T/merged.csv" || fail "session id for nonstandard name"
 ! grep -qE "Amphitheatre|lat|$VIN" "$T/merged.csv" || fail "merged file leaks"
+
+# 5. tools/analyze_drive_logs.py runs on the sample (every command).
+for c in summary charges drive capacity; do
+    $PY tools/analyze_drive_logs.py $c tools/testdata/sample-ev-log.csv > "$T/an-$c.txt" || fail "analyze $c exit $?"
+done
+grep -q "sample-ev-log.csv" "$T/an-summary.txt" || fail "analyze summary"
 
 
 echo "PASS"

@@ -92,10 +92,12 @@ public final class SocCurveTest {
         float[] p = points(SocCurve.message(60.3f, 61f));
         check("13 points", p.length == 26);
         check("Maps keeps every point", mapsKeepsAll(p));
-        check("raw 1% shows ~3% (energy is 0 at 2%)", Math.abs(p[1] - (2f + 59f / 60.3f)) < 0.01f);
-        check("raw 60% shows ~60.7% (through the car's 60.3 -> 61)", Math.abs(p[2 * 7 + 1] - (2f + 59f / 60.3f * 60f)) < 0.01f);
+        float z = SocCurve.ZERO_PCT;
+        check("energy is 0 at display 2.3%", z == 2.3f);
+        check("raw 1% shows ~3.3% (energy is 0 at 2.3%)", Math.abs(p[1] - (z + (61f - z) / 60.3f)) < 0.01f);
+        check("raw 60% shows ~60.7% (through the car's 60.3 -> 61)", Math.abs(p[2 * 7 + 1] - (z + (61f - z) / 60.3f * 60f)) < 0.01f);
         float[] low = points(SocCurve.message(2f, 4f));
-        check("raw under 5%: the plain 2%-zero line", Math.abs(low[2 * 6 + 1] - (2f + 0.98f * 50f)) < 0.01f && mapsKeepsAll(low));
+        check("raw under 5%: the plain 2.3%-zero line", Math.abs(low[2 * 6 + 1] - (z + (100f - z) / 100f * 50f)) < 0.01f && mapsKeepsAll(low));
         float[] hi = points(SocCurve.message(90f, 99.5f));
         check("a steep curve is clamped at 100 and still kept", mapsKeepsAll(hi) && hi[hi.length - 1] == 100f);
         System.exit(fail);

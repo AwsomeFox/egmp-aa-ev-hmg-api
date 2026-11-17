@@ -62,6 +62,14 @@
       "description": "Sends the battery %, the range the cluster shows and the odometer to the phone every 5 s during Android Auto, as Android Auto's fuel and odometer data. Apps that read the car's data, such as A Better Route Planner, show the live battery level. Needs no library patch."
     },
     {
+      "key": "model_learning",
+      "type": "toggle",
+      "default": true,
+      "title": "Learn this car's highway consumption",
+      "apply": "restart",
+      "description": "Compares the energy model with this car's own steady highway drives (10 km stretches at 60 km/h or more, from the EV log) and scales the model's road load to match, between 0.7x and 1.3x. Takes effect at the next Android Auto session. Turning it off forgets what it learned. Needs EV logs on."
+    },
+    {
       "key": "ev_log",
       "type": "toggle",
       "default": true,

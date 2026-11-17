@@ -39,3 +39,7 @@ venv/
 
 # Claude Code agent worktrees
 .claude/
+
+# The HMG-API mod SDK and hook maps hmgapi-mod/sdk.sh fetches
+.hmgapi/
+out/

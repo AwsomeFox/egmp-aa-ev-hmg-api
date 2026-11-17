@@ -42,7 +42,17 @@
       "key": "capacity_source",
       "type": "string",
       "pattern": "^[a-z_]{1,16}$",
-      "desc": "where the capacity came from: nominal (new-car value) or bms (learned: BMS available energy \u00f7 SOC)"
+      "desc": "where the capacity came from: nominal (new-car value) or bms (learned: the BMS available energy at 100 % display)"
+    },
+    {
+      "key": "road_scale",
+      "type": "number",
+      "desc": "learned scale on the model road load (1 = as shipped; RoadLearn)"
+    },
+    {
+      "key": "road_scale_n",
+      "type": "number",
+      "desc": "highway stretches road_scale was learned from"
     },
     {
       "key": "date",
