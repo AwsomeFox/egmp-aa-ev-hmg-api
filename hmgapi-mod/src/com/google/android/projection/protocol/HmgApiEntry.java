@@ -90,8 +90,49 @@ public final class HmgApiEntry extends ModEntry {
         return on("energy_model");
     }
 
+    /**
+     * Off when the mod has no "preconditioning" setting: the standalone build
+     * (hmgapi-mod/variants.py) leaves it out, with the relay service and the
+     * conditioning command, since without the Wireless mod there's no route data.
+     * The full build's settings.json gives its default (on).
+     */
+    static final String FULL = "egmp-aa-ev", STANDALONE = "egmp-aa-ev-standalone";
+    static final java.io.File STATE = new java.io.File("/data/hmgapi/public/state.json");
+
+    /**
+     * The two builds declare each other in "conflicts", but HMG-API (1.1.0) checks that only
+     * for mods that change files, not hook-only ones like these, so both could run in GPM
+     * at once (two sensor offers, one library patch refused). When both are on, the
+     * standalone build stays off, as long as the full one can run: the Wireless mod it
+     * requires is on too. HMG-API's public state (its mods, enabled or not) says.
+     */
+    static boolean standDown(String id, java.io.File state) {
+        if (!STANDALONE.equals(id)) return false;
+        try {
+            byte[] b = new byte[(int) state.length()];
+            java.io.FileInputStream in = new java.io.FileInputStream(state);
+            try {
+                int n = 0, r;
+                while (n < b.length && (r = in.read(b, n, b.length - n)) > 0) n += r;
+            } finally {
+                in.close();
+            }
+            Object mods = hmgapi.engine.Json.object(new String(b, "UTF-8")).get("mods");
+            return mods instanceof java.util.Map && enabledIn((java.util.Map<?, ?>) mods, FULL)
+                    && enabledIn((java.util.Map<?, ?>) mods, "wireless-carplay-aa");
+        } catch (Exception e) {
+            return false;   // no state: run
+        }
+    }
+
+    static boolean enabledIn(java.util.Map<?, ?> mods, String id) {
+        Object m = mods.get(id);
+        return m instanceof java.util.Map && Boolean.TRUE.equals(((java.util.Map<?, ?>) m).get("enabled"));
+    }
+
     static boolean precondOn() {
-        return on("preconditioning");
+        ModContext m = sMod;
+        return m == null || (m.enabled() && m.settingBoolean("preconditioning", false));
     }
 
     static boolean batteryCurveOn() {
@@ -111,6 +152,10 @@ public final class HmgApiEntry extends ModEntry {
     @Override
     public void appLoaded(final ModContext mod, final LoadedApp app) {
         if (!GPM.equals(app.packageName) || !GPM.equals(app.processName)) {
+            return;
+        }
+        if (standDown(mod.id, STATE)) {
+            mod.log("the full build (" + FULL + ") is on, with the Wireless mod it needs: this standalone build stays off");
             return;
         }
         sMod = mod;
@@ -214,7 +259,7 @@ public final class HmgApiEntry extends ModEntry {
         });
         mod.log("EV routing hooks in " + app.processName + " (energy model "
                 + (mod.settingBoolean("energy_model", true) ? "on" : "off") + ", preconditioning "
-                + (mod.settingBoolean("preconditioning", true) ? "on" : "off") + ", EV log "
+                + (precondOn() ? "on" : "off") + ", EV log "
                 + (mod.settingBoolean("ev_log", true) ? "on" : "off") + ", live data "
                 + (mod.settingBoolean("live_data", true) ? "on" : "off") + ")");
     }

@@ -10,22 +10,24 @@
 #  - RelayTest: the relay service's requests to HMG-API
 #  - recipe-test.sh: tools/mkrecipe.py and NativeCheck on synthetic libraries
 #  - check-scripts.sh, offload-test.sh: the offload service script
-#  - engine-test.sh: the built mod through HMG-API's own engine (needs
+#  - engine-test.sh: both built mods through HMG-API's own engine (needs
 #    sh hmgapi-mod/build.sh first)
-#   HMGAPI=<HMG-API checkout> sh hmgapi-mod/test/run.sh
+#   [WIRELESS=<the Wireless mod's folder>] sh hmgapi-mod/test/run.sh
+# with the HMG-API mod SDK and hook maps hmgapi-mod/sdk.sh fetches (or HMGAPI_SDK, HMGAPI_MAPS)
 set -e
 cd "$(dirname "$0")/../.."
 REPO=$PWD
-HMGAPI=${HMGAPI:-$REPO/../HMG-API}
-HMGAPI=$(cd "$HMGAPI" && pwd)
-. "$HMGAPI/tools/env.sh"
-[ -d "$HMGAPI/out/classes" ] && [ -f "$HMGAPI/out/hmgapi-client.jar" ] || (cd "$HMGAPI" && sh build.sh runtime client >/dev/null)
+[ -n "$HMGAPI_SDK" ] && [ -n "$HMGAPI_MAPS" ] || eval "$(sh hmgapi-mod/sdk.sh)"
+HMGAPI_SDK=$(cd "$HMGAPI_SDK" && pwd)
+. "$HMGAPI_SDK/bin/env.sh"
+RT=$HMGAPI_SDK/lib/hmgapi-runtime.jar:$HMGAPI_SDK/lib/hmgapi-runtime-stubs.jar
+CLIENT=$HMGAPI_SDK/lib/hmgapi-client.jar
 PKG=com/google/android/projection/protocol
 OUT=build/hmgapi-test
 rm -rf "$OUT" && mkdir -p "$OUT/classes"
 
 # the shim's Log/SystemClock first, then the mod's classes over the shared ones
-javac -nowarn -d "$OUT/classes" -cp "$ANDROID_JAR:$HMGAPI/out/classes:$HMGAPI/out/hmgapi-client.jar" \
+javac -nowarn -d "$OUT/classes" -cp "$ANDROID_JAR:$RT:$CLIENT" \
     gpm-ev/test/shim/android/util/Log.java gpm-ev/test/shim/android/os/SystemClock.java \
     gpm-ev/src/$PKG/NavProto.java gpm-ev/src/$PKG/PrecondCore.java gpm-ev/src/$PKG/EvRowAgg.java \
     gpm-ev/src/$PKG/EvLogger.java gpm-ev/src/$PKG/EvModelTemplate.java gpm-ev/src/$PKG/EvDriveLog.java \
@@ -34,7 +36,7 @@ javac -nowarn -d "$OUT/classes" -cp "$ANDROID_JAR:$HMGAPI/out/classes:$HMGAPI/ou
     gpm-ev/test/PrecondTest.java gpm-ev/test/SenderRowTest.java gpm-ev/test/EvLogTest.java gpm-ev/test/ScaleTest.java \
     hmgapi-mod/test/ModTest.java hmgapi-mod/test/SocCurveTest.java hmgapi-mod/test/NativeCheckTest.java hmgapi-mod/test/PrecondConfigTest.java \
     hmgapi-mod/service/src/dev/egmp/aaev/RelayService.java hmgapi-mod/test/RelayTest.java
-CP="$REPO/$OUT/classes:$HMGAPI/out/classes:$HMGAPI/out/hmgapi-client.jar:$ANDROID_JAR"
+CP="$REPO/$OUT/classes:$RT:$CLIENT:$ANDROID_JAR"
 # from gpm-ev/, where egmp's tests find ../tools/evlog_schema.json
 for t in PrecondTest PrecondConfigTest SenderRowTest EvLogTest ScaleTest ModTest SocCurveTest; do
     rc=0
@@ -45,6 +47,6 @@ done
 java -cp "$CP" dev.egmp.aaev.RelayTest
 CP="$CP" sh hmgapi-mod/test/recipe-test.sh
 
-sh hmgapi-mod/test/check-scripts.sh
+HMGAPI_SDK="$HMGAPI_SDK" sh hmgapi-mod/test/check-scripts.sh
 sh hmgapi-mod/test/offload-test.sh
-HMGAPI="$HMGAPI" sh hmgapi-mod/test/engine-test.sh
+HMGAPI_SDK="$HMGAPI_SDK" HMGAPI_MAPS="$HMGAPI_MAPS" sh hmgapi-mod/test/engine-test.sh

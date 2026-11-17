@@ -1,0 +1,54 @@
+# Builds and tests the HMG-API mod's two builds on every push and pull request, with the
+# HMG-API mod SDK hmgapi-sdk.json pins and the same Wireless mod as the release workflow.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  WIRELESS_REF: v2.2.0-rc.3
+
+jobs:
+  hmgapi-mod:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          repository: Open-HMG/hmgapi-wireless-cp-aa
+          ref: ${{ env.WIRELESS_REF }}
+          path: hmgapi-wireless-cp-aa
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Android SDK (build-tools with d8, a platform android.jar)
+        run: |
+          ls "$ANDROID_HOME"/build-tools/*/d8 >/dev/null 2>&1 && ls "$ANDROID_HOME"/platforms/android-*/android.jar >/dev/null 2>&1 \
+            || yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "build-tools;35.0.0" "platforms;android-35" >/dev/null
+
+      - name: The HMG-API mod SDK (hmgapi-sdk.json) and its hook maps
+        run: sh hmgapi-mod/sdk.sh | sed 's/; export.*//' >> "$GITHUB_ENV"
+
+      - name: Build and test
+        env:
+          WIRELESS: ${{ github.workspace }}/hmgapi-wireless-cp-aa/wireless-carplay-aa
+        run: |
+          sh hmgapi-mod/build.sh
+          sh hmgapi-mod/test/run.sh
+
+      - name: Same Wireless ref as the release workflow
+        run: |
+          for k in WIRELESS_REF; do
+            r=$(sed -n "s/^  $k: *//p" .github/workflows/release.yml)
+            c=$(sed -n "s/^  $k: *//p" .github/workflows/ci.yml)
+            [ "$r" = "$c" ] || { echo "::error::$k is $c here but $r in release.yml"; exit 1; }
+          done
