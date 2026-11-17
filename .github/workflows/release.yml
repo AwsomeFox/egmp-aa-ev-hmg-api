@@ -1,4 +1,5 @@
-# Builds the HMG-API mod for a release made in GitHub's UI and attaches it:
+# Builds the HMG-API mod's two builds (egmp-aa-ev, egmp-aa-ev-standalone) for a release
+# made in GitHub's UI and attaches them, with their NEMESIS packages:
 # Releases -> Draft a new release -> tag v<version> (the "version" in
 # hmgapi-mod/mod.json) -> Publish. To build again for an existing release (after a
 # failed run, say): Actions -> Release -> Run workflow, with its tag.
@@ -21,8 +22,10 @@ permissions:
   contents: write
 
 env:
-  # the HMG-API the mod is built and tested against (a release tag)
-  HMGAPI_REF: v1.0.1
+  # The mod is built with the HMG-API mod SDK hmgapi-sdk.json pins (hmgapi-mod/sdk.sh), and
+  # tested beside this Wireless CarPlay + Android Auto mod, in its own repo from HMG-API 1.1.0.
+  # Move the two together, to what an HMG-API release ships.
+  WIRELESS_REF: v2.2.0-rc.3
 
 jobs:
   hmgapi-mod:
@@ -38,9 +41,9 @@ jobs:
 
       - uses: actions/checkout@v4
         with:
-          repository: VysseCodes/HMG-API
-          ref: ${{ env.HMGAPI_REF }}
-          path: HMG-API
+          repository: Open-HMG/hmgapi-wireless-cp-aa
+          ref: ${{ env.WIRELESS_REF }}
+          path: hmgapi-wireless-cp-aa
 
       - uses: actions/setup-java@v4
         with:
@@ -62,16 +65,18 @@ jobs:
           ls "$ANDROID_HOME"/build-tools/*/d8 >/dev/null 2>&1 && ls "$ANDROID_HOME"/platforms/android-*/android.jar >/dev/null 2>&1 \
             || yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "build-tools;35.0.0" "platforms;android-35" >/dev/null
 
+      - name: The HMG-API mod SDK (hmgapi-sdk.json) and its hook maps
+        run: sh hmgapi-mod/sdk.sh | sed 's/; export.*//' >> "$GITHUB_ENV"
+
       - name: Build and test
         env:
-          HMGAPI: ${{ github.workspace }}/HMG-API
+          WIRELESS: ${{ github.workspace }}/hmgapi-wireless-cp-aa/wireless-carplay-aa
         run: |
           sh hmgapi-mod/build.sh
           sh hmgapi-mod/test/run.sh
 
-      - name: Signed package
+      - name: Signed packages
         env:
-          HMGAPI: ${{ github.workspace }}/HMG-API
           AUTHOR_KEY: ${{ secrets.HMGAPI_AUTHOR_KEY }}
         run: |
           if [ -z "$AUTHOR_KEY" ]; then
@@ -85,14 +90,17 @@ jobs:
           echo >> "$RUNNER_TEMP/author.key.pub"
           sh hmgapi-mod/build.sh "$RUNNER_TEMP/author.key"
           rm -f "$RUNNER_TEMP/author.key" "$RUNNER_TEMP/author.key.pub"
-          ls -l "dist/egmp-aa-ev-${{ steps.version.outputs.version }}.zip"
+          ls -l "dist/egmp-aa-ev-${{ steps.version.outputs.version }}.zip" "dist/egmp-aa-ev-standalone-${{ steps.version.outputs.version }}.zip"
 
       - name: NEMESIS packages
-        # HMG-API's tools/mknemesismod.sh: the signed mod as NEMESIS package hmgapi.egmp-aa-ev
-        # (depends on hmgapi 1.0 or newer; its scripts install it with HMG-API's engine):
-        #   egmp-aa-ev-<v>-nemesis.zip          for a USB stick, as NEMESIS's own downloads
-        #   egmp-aa-ev-<v>-nemesis-package.zip  the package itself (NEMESIS Package Store)
-        run: sh HMG-API/tools/mknemesismod.sh "dist/egmp-aa-ev-${{ steps.version.outputs.version }}.zip" "$PWD/dist"
+        # the SDK's mknemesismod.sh: each signed mod as NEMESIS package hmgapi.<id> (each refuses the
+        # other: mod.json "nemesis_conflicts"):
+        #   <id>-<v>-nemesis.zip          for a USB stick, as NEMESIS's own downloads
+        #   <id>-<v>-nemesis-package.zip  the package itself (NEMESIS Package Store)
+        run: |
+          for id in egmp-aa-ev egmp-aa-ev-standalone; do
+            sh "$HMGAPI_SDK/bin/mknemesismod.sh" "dist/$id-${{ steps.version.outputs.version }}.zip" "$PWD/dist"
+          done
 
       - name: Attach to the release
         env:
@@ -100,4 +108,5 @@ jobs:
           V: ${{ steps.version.outputs.version }}
         run: |
           gh release upload "${{ steps.tag.outputs.tag }}" --clobber \
-            "dist/egmp-aa-ev-$V.zip" "dist/egmp-aa-ev-$V-nemesis.zip" "dist/egmp-aa-ev-$V-nemesis-package.zip"
+            "dist/egmp-aa-ev-$V.zip" "dist/egmp-aa-ev-$V-nemesis.zip" "dist/egmp-aa-ev-$V-nemesis-package.zip" \
+            "dist/egmp-aa-ev-standalone-$V.zip" "dist/egmp-aa-ev-standalone-$V-nemesis.zip" "dist/egmp-aa-ev-standalone-$V-nemesis-package.zip"
