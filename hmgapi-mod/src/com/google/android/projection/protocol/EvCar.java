@@ -291,7 +291,9 @@ final class EvCar {
     /** Outside temp in C (raw x 0.5 - 40), NaN if unknown/invalid. */
     static float outsideTempC() {
         int raw = outTempRaw();
-        if (raw < 0 || raw >= 0xfe) {
+        // 0 (-40 C) is what the packet holds before the sensor is read, at every
+        // boot in the logs so far, never mid-drive: unknown, not cold
+        if (raw <= 0 || raw >= 0xfe) {
             return Float.NaN;
         }
         return raw * 0.5f - 40f;

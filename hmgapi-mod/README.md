@@ -20,7 +20,7 @@ while it runs and patches its library in memory.
 | `recipes/*.recipe` | egmp's three Android Auto library patches as HMG-API memory recipes, one per library build (`tools/mkrecipe.py`; US 260507, Ioniq 5 and EV6, and Ioniq 6 US 260903), each clear of the matching Wireless mod turn-by-turn recipe. `NativeCheck` reads them itself, so another build is one more recipe here and in `mod.json` |
 | `relay.jar` (`service/`) | service `relay` (user `system`): sends Precond's requests as HMG-API's `conditioning` command, which HMG-API answers only for a mod's own service |
 | `scripts/offload.sh` | service `offload` (root): copies EV logs to a USB drive with an `egmp-aa-ev-logs` folder |
-| `settings.json` | `energy_model`, `preconditioning`, `live_data`, `ev_log` (all on), and the preconditioning thresholds `precond_min_kw` (50), `precond_window_min` (60), `precond_arrival_m` (200), `precond_max_starts` (3): `PrecondCore.Config`, applied at once |
+| `settings.json` | `energy_model`, `preconditioning`, `live_data`, `model_learning`, `ev_log` (all on), and the preconditioning thresholds `precond_min_kw` (50), `precond_window_min` (60), `precond_arrival_m` (200), `precond_max_starts` (3): `PrecondCore.Config`, applied at once |
 
 Hook points used (all in HMG-API 1.0.0, mapped on every HMG-API map: Ioniq 5 and EV6 in the US and Canada, Ioniq 5 US 260903, and the Ioniq 6 US 260903 map):
 `gpm.sensor_source.init` (change: sensor 23 when the library patch is in place, sensor

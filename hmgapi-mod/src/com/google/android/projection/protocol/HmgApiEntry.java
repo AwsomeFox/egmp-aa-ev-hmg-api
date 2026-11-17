@@ -35,7 +35,7 @@ import hmgapi.hook.Points;
  *   (new) battery level, range, odometer          gpm.sensor_source.init: sensors 6 and 5
  *                                                 offered, LiveData sends them
  *
- * Settings (settings.json): energy_model, preconditioning, ev_log, live_data, and the
+ * Settings (settings.json): energy_model, preconditioning, model_learning, ev_log, live_data, and the
  * preconditioning thresholds precond_min_kw, precond_window_min,
  * precond_arrival_m, precond_max_starts (PrecondCore.Config). The thresholds
  * apply at once (HMG-API hands every running app a saved change); turning the
@@ -167,6 +167,7 @@ public final class HmgApiEntry extends ModEntry {
         if (mod.settingBoolean("energy_model", true)) {
             mod.nativePatch(app, "libautoreceiver_infobank.so");
         }
+        RoadLearn.setEnabled(on("model_learning"));
         if (evLogOn()) {
             EvDriveLog.start();
         }
@@ -260,7 +261,8 @@ public final class HmgApiEntry extends ModEntry {
         mod.log("EV routing hooks in " + app.processName + " (energy model "
                 + (mod.settingBoolean("energy_model", true) ? "on" : "off") + ", preconditioning "
                 + (precondOn() ? "on" : "off") + ", EV log "
-                + (mod.settingBoolean("ev_log", true) ? "on" : "off") + ", live data "
+                + (mod.settingBoolean("ev_log", true) ? "on" : "off") + ", learning "
+                + (mod.settingBoolean("model_learning", true) ? "on" : "off") + ", live data "
                 + (mod.settingBoolean("live_data", true) ? "on" : "off") + ")");
     }
 

@@ -30,15 +30,15 @@ rm -rf "$OUT" && mkdir -p "$OUT/classes"
 javac -nowarn -d "$OUT/classes" -cp "$ANDROID_JAR:$RT:$CLIENT" \
     gpm-ev/test/shim/android/util/Log.java gpm-ev/test/shim/android/os/SystemClock.java \
     gpm-ev/src/$PKG/NavProto.java gpm-ev/src/$PKG/PrecondCore.java gpm-ev/src/$PKG/EvRowAgg.java \
-    gpm-ev/src/$PKG/EvLogger.java gpm-ev/src/$PKG/EvModelTemplate.java gpm-ev/src/$PKG/EvDriveLog.java \
+    gpm-ev/src/$PKG/EvLogger.java gpm-ev/src/$PKG/EvModelTemplate.java gpm-ev/src/$PKG/EvDriveLog.java gpm-ev/src/$PKG/RoadLearn.java \
     hmgapi-mod/src/$PKG/*.java \
     gpm-ev/stubs/com/hkmc/cluster/NavigationCluster.java gpm-ev/stubs/com/hkmc/cluster/NavigationClusterListener.java \
-    gpm-ev/test/PrecondTest.java gpm-ev/test/SenderRowTest.java gpm-ev/test/EvLogTest.java gpm-ev/test/ScaleTest.java \
+    gpm-ev/test/PrecondTest.java gpm-ev/test/SenderRowTest.java gpm-ev/test/EvLogTest.java gpm-ev/test/ScaleTest.java gpm-ev/test/RoadLearnTest.java \
     hmgapi-mod/test/ModTest.java hmgapi-mod/test/SocCurveTest.java hmgapi-mod/test/NativeCheckTest.java hmgapi-mod/test/PrecondConfigTest.java \
     hmgapi-mod/service/src/dev/egmp/aaev/RelayService.java hmgapi-mod/test/RelayTest.java
 CP="$REPO/$OUT/classes:$RT:$CLIENT:$ANDROID_JAR"
 # from gpm-ev/, where egmp's tests find ../tools/evlog_schema.json
-for t in PrecondTest PrecondConfigTest SenderRowTest EvLogTest ScaleTest ModTest SocCurveTest; do
+for t in PrecondTest PrecondConfigTest SenderRowTest EvLogTest ScaleTest RoadLearnTest ModTest SocCurveTest; do
     rc=0
     (cd gpm-ev && java -cp "$CP" com.google.android.projection.protocol.$t) > "$OUT/$t.log" 2>&1 || rc=$?
     grep -v "not found by name; using" "$OUT/$t.log" || true
