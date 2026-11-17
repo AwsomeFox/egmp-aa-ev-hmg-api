@@ -29,7 +29,7 @@ def standalone(mod, settings):
                           "No battery preconditioning.")
     mod.pop("requires", None)
     mod["conflicts"] = ["egmp-aa-ev"]
-    mod["nemesis_conflicts"] = ["hmgapi.egmp-aa-ev"]
+    mod["nemesis_conflicts"] = ["hmgapi.egmp-aa-ev", "aa.ev.model"]
     mod.pop("vehicle", None)                       # only preconditioning sends commands
     mod["services"] = [s for s in mod.get("services", []) if s.get("name") != "relay"]
     # HMG-API prefixes the mod's own log lines with its id
