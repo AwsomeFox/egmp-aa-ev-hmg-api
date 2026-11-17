@@ -53,7 +53,7 @@ Lines starting with `# `, each `# key=value`. The first line is exactly `# egmp-
 | `vin_model` | VIN characters 1–8 plus character 10 (maker, model, body, motor, model year). **Never the full VIN**: no check digit (9), plant (11) or serial number (12–17) | `KM8KRDAFN` |
 | `pkg` | logging package and version | `aa.ev.model 0.2.1` (NEMESIS), `egmp-aa-ev 0.3.0 (HMG-API)` |
 | `model_capacity_wh` | nominal capacity of the model template, Wh | `77400` |
-| `capacity_source` | where `capacity_wh` comes from: `nominal` (new-car value, nothing learned yet) or `bms` (learned from BMS available energy ÷ SOC). Readers should accept other short lower-case values | `bms` |
+| `capacity_source` | where `capacity_wh` comes from: `nominal` (new-car value, nothing learned yet) or `bms` (learned from BMS available energy: the energy at 100 % display, energy × (100 − 2.3) ÷ (SOC − 2.3)). Readers should accept other short lower-case values | `bms` |
 | `date` | UTC date the file started, `YYYY-MM-DD`. No time of day. Left out if the clock wasn't set | `2026-01-17` |
 | `period_s` | row period, s | `5` |
 | `sample_s` | *v2*: sampling period inside a row, s | `1` |

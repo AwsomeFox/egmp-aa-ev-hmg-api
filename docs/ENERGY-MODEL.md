@@ -70,7 +70,7 @@ Write it as protobuf text (`vem.VehicleEnergyModel`), then `protoc --encode=vem.
 | `1.6`, `1.7` | 1.225 static density; **outside temp is live** (nav battery packet `DATC_OUT_TEMP_SNSR` via `NavigationCluster.requestBatteryInfoReq()`, patched in place at runtime) |
 | `2.x` road load | **your rolldown data** (conversions below) |
 | `3.7` loss map | not in rolldown. Scale Ford's map, or build one from an efficiency estimate. Remember x is **sint32** |
-| `4.1` | E-GMP 800 V curve. Bulk (≤80%) calibrated on 233 real EA sessions, warm/preconditioned pack: ~230–235 kW (3C) to 50%, thermal step-down to 160 kW at 53% held to 80%. Top end (>80%) is **the car's own charge-time estimate**, which the owner confirms is realistic: 70/48.5/33.5/25.5/17/12 kW at 81/85/90/95/98/100%. That gives **80→90% = 8 min and 90→100% = 18 min** on a 350 kW charger at the learned 62.9 kWh (~50 kW average over 80–90%, ~22 kW over 90–100%), the same on every charger above ~60 kW. No thermal pause. (Cold-pack caps were measured but aren't shipped; see "field findings".) The energy axis is defined for the 77.4 kWh reference pack and **rescaled at runtime to the learned capacity** (see "Capacity scaling") |
+| `4.1` | E-GMP 800 V curve. Bulk (≤80%) calibrated on 233 real EA sessions, warm/preconditioned pack: ~230–235 kW (3C) to 50%, thermal step-down at 53% to 135 kW held to 80% (160 kW until 2026-11-17; see "Field findings (2026-11-17)"). Top end (>80%) is **the car's own charge-time estimate**, which the owner confirms is realistic: 70/48.5/33.5/25.5/17/12 kW at 81/85/90/95/98/100%. That gives **80→90% = 8 min and 90→100% = 18 min** on a 350 kW charger at the learned 62.9 kWh (~50 kW average over 80–90%, ~22 kW over 90–100%), the same on every charger above ~60 kW. No thermal pause. (Cold-pack caps were measured but aren't shipped; see "field findings".) The energy axis is defined for the 77.4 kWh reference pack and **rescaled at runtime to the learned capacity** (see "Capacity scaling") |
 | `5.4` | I²R: loss = R·(P/V)². Use the pack's DC resistance and ~650–700 V nominal. R is unmeasured; estimate it from the cell count and cell resistance, or from the voltage sag under load |
 | `7` aux power (Q4) | driving heater/A-C power vs outside temp; cold part calibrated with road load A (see "Cold weather") |
 | `8.1` | integrated from 4.1 (×η=0.95 charger→battery, 0.5% cells in 4 slices) + AC limits (10.9 kW onboard, 1.44 kW L1); 13 charger rows (350/260/250/240/200/175/150/125/100/50/25 kW DC, 10.9/1.44 kW AC). Each row has 29 points of (headroom to full, seconds to full): headroom from 100% down to 10% in 5% steps, then 9…1% in 1% steps, then 0.5%. **250 kW = Tesla Supercharger**: US Superchargers are all listed at exactly 250 kW and run at ~500 V, so the 800 V pack charges via the boost converter at a flat 105 kW to 90% (owner-measured, no step-down or pause), then the normal taper. Maps keys these tables by charger power only, so the voltage limit has to live in that row; 260/240 kW rows bracket it so other stations near 250 kW stay on the 800 V profile. Energy axis and seconds defined for the 77.4 kWh reference pack and **rescaled at runtime** (see "Capacity scaling") |
@@ -158,12 +158,14 @@ Minutes from the tables at 62.9 kWh (k = 0.813); 180 kW interpolates the 175 and
 | | 10→80% | 44→80% | 80→90% | 90→100% | 21→100% | 28→100% |
 |---|---|---|---|---|---|---|
 | 180 kW, 2022-23 top end | 16.2 | 8.7 | 4.6 | 12.5 | 30.9 | 29.4 |
-| 180 kW, now | 16.2 | 8.7 | 8.0 | 18.0 | 39.8 | 38.2 |
+| 180 kW, 160 kW plateau (to 2026-11-17) | 16.2 | 8.7 | 8.0 | 18.0 | 39.8 | 38.2 |
+| 180 kW, now (135 kW plateau) | 17.5 | 10.0 | 8.0 | 18.0 | 41.1 | 39.5 |
 | 350 kW, 2022-23 top end | 14.2 | 8.4 | 8.6 | 12.5 | 33.5 | 32.3 |
-| 350 kW, now | 14.2 | 8.4 | 8.0 | 18.0 | 38.3 | 37.1 |
-| 350 kW, now, 77.4 kWh reference pack | 17.4 | 10.3 | 9.8 | 22.1 | 47.1 | 45.6 |
+| 350 kW, 160 kW plateau (to 2026-11-17) | 14.2 | 8.4 | 8.0 | 18.0 | 38.3 | 37.1 |
+| 350 kW, now (135 kW plateau) | 15.5 | 9.7 | 8.0 | 18.0 | 39.6 | 38.4 |
+| 350 kW, now, 77.4 kWh reference pack | 19.0 | 11.9 | 9.9 | 22.1 | 48.7 | 47.3 |
 
-**Open question (capacity):** recent EA sessions suggest ~70–71 kWh usable, not 62.9 (several 2024-26 deep sessions delivered more energy than 62.9 kWh allows, see "Field findings"). Either the BMS energy reads low at high SOC or its 2 Wh unit is off. A logged DC charge (ΔENERGYMAP × 2 vs charger kWh × 0.95) will settle it; until then the shipped capacity is the BMS figure.
+**Open question (capacity):** recent EA sessions suggest ~70–71 kWh usable, not 62.9 (several 2024-26 deep sessions delivered more energy than 62.9 kWh allows, see "Field findings"). Either the BMS energy reads low at high SOC or its 2 Wh unit is off. A logged DC charge (ΔENERGYMAP × 2 vs charger kWh × 0.95) will settle it; until then the shipped capacity is the BMS figure. *(2026-11-17: AC sessions on a 2022 EV6 point to the 2 Wh unit being right. Over 2–4 h on a 10.9 kW-class circuit, ΔENERGYMAP × 2 gave 9.3–9.7 kW into the battery. Energy reading 13 % low would mean ~11 kW, more than the 10.9 kW on-board charger can deliver. See "Field findings (2026-11-17)".)*
 
 Scaled times are shorter than a new pack's because a smaller pack takes in less energy at the same power. Unconfirmed: whether Maps' server uses 4.1, 8.1 or both. Both are scaled, and the tables match a fine integration of 4.1.
 
@@ -172,10 +174,10 @@ Scaled times are shorter than a new pack's because a smaller pack takes in less 
 Calibration (`tools/analyze_charge_history.py`, `reference/charge_history*.csv`, plus exact start-SOC spot pulls from the EA app):
 - **EA "TotalEnergyDelivered" is charger-side**; the battery absorbs ~5% less. Warm-weather η = 0.944–0.958 → `CHARGE_ETA = 0.95` in the time tables. Mean model error vs 233 sessions (`tools/analyze_charge_history.py`, all at C = 77.4 kWh): −2.0 min, MAE 3.1 min with the 2022-23 top end; −1.3 min, MAE 2.7 min now.
 - **Usable capacity ≈ 77.4 kWh when new** (2022 deep sessions fit C=77400 with η≈0.95) — Hyundai's figure is usable, not gross. Runtime degradation: usable capacity is learned on the car as BMS available energy ÷ display SOC. `EV_AVLBL_ENRG` (nav battery packet) is in 2 Wh steps like `BMS_EVENERGYCAPA`: 14462 at 46.0% on the owner's ~105k mi car = 28.9 kWh → **~62.9 kWh usable**, vs 77.4 nominal. BMS SOH (`tm_hscan_service` txn 0xd6, reads 95) is a health index (resistance, balance), not usable capacity; it is only logged.
-- **The thermal step-down depends on the session (heat added this session), not on absolute SOC.** The car charges at full 3C from 0% (no low-SOC ramp). It steps down from 3C to ~160 kW at ~55–60% from a 0% start, ~65–70% from 10%, and ~75–80% from 30%. The energy-indexed model can't express that, so the step is placed for the usual road-trip case of arriving at the charger low: at 53%. That gives **10→80% = 17.5 min** on 350 kW on the reference pack (the owner's real figure; Hyundai's official figure is 18). Sessions that arrive warm or at high SOC will read slightly pessimistic in the mid band, and slightly optimistic otherwise. Some 2022 sessions showed a 3–6 min thermal pause at ~78–85%. It is no longer modelled separately (see the top end below).
+- **The thermal step-down depends on the session (heat added this session), not on absolute SOC.** The car charges at full 3C from 0% (no low-SOC ramp). It steps down from 3C to ~160 kW at ~55–60% from a 0% start, ~65–70% from 10%, and ~75–80% from 30%. The energy-indexed model can't express that, so the step is placed for the usual road-trip case of arriving at the charger low: at 53%. That gave **10→80% = 17.5 min** on 350 kW on the reference pack with a 160 kW plateau (the owner's real figure; Hyundai's official figure is 18); with today's 135 kW it is 19.0. Sessions that arrive warm or at high SOC will read slightly pessimistic in the mid band, and slightly optimistic otherwise. Some 2022 sessions showed a 3–6 min thermal pause at ~78–85%. It is no longer modelled separately (see the top end below).
 - **Top end (>80%) = the car's own charge-time estimate.** On 2026-10-29, on a 350 kW charger from 44%, the car predicted 80% at 21 min, 90% at 29 and 100% at 47: **80→90% = 8 min, 90→100% = 18 min**. The owner confirms that's realistic for this car. Charging that high rarely makes sense, and a realistically slow taper is what makes Maps plan departures well below 100%. The pack was cold that night (min cell 10 °C), but that mainly slows the bulk; 80–100% is voltage-limited. The curve is solved so both anchors come out exactly at the learned 62.9 kWh, and `ScaleTest` asserts them. This replaces the 2022-23 fit (150 kW after a 300 s pause at ~81%, then 60/35/22/15 kW at 90/95/98/100%). That fit reached 80→90% = 8.6 min only because of the pause, and gave 90→100% = 12.5 min. Its "95→100% in 10.4 min" spot check is superseded.
 - **The EA history agrees with the new top end.** Start SOC is backed out as end − η·E/C. For 2022-23, C = 77.4 kWh. For 2024-26, the learned 62.9 kWh gives impossible negative starts for several deep sessions (up to 74 kWh delivered ending at 100%), so 71 kWh, the 2024-26 envelope, was checked too. Taking sessions on 350 kW-class cabinets that start at ≤60% and end at ≥88%, the time beyond the modelled bulk per SOC% above 80 (normalised to 62.9 kWh) is: 2022-23 median **0.97 min/%** (n=23), 2024-26 0.79–0.94 min/% (n=5–9 depending on capacity). The new model's 0.8 min/% for 80–90% and 1.8 min/% for 90–100% fit that, since most sessions stop before 95%. The top end was no faster in 2022-23; the old curve was simply too fast there. Model vs sessions ending at ≥85%: 2022-23 mean error −4.2 → −1.3 min, MAE 5.1 → 3.6 (n=64). 2024-26 MAE 3.0 → 1.5 at C=62.9 (n=13) and 4.7 → 3.6 at C=71 (n=21).
-- **In 2024-26 sessions the bulk is slower than the warm model**: median actual/model 1.2–1.3, vs 1.11 in 2022-23. Many recent sessions were not preconditioned. The bulk stays warm-pack because preconditioning is now verified working on the car.
+- **In 2024-26 sessions the bulk is slower than the warm model**: median actual/model 1.2–1.3, vs 1.11 in 2022-23. Many recent sessions were not preconditioned. The bulk stayed warm-pack because preconditioning is now verified working on the car. A preconditioned 2022 EV6 still only held ~125 kW (2026-11-17), so the plateau is now 135 kW.
 - **EA export quirks**: some 2022 sessions have `ChargeDuration = 0 min 0 sec` (use `TotalDuration − GracePeriod`); one negative-duration row; one hour-format duration.
 - **Derated/broken cabinets** are obvious by max rate (e.g. 45/54/74 kW on 350-class stations). A cluster of ~104–115 kW maxes = 400 V-class cabinets or shared power — the car's boost converter caps ~105 kW on those (same as Tesla 400 V Superchargers; a route planner can't see this from charger rating alone).
 - **Cold-pack caps** (owner's logbook, *not shipped* — the shipped model assumes preconditioning works): <20 °C → ~160 kW, <15 °C → ~120 kW, <10 °C → ~90 kW.
@@ -192,7 +194,7 @@ Explored and parked:
 
 ## Battery % curve (sensor 26, 2026-11-10)
 
-Maps doesn't take the car's state of charge from sensor 23: it shows **energy ÷ capacity** (`1.3` / `1.4`). On E-GMP the BMS energy (`ENERGYMAP`) reaches 0 near **display 2 %**, so Maps read up to 2 points under the dash, most near empty, where its arrival % and 0 % checks matter. Maps has a second sensor for exactly this.
+Maps doesn't take the car's state of charge from sensor 23: it shows **energy ÷ capacity** (`1.3` / `1.4`). On E-GMP the BMS energy (`ENERGYMAP`) reaches 0 near **display 2.3 %**, so Maps read up to 2 points under the dash, most near empty, where its arrival % and 0 % checks matter. Maps has a second sensor for exactly this.
 
 **From the code (Google Maps 26.44.06):**
 - The car-sensor dispatcher (`pyi`) registers handlers for its sensor types 1, 2, 6, 7, 10, 11, 14, 17, 18, 23, 24 and 25. Type 23 is parsed straight from the bytes as the energy model; 25 is decoded by `CarSensorEvent.c()` as `cdpz`:
@@ -214,7 +216,40 @@ Field 26 is what Open Android Auto calls `RAW_EV_TRIP_SETTINGS {1: bytes}`; the 
 
 **What the mod sends** (`SocCurve`, every 5 s after the model, as its own `0x8003` message): 13 points (raw 1, 5, 10, 20 … 90, 95, 99 %) on the line through (raw 0, shown 2 %) and the car's current (energy ÷ capacity, display SOC), clamped to 0–100 and never falling. It's offered only where the recipe in memory takes type 26 (`NativeCheck.maxSensorType`): the US 260507 build today. The Ioniq 6 US 260903 recipe still stops at 23 until it's regenerated from that library with `--max-type 26`. Setting `battery_curve`.
 
-**Open:** the 2 % zero point comes from the BMS energy reaching 0 near display 2 %; low-SOC log rows (energy and display SOC together) would pin it down per car.
+**Zero point:** `EvModelTemplate.ENERGY_ZERO_PCT` = 2.3 %, from parked log rows (energy and display SOC together): a 2022 EV6 fits 649 Wh/% × (SOC − 2.32 %) from 7 to 100 %, a 2023 Ioniq 5 730 Wh/% × (SOC − 2.27 %) from 41 to 100 % (`tools/analyze_drive_logs.py capacity`). It was 2 % until 2026-11-17.
+
+## Field findings (2026-11-17, a 2022 EV6's logs)
+
+Issue #13 (AwsomeFox/egmp-aa-ev-hmg-api): a 2022 EV6 AWD, US 260507, ~90k mi. 28 logs over a week: ~1000 km, mostly interstate at 105–130 km/h, 5–28 °C. The two long days were about 1000 ft down and back up. The logs include three DC stops and four AC sessions. `tools/analyze_drive_logs.py` reproduces every number here: `summary`, `charges`, `drive` and `capacity` on the log files.
+
+**Road load per model.** On 84 steady 10 km stretches, with the logged climate power taken out, the Ioniq 5 road load predicted 234 Wh/km at 120 km/h. The EV6 used ~193.
+- Over all stretches, the model came out 22 % high on energy.
+- Maps' own plan agrees: at the 350 kW stop it expected 42.3 % on arrival, and the car arrived at 45.6 %.
+- Highway data can't separate A from C. Any C from 0.35 to 0.45 with its fitted A matches within ~3 Wh/km.
+- The EV6 now gets **A = 180 N, C = 0.40 N/(m/s)²** (`CAR_ROAD_LOAD`). That is CdA ~0.65 m² against the Ioniq 5's ~0.80, and rolling resistance ~0.0085. With it, the model comes out 4 % high on the same stretches.
+- The sender picks the pair once per session from `ro.build.product` (`EvModelSender.carIndex`) and patches it into 2.1.1 (A, plus the cold penalty) and 2.3.1 (C, `ROAD_C_OFFSET`).
+- Other models keep the Ioniq 5 values until their logs say otherwise. The Ioniq 6 is the obvious next one: it is much sleeker, but there are no logs yet.
+
+Not changed:
+- **Stop-and-go city driving:** it uses ~20 % more than the steady-speed model on both the EV6 and a 2023 Ioniq 5's city logs. Maps plans that part itself.
+- **Hills:** they cost ~4.8 Wh per metre of GPS altitude. Hills are Maps' server's job; the model has no mass field.
+
+**DC plateau 160 → 135 kW (53–80 %).**
+- After a 2–3 min ramp-up, the EV6 held 120–125 kW battery-side from 45 to 80 % on a 350 kW charger, with the pack at 20–28 °C.
+- The car's own preconditioning had run (state DONE) and stopped at ~22 °C, with 8 °C outside.
+- 46 → 83 % took 12.8 min. The 160 kW model said 9.4, Maps planned 10.0, and 135 kW says 10.7.
+- The owner's 2024-26 EA sessions ran 1.2–1.3× the 160 kW model too.
+- The taper from 80 % matched.
+- No session started below 38 %, so the 230 kW bulk below 50 % is untested and unchanged.
+- 10 → 80 % on the reference pack is now 19.0 min. It was 17.4, against Hyundai's 18 for a fully warm pack.
+
+**AC.** The EV6 put 9.3–9.7 kW into the battery on a 10.9 kW-class circuit and 5.6–5.7 kW on a ~7 kW one. The AC rows now use an efficiency of 0.89 (`AC_ETA`) instead of 0.95. 40 → 99.5 % at 10.9 kW: the model now says 236 min, against 249 real.
+
+**Capacity learning.**
+- Energy reaches 0 at display ~2.3 % (see "Battery % curve").
+- The old estimate, energy ÷ SOC, read 1.6 % low at 60 % and 7 % low at 30 %. The EV6's learned capacity swung from 61.5 to 64.6 kWh between sessions.
+- A sample is now energy × (100 − 2.3) ÷ (SOC − 2.3): the energy at 100 % display. That is 63.4 kWh on the EV6, 82 % of 77.4. The car's own health index reads 92–93 %, so it is not usable capacity.
+- The BMS energy dropped 1.6 kWh at ~13 % while parked (a recalibration). Low-SOC readings can jump.
 
 ## Next steps
 1. ~~Recover the real schema from Google Maps~~ (done, see above).

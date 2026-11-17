@@ -18,8 +18,10 @@ import android.util.Log;
  *  - the nav battery packet: DATC_OUT_TEMP_SNSR patches model field 1.7
  *    (aux/HVAC table lookup) and road load A (cold penalty,
  *    EvModelTemplate.COLD_*)
+ *  - the product id (ro.build.product) picks the road load for this model
+ *    (EvModelTemplate.CAR_*, e.g. the EV6's), patched into A and C
  *  - EV_AVLBL_ENRG / HEV 0x31 (BMS available energy, 2 Wh steps): current
- *    energy, and usable capacity learned as available energy / SOC (see
+ *    energy, and usable capacity learned as the energy at 100% display (see
  *    learnCapacity); the charge curve and charge-time tables are rescaled to
  *    that capacity so their taper stays at the same SOC (see scaleTemplate)
  *
@@ -40,11 +42,12 @@ public final class EvModelSender {
     // BMS remaining usable energy: HEV flag 0x31 ENERGYMAP_1000MS, the same
     // signal as the nav packet's EV_AVLBL_ENRG (docs/DATA-SOURCES.md 1.1), in
     // 2 Wh steps like BMS_EVENERGYCAPA; 0xFFFF = invalid. Usable capacity is
-    // learned as energy / display SOC: 14462 at 46.0% on the owner's car =
-    // 28.9 kWh -> ~62.9 kWh. Energy reaches 0 near display 2%, so low-SOC
-    // samples read a little low: samples at >= CAP_GOOD_HALF_PCT win, lower
-    // ones (>= CAP_MIN_HALF_PCT) only fill in until one exists. Smoothed;
-    // kept across sessions in CAP_FILE ("<Wh> <1 if good>").
+    // learned as the energy at 100% display. Energy reaches 0 at display
+    // EvModelTemplate.ENERGY_ZERO_PCT (~2.3% on every car logged so far), so
+    // a sample is energy x (100 - zero) / (SOC - zero): energy / SOC alone
+    // read 1.6% low at 60% and 7% low at 30%. Samples at >= CAP_GOOD_HALF_PCT
+    // win, lower ones (>= CAP_MIN_HALF_PCT) only fill in until one exists.
+    // Smoothed; kept across sessions in CAP_FILE ("<Wh> <1 if good>").
     static final int ENRG_WH_PER_UNIT = 2;
     private static final int CAP_MIN_HALF_PCT = 60;      // 30% SOC
     private static final int CAP_GOOD_HALF_PCT = 120;    // 60% SOC
@@ -187,9 +190,11 @@ public final class EvModelSender {
         if (outOk) {
             writeFloatLe(msg, EvModelTemplate.TEMP_OFFSET, outC);
         }
+        pickRoadLoad();
         float roadA = coldRoadLoadA(outOk ? Math.round(outC)
                 : Integer.MIN_VALUE);
         writeFloatLe(msg, EvModelTemplate.ROAD_A_OFFSET, roadA);
+        writeFloatLe(msg, EvModelTemplate.ROAD_C_OFFSET, sBaseC);
         int rc = sSource.sendRawMessage(msg);
         sRoadA = roadA;
         Log.i(TAG, "energy model sent: " + wh + " Wh of " + cap
@@ -211,10 +216,41 @@ public final class EvModelSender {
         }
     }
 
+    // ---- road load per model -------------------------------------------------
+
+    private static float sBaseA = Float.NaN;  // this model's A and C, set once
+    private static float sBaseC = EvModelTemplate.ROAD_C_N;
+
+    /** Once: the road load for this model from the product id. */
+    private static void pickRoadLoad() {
+        if (!Float.isNaN(sBaseA)) {
+            return;
+        }
+        String product = EvDriveLog.prop("ro.build.product");
+        int i = carIndex(product);
+        sBaseA = i < 0 ? EvModelTemplate.ROAD_A_N : EvModelTemplate.CAR_ROAD_A_N[i];
+        sBaseC = i < 0 ? EvModelTemplate.ROAD_C_N : EvModelTemplate.CAR_ROAD_C_N[i];
+        Log.i(TAG, "road load for " + EvLogger.productShort(product) + ": A="
+                + sBaseA + "N, C=" + sBaseC + (i < 0 ? " (default)" : ""));
+    }
+
+    /** Index into EvModelTemplate.CAR_* for this product id, or -1. */
+    static int carIndex(String product) {
+        if (product == null) {
+            return -1;
+        }
+        for (int i = 0; i < EvModelTemplate.CAR_PREFIX.length; i++) {
+            if (product.startsWith(EvModelTemplate.CAR_PREFIX[i])) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
     // ---- cold road load ------------------------------------------------------
 
     /**
-     * Road load A for the outside temperature: base A plus the cold penalty
+     * Road load A for the outside temperature: this model's A plus the cold penalty
      * (EvModelTemplate.COLD_*, linear, clamped). The temperature it is based
      * on only moves once the reading is COLD_HYST_C away, so a value
      * wobbling around an edge doesn't keep changing A (Maps re-routes when A
@@ -226,10 +262,11 @@ public final class EvModelSender {
                 || Math.abs(outC - sColdTempC) >= COLD_HYST_C)) {
             sColdTempC = outC;
         }
+        float base = Float.isNaN(sBaseA) ? EvModelTemplate.ROAD_A_N : sBaseA;
         if (sColdTempC == Integer.MIN_VALUE) {
-            return EvModelTemplate.ROAD_A_N;
+            return base;
         }
-        return EvModelTemplate.ROAD_A_N + coldDeltaA(sColdTempC);
+        return base + coldDeltaA(sColdTempC);
     }
 
     /** Extra road load (N) at temp C; COLD_TEMPS_C runs warm to cold. */
@@ -286,7 +323,13 @@ public final class EvModelSender {
         return Math.max(wh, MIN_ENERGY_WH);
     }
 
-    /** One capacity sample (available energy / SOC) into the estimate. */
+    /** Capacity (energy at 100% display) from one energy and display SOC (0.5% steps). */
+    static float capacitySample(int availWh, int halfPct) {
+        float zero = 2f * EvModelTemplate.ENERGY_ZERO_PCT;
+        return halfPct <= zero ? -1f : (float) availWh * (200f - zero) / (halfPct - zero);
+    }
+
+    /** One capacity sample (energy at 100% display) into the estimate. */
     private static void learnCapacity(int halfPct, int availWh) {
         synchronized (CAP_LOCK) {
             loadCapacity();
@@ -297,7 +340,7 @@ public final class EvModelSender {
             if (sCapacityGood && !good) {
                 return;
             }
-            float sample = (float) availWh * 200f / halfPct;
+            float sample = capacitySample(availWh, halfPct);
             if (sample < CAP_MIN_WH || sample > CAP_MAX_WH) {
                 return;
             }
@@ -490,8 +533,11 @@ public final class EvModelSender {
             }
             byte[] aWant = new byte[4];
             writeFloatLe(aWant, 0, EvModelTemplate.ROAD_A_N);
+            byte[] cWant = new byte[4];
+            writeFloatLe(cWant, 0, EvModelTemplate.ROAD_C_N);
             for (int i = 0; i < 4; i++) {
-                if (template[EvModelTemplate.ROAD_A_OFFSET + i] != aWant[i]) {
+                if (template[EvModelTemplate.ROAD_A_OFFSET + i] != aWant[i]
+                        || template[EvModelTemplate.ROAD_C_OFFSET + i] != cWant[i]) {
                     return false;
                 }
             }

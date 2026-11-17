@@ -442,7 +442,8 @@ public final class EvDriveLog {
         return d.compareTo("2024-01-01") < 0 ? null : d;
     }
 
-    private static String prop(String key) {
+    /** A system property, "" if unreadable. */
+    static String prop(String key) {
         try {
             return (String) Class.forName("android.os.SystemProperties")
                     .getMethod("get", String.class, String.class)

@@ -84,6 +84,22 @@ OUTSIDE_TEMP_C = 15.0  # placeholder; EvModelSender patches the live outside tem
 # Road load from reference/IONIQ5 roll-down test.xlsx (A, B, C).
 ROAD_LOAD = (196.0, 0.0, 0.493)
 
+# Road load per model, picked at runtime by the head unit's product id
+# (ro.build.product, e.g. CVEV.USA...): (product prefix, A in N, C in
+# N/(m/s)^2). Models not listed send ROAD_LOAD. The cold penalty
+# (COLD_DELTA_A) is added on top either way.
+#   EV6 (CV): fitted on 84 steady 10 km stretches of a 2022 EV6 AWD's logs
+#   (issue #13, ~1000 km, mostly interstate, 5-28 C): the Ioniq 5 values
+#   predicted 234 Wh/km at 120 km/h, the EV6 used ~193 (climate power
+#   measured and taken out). Highway data can't separate A from C; any C in
+#   0.35-0.45 with its matching A fits within 3 Wh/km. 0.40 (CdA ~0.65 m^2,
+#   a lower, sleeker body than the Ioniq 5's ~0.80) and A = 180 N (rolling
+#   resistance ~0.0085 at ~2150 kg) are the physical pair.
+#   tools/analyze_drive_logs.py reproduces the fit.
+CAR_ROAD_LOAD = [
+    ("CV", 180.0, 0.40),
+]
+
 # Drivetrain loss: spin(v) + 6% of wheel power. Spin grows with speed like
 # Ford's map (450 W @ 0 -> 2.7 kW @ 36 m/s) but leaner. Negative x = regen
 # (experiment: sint32 allows it, Ford omits it; whether the planner uses it
@@ -97,13 +113,14 @@ DL_FRACTION = 0.06
 # Max DC charge power vs absolute battery energy (reference pack; the head
 # unit rescales the axis to the learned capacity, so read each point as SOC).
 #
-# Bulk (<=80%), warm/preconditioned pack: full 3C from 0% (no low-SOC ramp-in),
-# plateau to ~50%, thermal step-down to ~160 kW held to 80%. The step-down is
-# thermal (heat added THIS session), not absolute SOC: it lands ~55-60% from a
-# 0% start, ~65-70% from 10%, ~75-80% from 30%. An energy-indexed model can't
-# express that, so the step sits at 53%: calibrated so the canonical
-# road-trip number, 10->80% on a 350 kW charger, is ~17.5 min on the
-# reference pack (owner's logbook; Hyundai's official 18).
+# Bulk (<=80%): full 3C from 0% (no low-SOC ramp-in), plateau to ~50%, then
+# a step down to 135 kW held to 80%. The step-down is thermal (heat added THIS
+# session), not absolute SOC: it lands ~55-60% from a 0% start, ~65-70% from
+# 10%, ~75-80% from 30%. An energy-indexed model can't express that, so the
+# step sits at 53%. With 160 kW there, 10->80% on a 350 kW charger was
+# ~17.5 min on the reference pack (owner's logbook, a hot pack; Hyundai's
+# official 18); with 135 kW it is 19.0, closer to what packs reach in practice
+# (see the plateau note below).
 #
 # Top end (>80%): the car's own charge-time estimate, which the owner confirms
 # is realistic for this car: 80->90% = 8 min and 90->100% = 18 min on a
@@ -116,12 +133,18 @@ DL_FRACTION = 0.06
 # well or better without it. A slow top is also what makes Maps plan
 # departures well below 100%. Verified against the EA history: see
 # docs/ENERGY-MODEL.md "Field findings".
+#
+# 53-80% plateau: 135 kW (was 160). A 2022 EV6's DC stops (issue #13) held
+# 120-125 kW battery-side from 45 to 80% at a 20-28 C pack, even after the
+# car's own preconditioning had finished (it stops heating at ~22 C), and
+# the owner's 2024-26 EA sessions ran 1.2-1.3x the 160 kW model. 46->83% on
+# a 350 kW charger took 12.8 min; 160 kW said 9.4.
 CHARGE_CURVE = [
     (0, 230000),       # full send from 0%
     (20000, 235000),   # ~26%: peak
     (38700, 228000),   # 50%: plateau end
-    (41022, 160000),   # 53%: thermal step-down (see note above)
-    (61920, 160000),   # 80%: end of the bulk; the voltage taper starts here
+    (41022, 135000),   # 53%: thermal step-down (see note above)
+    (61920, 135000),   # 80%: end of the bulk; the voltage taper starts here
     (62694, 70000),    # 81%
     (65790, 48500),    # 85%
     (69660, 33500),    # 90%  (80->90% at k = 0.813: 8.0 min)
@@ -193,6 +216,16 @@ HEADROOM_STEPS = list(range(200, 19, -10)) + list(range(18, 1, -2)) + [1]
 # I^2R + cooling/pumps. Fitted against 125 real EA sessions (see
 # tools/analyze_charge_history.py); eta = 1.0 biases the model ~1.8 min fast.
 CHARGE_ETA = 0.95  # fitted on two deep warm sessions (0.955, 0.944)
+# AC rows: the on-board charger loses more. A 2022 EV6 on a 10.9 kW-class
+# circuit put 9.3-9.7 kW into the battery over 2-4 h sessions (issue #13).
+AC_ETA = 0.89
+AC_MAX_W = 20000   # charger rows at or below this are AC
+
+# The BMS energy (1.3) reaches 0 at about this display SOC (%) on every car
+# logged so far (2022 EV6: 2.32, 2023 Ioniq 5: 2.27; fitted on parked rows).
+# Capacity is learned as the energy at 100% display, and the battery %
+# curve (sensor 26) maps raw 0 to it.
+ENERGY_ZERO_PCT = 2.3
 
 # Runtime-scaled varints (4.1 energy_wh, 8.1 energy_wh and seconds) are
 # widened to this many bytes: 21 bits, room for 2 097 151. The largest
@@ -224,6 +257,11 @@ def charger_power(charger_w: int, energy_wh: float) -> float:
     return min(charger_w, interp_curve(energy_wh))
 
 
+def charge_eta(charger_w: int) -> float:
+    """Charger-side to battery-side efficiency on this charger."""
+    return AC_ETA if charger_w <= AC_MAX_W else CHARGE_ETA
+
+
 def cumulative_table(charger_w: int) -> list[tuple[int, float]]:
     """Seconds to charge from empty to each GRID_WH step on this charger
     (ascending absolute energy, (0, 0) first). Used to build the 8.1 rows and
@@ -236,7 +274,7 @@ def cumulative_table(charger_w: int) -> list[tuple[int, float]]:
         for j in range(GRID_SLICES):
             # slice midpoint power, charger-side; scale to battery-side energy
             p = charger_power(charger_w, e0 + (j + 0.5) * de)
-            seconds += 3600.0 * de / (p * CHARGE_ETA)
+            seconds += 3600.0 * de / (p * charge_eta(charger_w))
         out.append((i * GRID_WH, seconds))
     return out
 
@@ -478,6 +516,11 @@ def main() -> int:
     assert af[1].wire == 5 and af[1].val_len == 4
     a_off_in_model = af[1].val_off
     assert struct.unpack("<f", model[a_off_in_model:a_off_in_model + 4])[0] == ROAD_LOAD[0]
+    # road_load.c_n_per_mps2.value (2.3.1, float) - per-model road load patch point
+    cf = parse_fields(model, rf[3].val_off, rf[3].val_off + rf[3].val_len)
+    assert cf[1].wire == 5 and cf[1].val_len == 4
+    c_off_in_model = cf[1].val_off
+    assert abs(struct.unpack("<f", model[c_off_in_model:c_off_in_model + 4])[0] - ROAD_LOAD[2]) < 1e-6
 
     batch = (
         b"\x80\x03"
@@ -490,10 +533,11 @@ def main() -> int:
     cap_off += hdr
     temp_off = temp_off_in_model + hdr
     a_off = a_off_in_model + hdr
+    c_off = c_off_in_model + hdr
     print(f"model {len(model)} bytes, batch {len(batch)} bytes "
           f"(model {size_battery_only} before widening the 4.1/8.1 varints); "
           f"offsets: energy@{energy_off} capacity@{cap_off} temp@{temp_off} "
-          f"roadA@{a_off}; {len(axis_marks)} energy-axis + {len(time_marks)} "
+          f"roadA@{a_off} roadC@{c_off}; {len(axis_marks)} energy-axis + {len(time_marks)} "
           f"seconds varints scaled at runtime")
     scale_java = (
         java_ints("AXIS_OFFSETS", [o + hdr for o, _ in axis_marks],
@@ -508,6 +552,9 @@ def main() -> int:
     model_rev = hashlib.sha1(batch).hexdigest()[:8]
     cold_t = ", ".join(f"{t}f" for t, _ in COLD_DELTA_A)
     cold_a = ", ".join(f"{a}f" for _, a in COLD_DELTA_A)
+    car_p = ", ".join(f'"{p}"' for p, _, _ in CAR_ROAD_LOAD)
+    car_a = ", ".join(f"{a}f" for _, a, _ in CAR_ROAD_LOAD)
+    car_c = ", ".join(f"{c}f" for _, _, c in CAR_ROAD_LOAD)
 
     OUT_MODEL.write_bytes(bytes(model))
     OUT_BATCH.write_bytes(batch)
@@ -532,6 +579,14 @@ def main() -> int:
         "    static final String MODEL_REV = \"%s\";  // sha1 of the batch, short\n"
         "    static final int ROAD_A_OFFSET = %d;  // road_load.a_n float bits\n"
         "    static final float ROAD_A_N = %rf;\n"
+        "    static final int ROAD_C_OFFSET = %d;  // road_load.c_n_per_mps2 float bits\n"
+        "    static final float ROAD_C_N = %rf;\n"
+        "    // road load per model: product id prefix, A (N), C (N/(m/s)^2)\n"
+        "    static final String[] CAR_PREFIX = {%s};\n"
+        "    static final float[] CAR_ROAD_A_N = {%s};\n"
+        "    static final float[] CAR_ROAD_C_N = {%s};\n"
+        "    // display SOC (%%) at which the BMS energy reaches 0\n"
+        "    static final float ENERGY_ZERO_PCT = %rf;\n"
         "    // extra road load A vs outside temp (C), linear between, clamped\n"
         "    static final float[] COLD_TEMPS_C = {%s};\n"
         "    static final float[] COLD_DELTA_A_N = {%s};\n"
@@ -546,7 +601,8 @@ def main() -> int:
         "    private EvModelTemplate() {}\n"
         "}\n"
         % (CAPACITY_WH, cap_off, CAPACITY_WIDTH, energy_off, ENERGY_WIDTH,
-           PLACEHOLDER_WH, temp_off, model_rev, a_off, ROAD_LOAD[0], cold_t, cold_a,
+           PLACEHOLDER_WH, temp_off, model_rev, a_off, ROAD_LOAD[0], c_off, ROAD_LOAD[2],
+           car_p, car_a, car_c, ENERGY_ZERO_PCT, cold_t, cold_a,
            SCALE_WIDTH, scale_java, lines[0], concat)
     )
     print(f"wrote {OUT_TXT.relative_to(ROOT)}, {OUT_MODEL.relative_to(ROOT)}, "

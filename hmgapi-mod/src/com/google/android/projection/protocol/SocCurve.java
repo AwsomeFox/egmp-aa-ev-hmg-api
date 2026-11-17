@@ -23,7 +23,7 @@ package com.google.android.projection.protocol;
 final class SocCurve {
     /** the SensorBatch field (and sensor type the library must accept) */
     static final int SENSOR = 26;
-    static final float ZERO_PCT = 2f;
+    static final float ZERO_PCT = EvModelTemplate.ENERGY_ZERO_PCT;
     static final float[] RAW_POINTS = {1f, 5f, 10f, 20f, 30f, 40f, 50f, 60f, 70f, 80f, 90f, 95f, 99f};
 
     private SocCurve() {
