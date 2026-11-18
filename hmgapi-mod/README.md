@@ -46,8 +46,9 @@ sh hmgapi-mod/build.sh
 WIRELESS=../hmgapi-wireless-cp-aa/wireless-carplay-aa sh hmgapi-mod/test/run.sh
 ```
 
-The first gives `build/mod/egmp-aa-ev/` and `build/mod/egmp-aa-ev-standalone/` (no Wireless mod,
-no preconditioning; [`variants.py`](variants.py)). With your HMG-API author key it also signs the
+The first gives `build/mod/egmp-aa-ev/` and `build/mod/egmp-aa-ev-standalone/` (no Wireless mod; its
+library recipes carry the Wireless mod's route data patch, `route/`, merged with ours:
+[`variants.py`](variants.py)). With your HMG-API author key it also signs the
 packages, `dist/<id>-<version>.zip`. Make a key once, keep it private and backed up
 (a lost key means owners must remove the mod before installing a new one):
 

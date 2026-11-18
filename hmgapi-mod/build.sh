@@ -76,7 +76,7 @@ for d in "$MOD" "$SOLO"; do
     cp hmgapi-mod/scripts/offload.sh "$d/scripts/"
     chmod 755 "$d/scripts/offload.sh"
 done
-cp "$MOD/hooks.jar" "$SOLO/hooks.jar"
+cp "$MOD/hooks.jar" "$MOD/relay.jar" "$SOLO/"
 # the offload service asks HMG-API for its USB folder by the mod's id
 sed -i.orig "s/^MOD=$ID\$/MOD=$ID-standalone/" "$SOLO/scripts/offload.sh" && rm -f "$SOLO/scripts/offload.sh.orig"
 grep -q "^MOD=$ID-standalone\$" "$SOLO/scripts/offload.sh" || { echo "offload.sh: MOD line not found" >&2; exit 1; }
