@@ -66,13 +66,16 @@ PY
 eng() { set +e; out=$(HMGAPI_ROOT=$R HMGAPI_HOST=1 HMGAPI_PRODUCT=$P1 java -cp "$CP" hmgapi.engine.Engine "$@" 2>&1); rc=$?; set -e; }
 
 PRODUCTS="NEEV23.USA.0000.V015.012.260507 NEEV.USA.0000.V015.012.260507 NEEV23.USA.0000.V016.010.260903"
-# and every other E-GMP car whose map the SDK's HMG-API has, and an EV that isn't E-GMP (Niro EV)
+# and every other E-GMP car whose map the SDK's HMG-API has
 for e in "kia/ev6/usa/260507 CVEV.USA.0000.V015.012.260507" "kia/ev6/can/260206 CVEV.CAN.0000.V015.010.260206" \
-         "hyundai/neev/can/260206 NEEV.CAN.0000.V015.010.260206" "hyundai/ceev/usa/260903 CEEV.USA.0000.V016.010.260903" \
-         "kia/sg2ev/usa/260507 SG2EV.USA.0000.V015.012.260507"; do
+         "hyundai/neev/can/260206 NEEV.CAN.0000.V015.010.260206" "hyundai/ceev/usa/260903 CEEV.USA.0000.V016.010.260903"; do
     set -- $e
     [ -f "$HMGAPI_MAPS/$1/car.json" ] && PRODUCTS="$PRODUCTS $2"
 done
+# an EV that isn't E-GMP (Niro EV): the standalone build runs on it; the full one only where
+# the Wireless mod it requires does, which is the Wireless mod's to say
+OTHER=""
+[ -f "$HMGAPI_MAPS/kia/sg2ev/usa/260507/car.json" ] && OTHER="SG2EV.USA.0000.V015.012.260507"
 
 cat > "$D/R.java" <<'J'
 import hmgapi.engine.MemRecipe;
@@ -97,7 +100,23 @@ check_mod() {
     MOD=$1; KIND=$2
     ID=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["id"])' "$MOD/mod.json")
     echo "=== $ID"
-    for P in $PRODUCTS; do
+    if [ $KIND = full ]; then
+        for P in $OTHER; do
+            unit $P "$MOD" "$WIRELESS"
+            eng plan
+            hasnt "$P: no mod.json errors, matches the car" "$ID: " "$(echo "$out" | grep -i 'error\|isn.t one\|must be\|needs \|matches none' || true)"
+            r=$(echo "$out" | grep "$ID won't load" || true)
+            case "$r" in
+                "") echo "ok    $P: hooks load (the Wireless mod runs here)" ;;
+                *"requires wireless-carplay-aa, which isn't loaded"*) echo "ok    $P: waits only for the Wireless mod, which doesn't run here (the standalone build does)" ;;
+                *) echo "FAIL  $P: won't load for its own reason: $r"; fail=1 ;;
+            esac
+        done
+        PLAN=$PRODUCTS
+    else
+        PLAN="$PRODUCTS $OTHER"
+    fi
+    for P in $PLAN; do
         if [ $KIND = full ]; then unit $P "$MOD" "$WIRELESS"; else unit $P "$MOD"; fi
         eng plan
         has "$P: plan runs" "$ID" "$out"
