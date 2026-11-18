@@ -181,16 +181,19 @@ public final class HmgApiEntry extends ModEntry {
             mod.nativePatch(app, "libautoreceiver_infobank.so");
         }
         RoadLearn.setEnabled(on("model_learning"));
+        ChargeLearn.setEnabled(on("model_learning"));
         String product = EvDriveLog.prop("ro.build.product");
         if (egmp(product)) {
             RoadLearn.setPrior(RoadLearn.PRIOR);
+            ChargeLearn.setPrior(ChargeLearn.PRIOR);
         } else {
             // another EV (mod.json "system"): E-GMP values to start from, learned faster
             RoadLearn.setPrior(RoadLearn.PRIOR_OTHER);
+            ChargeLearn.setPrior(ChargeLearn.PRIOR_OTHER);
             mod.log("not an E-GMP car (" + product + "): the energy model starts from E-GMP values and learns"
                     + " this car as it drives (road load from " + RoadLearn.samples() + " highway stretches so far"
-                    + (on("model_learning") ? "" : ", learning off") + "; capacity from charges above 60%)."
-                    + " Charge times are E-GMP's, too fast for a 400 V car");
+                    + (on("model_learning") ? "" : ", learning off") + "; capacity from charges above 60%; DC charge"
+                    + " times from " + ChargeLearn.sessions() + " stops so far, E-GMP's until then: too fast for a 400 V car)");
         }
         if (evLogOn()) {
             EvDriveLog.start();

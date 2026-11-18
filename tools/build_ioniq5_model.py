@@ -246,6 +246,11 @@ ENERGY_ZERO_PCT = 2.3
 # 90 kWh on the car (k <= 1.17), so scaled values always fit.
 SCALE_WIDTH = 3
 SCALE_MAX_CAPACITY_WH = 90000  # EvModelSender.CAP_MAX_WH
+# Learned DC charge curves (ChargeLearn): the 4.1 powers are multiplied by a learned
+# scale per SOC band, within these bounds, and the 8.1 rows recomputed from them on the
+# car (EvModelSender, the same integration as charge_table()).
+CHARGE_SCALE_MIN = 0.25
+CHARGE_SCALE_MAX = 1.2
 
 
 def interp_curve(energy_wh: float) -> float:
@@ -392,6 +397,7 @@ def widen_runtime_fields(model: bytearray) -> tuple[int, int]:
 _SCALE_MSGS = {(4,), (4, 1), (8,), (8, 1), (8, 1, 2)}
 _SCALE_VARINTS = {
     (4, 1, 1): "axis",      # charge_limits.max_charge_power.energy_wh
+    (4, 1, 2): "power",     # charge_limits.max_charge_power.power_w (learned per car: ChargeLearn)
     (8, 1, 2, 1): "axis",   # charge_time...points.energy_wh (headroom to full)
     (8, 1, 2, 2): "time",   # charge_time...points.seconds (time to full)
 }
@@ -423,10 +429,10 @@ def _widen_scaled(buf, start: int, end: int, path: tuple, marks: list) -> bytear
     return out
 
 
-def widen_scaled_fields(model: bytearray) -> tuple[bytearray, list, list]:
-    """Widen the capacity-scaled varints of blocks 4.1 and 8.1.
+def widen_scaled_fields(model: bytearray) -> tuple[bytearray, list, list, list]:
+    """Widen the capacity-scaled varints of blocks 4.1 and 8.1, and 4.1's powers.
 
-    Returns (new model, axis marks, time marks), each mark (offset in the new
+    Returns (new model, axis marks, time marks, power marks), each mark (offset in the new
     model, reference value). Blocks 4 and 8 follow battery (1) and road load
     (2), so the patch points there keep their offsets. Checks the marks
     against CHARGE_CURVE / charge_table() so every point is accounted for.
@@ -435,6 +441,8 @@ def widen_scaled_fields(model: bytearray) -> tuple[bytearray, list, list]:
     new = _widen_scaled(model, 0, len(model), (), marks)
     axis = [(o, v) for k, o, v in marks if k == "axis"]
     times = [(o, v) for k, o, v in marks if k == "time"]
+    powers = [(o, v) for k, o, v in marks if k == "power"]
+    assert [v for _, v in powers] == [p for _, p in CHARGE_CURVE], "4.1 power mismatch"
     want_axis = [e for e, _ in CHARGE_CURVE]
     want_time = []
     for c in CHARGERS_W:
@@ -451,7 +459,11 @@ def widen_scaled_fields(model: bytearray) -> tuple[bytearray, list, list]:
     limit = 1 << (7 * SCALE_WIDTH)
     kmax = SCALE_MAX_CAPACITY_WH / CAPACITY_WH
     assert max(want_axis + want_time) * kmax < limit, "SCALE_WIDTH too small"
-    return new, axis, times
+    # learned charge curves: powers up to CHARGE_SCALE_MAX x, seconds for a curve down to
+    # CHARGE_SCALE_MIN x (slower: longer), at the largest pack
+    assert max(p for _, p in CHARGE_CURVE) * CHARGE_SCALE_MAX < limit, "SCALE_WIDTH too small for powers"
+    assert max(want_time) * kmax / CHARGE_SCALE_MIN < limit, "SCALE_WIDTH too small for learned seconds"
+    return new, axis, times, powers
 
 
 def protoc_decode(model: bytes) -> str:
@@ -514,7 +526,7 @@ def main() -> int:
 
     energy_off, cap_off = widen_runtime_fields(model)
     size_battery_only = len(model)
-    model, axis_marks, time_marks = widen_scaled_fields(model)
+    model, axis_marks, time_marks, power_marks = widen_scaled_fields(model)
     verify(bytes(model), canonical)
     # battery.outside_temp_c (field 7, wire type 5) - float bits patch point
     top = parse_fields(model, 0, len(model))
@@ -561,6 +573,24 @@ def main() -> int:
                     "8.1 seconds varints (SCALE_WIDTH bytes)")
         + java_ints("TIME_S", [v for _, v in time_marks],
                     "their values for the reference pack")
+        + java_ints("POWER_OFFSETS", [o + hdr for o, _ in power_marks],
+                    "4.1 power_w varints (SCALE_WIDTH bytes), x the learned charge scale")
+        + java_ints("CURVE_WH", [e for e, _ in CHARGE_CURVE], "4.1: energy (Wh, reference pack)")
+        + java_ints("CURVE_W", [p for _, p in CHARGE_CURVE], "4.1: max charge power there (W, charger side)")
+        + "    // 8.1, as charge_table(): rows by charger power, each the seconds to full from\n"
+        + "    // HEADROOM_STEPS x GRID_WH below full, integrated in GRID_SLICES slices per cell\n"
+        + java_ints("CHARGERS_W", CHARGERS_W, "8.1 rows: charger power (W)")
+        + java_ints("HEADROOM_STEPS", HEADROOM_STEPS, "8.1 points: headroom in GRID_WH cells")
+        + java_ints("SUPERCHARGERS_W", list(SUPERCHARGERS_W), "Tesla rows: flat SUPERCHARGER_FLAT_W (boost)")
+        + f"    static final int GRID_WH = {GRID_WH};\n"
+        + f"    static final int GRID_SLICES = {GRID_SLICES};\n"
+        + f"    static final int SUPERCHARGER_FLAT_W = {SUPERCHARGER_FLAT_W};\n"
+        + f"    static final int SUPERCHARGER_FLAT_TO_WH = {SUPERCHARGER_FLAT_TO_WH};\n"
+        + f"    static final double CHARGE_ETA = {CHARGE_ETA!r};\n"
+        + f"    static final double AC_ETA = {AC_ETA!r};\n"
+        + f"    static final int AC_MAX_W = {AC_MAX_W};\n"
+        + f"    static final float CHARGE_SCALE_MIN = {CHARGE_SCALE_MIN!r}f;\n"
+        + f"    static final float CHARGE_SCALE_MAX = {CHARGE_SCALE_MAX!r}f;\n"
     )
     model_rev = hashlib.sha1(batch).hexdigest()[:8]
     cold_t = ", ".join(f"{t}f" for t, _ in COLD_DELTA_A)
