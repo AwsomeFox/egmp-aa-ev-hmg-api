@@ -289,7 +289,23 @@ Replaying the 2022 EV6's logs (`EV_LOGS=<folder> sh gpm-ev/test/run.sh`):
 
 Not learned yet:
 - **Aux power by outside temperature (block 7):** needs patch points for its values.
-- **The DC plateau (4.1/8.1) and AC rates:** they need to tell when the charger, not the car, was the limit. The 8.1 tables would also have to be integrated again on the head unit.
+- **AC rates:** an AC session can't tell the car's on-board charger from the wall unit's limit.
+
+## On-car learning (DC charge curve)
+
+`ChargeLearn` (gpm-ev/src) learns how fast this car DC-charges, per 10 % SOC band, and the sender turns it into the 4.1 curve and the 8.1 tables Maps gets.
+- **Input:** EvDriveLog's 5 s rows during DC charging (`fast_charging_raw`). Every 60 s window gives the battery-side power from the BMS energy, made charger-side (÷ `CHARGE_ETA`) like the curve, and divided by the model's power at that SOC: a ratio.
+- **Only where the car set the pace:**
+  - the charger's power must be known: `nav_charger_kw`, the charger Maps was guiding to, seen up to 10 min before plugging in. An unguided session teaches nothing, so a slow post never makes the car look slow;
+  - the window ran below 0.9 × that power;
+  - not a Tesla Supercharger row (250/325 kW: the boost converter's flat ~97 kW, already in the model);
+  - not the first 3 min (the ramp), not a pack below 20 °C (the model is the preconditioned curve; unknown counts as warm).
+- **Per session:** windows below 0.6 × the session's median are dropped (a charger's brief dip). Each band with 3 or more windows gives its median as one sample, and the median of all windows is one sample of the car's overall scale.
+- **Scale per band:** (PRIOR × g + the band's samples) ÷ (PRIOR + n), with g the overall scale learned the same way from 1.0. A band never charged in follows the car's overall scale. PRIOR is 2 sessions on E-GMP (the model was fitted on E-GMP stops) and 0.5 on other EVs, whose 400 V packs charge far slower. Clamped to 0.25–1.2.
+- **Use:** the sender reads the curve once per Android Auto session, writes its powers into 4.1 (`POWER_OFFSETS`) and integrates the 8.1 rows from it on the head unit (`ChargeCurve`, the generator's `charge_table()`; for the model's own curve it gives the generator's seconds exactly), then scales energies and seconds by capacity as before. The AC rows follow the curve only where it falls below the charger near full.
+- **Storage and visibility:** `charge_curve` in GPM's files dir; the log header shows `charge_scale` (per band) and `charge_sessions`. Same setting as road load learning.
+
+Replaying the 2022 EV6's logs (`EV_LOGS=<folder> sh gpm-ev/test/run.sh`, ChargeLearnTest): all three of its DC stops were guided by Maps (two at 150 kW posts, mostly charger-limited, one at 350 kW). They give 0.95–0.96 at 50–80 % and 0.97 overall. For its 44 → 82 % stop at a 350 kW charger (13.4 min real), Maps' time goes from 10.6 min (model) to 11.1 min. The rest is the 40–50 % band, which these stops only reached during the ramp, and the ramp itself, which Maps' tables can't carry: they are differences of time-to-full.
 
 ## Next steps
 1. ~~Recover the real schema from Google Maps~~ (done, see above).

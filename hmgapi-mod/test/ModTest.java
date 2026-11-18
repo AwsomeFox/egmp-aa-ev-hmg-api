@@ -186,6 +186,25 @@ public final class ModTest {
         void shutdown() {}   // not public: not the one
     }
 
+    /** A learned charge curve in the template: 4.1 powers and the 8.1 seconds integrated from it. */
+    static void testChargeCurve() {
+        byte[] t = java.util.Base64.getMimeDecoder().decode(EvModelTemplate.TEMPLATE_B64);
+        check("the template's own curve passes the placeholder check (powers included)", EvModelSender.checkPlaceholders(t));
+        check("the model's own curve: the same bytes as capacity scaling alone",
+                java.util.Arrays.equals(EvModelSender.scaleTemplate(t, 70000, ChargeCurve.model()),
+                        EvModelSender.scaleTemplate(t, 70000)));
+        float[] half = ChargeCurve.model();
+        for (int i = 0; i < half.length; i++) half[i] /= 2;
+        byte[] h = EvModelSender.scaleTemplate(t, EvModelTemplate.CAPACITY_WH, half);
+        int p0 = EvModelTemplate.POWER_OFFSETS[0];
+        int v = (h[p0] & 0x7f) | (h[p0 + 1] & 0x7f) << 7 | (h[p0 + 2] & 0x7f) << 14;
+        check("half the curve: 4.1's first power " + v, v == EvModelTemplate.CURVE_W[0] / 2);
+        int s0 = EvModelTemplate.TIME_OFFSETS[0];
+        int sec = (h[s0] & 0x7f) | (h[s0 + 1] & 0x7f) << 7 | (h[s0 + 2] & 0x7f) << 14;
+        check("... and the 350 kW row from empty about twice as long: " + sec + " vs " + EvModelTemplate.TIME_S[0],
+                sec > 1.9 * EvModelTemplate.TIME_S[0] && sec < 2.1 * EvModelTemplate.TIME_S[0]);
+    }
+
     /** The shutdown guard: stop() waits for a send under way, and finds SensorSource.shutdown(). */
     static void testLifecycle() throws Exception {
         check("SensorSource.shutdown() found by name and shape", HmgApiEntry.sensorShutdown(FakeSource.class) != null);
@@ -257,6 +276,7 @@ public final class ModTest {
         testNoHmgApi();
         testEvCheck();
         testLifecycle();
+        testChargeCurve();
         // the two builds on one unit (HMG-API doesn't enforce their conflicts for hook-only mods)
         try {
             java.io.File st = java.io.File.createTempFile("state", ".json");

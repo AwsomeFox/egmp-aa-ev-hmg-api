@@ -7,7 +7,7 @@
       "default": true,
       "title": "Battery data for Google Maps (EV energy model)",
       "apply": "restart",
-      "description": "Sends Maps the battery's real energy, its learned usable capacity, charge curves and the outside temperature every 5 s during Android Auto, for its arrival charge and charging stops. Needs an Android Auto library build the mod can patch: the ones it ships a patch for (Ioniq 5 and EV6 US 260507, EV6 Canada 260206, Ioniq 6 US 260903 and Canada 260206), or any build with the same code, found by HMG-API after 1.1.0-rc.2. Made for E-GMP (Ioniq 5, Ioniq 6, EV6). Other EVs (Kona Electric, Niro EV, Soul EV) start from E-GMP values and need time to learn: highway driving at 60 km/h or more for the car's consumption (most of the way after about 200 km, with \"Learn this car's highway consumption\" on), and a charge above 60% for its battery size. Until then Maps' arrival charge can be off. Charge times stay E-GMP's, which are too fast for 400 V cars, so plan longer stops."
+      "description": "Sends Maps the battery's real energy, its learned usable capacity, charge curves and the outside temperature every 5 s during Android Auto, for its arrival charge and charging stops. Needs an Android Auto library build the mod can patch: the ones it ships a patch for (Ioniq 5 and EV6 US 260507, EV6 Canada 260206, Ioniq 6 US 260903 and Canada 260206), or any build with the same code, found by HMG-API after 1.1.0-rc.2. Made for E-GMP (Ioniq 5, Ioniq 6, EV6). Other EVs (Kona Electric, Niro EV, Soul EV) start from E-GMP values and need time to learn: highway driving at 60 km/h or more for the car's consumption (most of the way after about 200 km, with \"Learn this car\" on), and a charge above 60% for its battery size. Until then Maps' arrival charge can be off. Charge times start from E-GMP's, too fast for 400 V cars, and learn from the car's DC stops at chargers Maps guided it to (with \"Learn this car\" on)."
     },
     {
       "key": "battery_curve",
@@ -65,9 +65,9 @@
       "key": "model_learning",
       "type": "toggle",
       "default": true,
-      "title": "Learn this car's highway consumption",
+      "title": "Learn this car: highway consumption and DC charging",
       "apply": "restart",
-      "description": "Compares the energy model with this car's own steady highway drives (10 km stretches at 60 km/h or more, from the EV log) and scales the model's road load to match, between 0.7x and 1.3x. Takes effect at the next Android Auto session. Turning it off forgets what it learned. Needs EV logs on."
+      "description": "Compares the energy model with this car's own steady highway drives (10 km stretches at 60 km/h or more, from the EV log) and scales the model's road load to match, between 0.7x and 1.3x. Also learns how fast the car really DC fast-charges in each 10% SOC band, from stops at chargers Maps was guiding to where the car, not the charger, set the pace, so Maps' charge times follow the car's own stops. Takes effect at the next Android Auto session. Turning it off forgets what it learned. Needs EV logs on."
     },
     {
       "key": "ev_log",

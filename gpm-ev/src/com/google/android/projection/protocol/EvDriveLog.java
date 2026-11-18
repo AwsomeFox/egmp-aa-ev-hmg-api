@@ -294,6 +294,9 @@ public final class EvDriveLog {
     private static final int COL_HVAC = column("hvac_raw");
     private static final int COL_CHG_STS = column("chg_sts_raw");
     private static final int COL_FAST = column("fast_charging_raw");
+    private static final int COL_CAP = column("capacity_wh");
+    private static final int COL_NAV_KW = column("nav_charger_kw");
+    private static final int COL_PACK_MIN = column("pack_min_c");
 
     static int column(String name) {
         for (int i = 0; i < COLUMNS.length; i++) {
@@ -304,13 +307,15 @@ public final class EvDriveLog {
         throw new IllegalStateException("no column " + name);
     }
 
-    /** The row's driving values to RoadLearn (on-car road load learning). */
+    /** The row's values to RoadLearn (road load) and ChargeLearn (DC charge curve). */
     static void learn(long now, Object[] v) {
         boolean charging = num(v[COL_CHG_STS], 0) >= 1 || num(v[COL_FAST], 0) >= 1;
         RoadLearn.row(now / 1000, (int) num(v[COL_ENERGY], -1), num(v[COL_ODO], Float.NaN),
                 num(v[COL_SPEED_AVG], Float.NaN), num(v[COL_OUT_C], Float.NaN),
                 (int) num(v[COL_HVAC], -1), charging,
                 EvModelSender.baseRoadA(), EvModelSender.baseRoadC());
+        ChargeLearn.row(now / 1000, (int) num(v[COL_ENERGY], -1), (int) num(v[COL_CAP], -1),
+                num(v[COL_FAST], 0) >= 1, num(v[COL_NAV_KW], Float.NaN), num(v[COL_PACK_MIN], Float.NaN));
     }
 
     private static float num(Object o, float unknown) {
@@ -455,6 +460,8 @@ public final class EvDriveLog {
         EvLogger.header(h, "capacity_source", capacitySource);
         EvLogger.header(h, "road_scale", String.valueOf(RoadLearn.scale()));
         EvLogger.header(h, "road_scale_n", String.valueOf(RoadLearn.samples()));
+        EvLogger.header(h, "charge_scale", ChargeLearn.summary());
+        EvLogger.header(h, "charge_sessions", String.valueOf(ChargeLearn.sessions()));
         EvLogger.header(h, "date", date);
         EvLogger.header(h, "period_s", String.valueOf(ROW_MS / 1000));
         EvLogger.header(h, "sample_s", String.valueOf(SAMPLE_MS / 1000));

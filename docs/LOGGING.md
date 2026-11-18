@@ -34,6 +34,8 @@ v2 is a superset of v1: same header keys plus `sample_s`, same columns plus the 
 # capacity_source=bms
 # road_scale=1.0
 # road_scale_n=0
+# charge_scale=1.0 1.0 1.0 1.0 1.0 1.0 1.0 1.0 1.0 1.0
+# charge_sessions=0
 # date=2026-01-17
 # period_s=5
 # sample_s=1
@@ -58,6 +60,8 @@ Lines starting with `# `, each `# key=value`. The first line is exactly `# egmp-
 | `capacity_source` | where `capacity_wh` comes from: `nominal` (new-car value, nothing learned yet) or `bms` (learned from BMS available energy: the energy at 100 % display, energy × (100 − 2.3) ÷ (SOC − 2.3)). Readers should accept other short lower-case values | `bms` |
 | `road_scale` | the scale on the model's road load learned on this car (`RoadLearn`; 1 = as shipped, 0.7–1.3). Applies from the next Android Auto session. Optional | `0.94` |
 | `road_scale_n` | how many 10 km highway stretches `road_scale` was learned from. Optional | `12` |
+| `charge_scale` | the scale on the model's DC charge power learned on this car, per 10 % SOC band from 0–10 % (`ChargeLearn`; 1 = as shipped, 0.25–1.2). Applies from the next Android Auto session. Optional | `0.97 0.97 0.97 0.97 0.97 0.95 0.95 0.96 0.97 0.97` |
+| `charge_sessions` | how many DC sessions `charge_scale` was learned from. Optional | `3` |
 | `date` | UTC date the file started, `YYYY-MM-DD`. No time of day. Left out if the clock wasn't set | `2026-01-17` |
 | `period_s` | row period, s | `5` |
 | `sample_s` | *v2*: sampling period inside a row, s | `1` |

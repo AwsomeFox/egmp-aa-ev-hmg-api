@@ -17,6 +17,7 @@ javac -source 8 -target 8 \
     -d build/classes \
     src/$PKG/EvModelSender.java src/$PKG/EvModelTemplate.java src/$PKG/EvLogger.java \
     src/$PKG/EvCar.java src/$PKG/EvDriveLog.java src/$PKG/EvRowAgg.java src/$PKG/RoadLearn.java \
+    src/$PKG/ChargeLearn.java src/$PKG/ChargeCurve.java \
     src/$PKG/NavProto.java src/$PKG/PrecondCore.java src/$PKG/Precond.java \
     stubs/$PKG/SensorSource.java \
     stubs/com/hkmc/cluster/NavigationCluster.java \
@@ -32,6 +33,8 @@ javac -source 8 -target 8 \
     build/classes/$PKG/EvDriveLog*.class \
     build/classes/$PKG/EvRowAgg*.class \
     build/classes/$PKG/RoadLearn*.class \
+    build/classes/$PKG/ChargeLearn*.class \
+    build/classes/$PKG/ChargeCurve*.class \
     build/classes/$PKG/NavProto*.class \
     build/classes/$PKG/Precond*.class
 

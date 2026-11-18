@@ -83,7 +83,8 @@ public final class EvModelSender {
     private static volatile boolean sRunning;
     private static Sink sSource;
     private static byte[] sTemplate;
-    private static byte[] sScaled;          // sTemplate scaled for sScaledCapWh
+    private static byte[] sScaled;          // sTemplate scaled for sScaledCapWh and sCurve
+    private static float[] sCurve;          // ChargeLearn's curve, fixed for the session (null: the model's)
     private static int sScaledCapWh = -1;
     private static int sLastGoodHalfPct = -1;
 
@@ -114,6 +115,13 @@ public final class EvModelSender {
                 return;
             }
             sScale = RoadLearn.scale();
+            float[] curve = ChargeLearn.curveW();
+            if (curve != sCurve) {
+                sCurve = curve;
+                sScaled = null;   // rebuild the charge tables for it
+            }
+            Log.i(TAG, "charge curve " + (curve == null ? "the model's" : "learned from " + ChargeLearn.sessions()
+                    + " DC sessions (" + ChargeLearn.summary() + ")"));
             Log.i(TAG, "road load scale " + sScale + " (learned from "
                     + RoadLearn.samples() + " highway stretches)");
             sRunning = true;
@@ -533,7 +541,7 @@ public final class EvModelSender {
     private static byte[] scaledTemplateLocked(int capWh) {
         if (sScaled == null || capWh != sScaledCapWh) {
             try {
-                sScaled = scaleTemplate(sTemplate, capWh);
+                sScaled = scaleTemplate(sTemplate, capWh, sCurve);
                 Log.i(TAG, "charge curve/tables scaled to " + capWh + " Wh");
             } catch (Throwable t) {
                 logTickFailure(t);
@@ -552,13 +560,31 @@ public final class EvModelSender {
      * time. Powers are untouched. Identity at k = 1.
      */
     static byte[] scaleTemplate(byte[] template, int capWh) {
+        return scaleTemplate(template, capWh, null);
+    }
+
+    /**
+     * As scaleTemplate(template, capWh), with a learned charge curve (ChargeLearn: 4.1
+     * powers, W, for the reference pack; null for the model's): its powers go into 4.1 and
+     * the 8.1 seconds are integrated from it (ChargeCurve, as the generator does), before
+     * the capacity scaling.
+     */
+    static byte[] scaleTemplate(byte[] template, int capWh, float[] curveW) {
         byte[] out = (byte[]) template.clone();
         long ref = EvModelTemplate.CAPACITY_WH;
-        if (capWh == ref) {
-            return out;
-        }
         int width = EvModelTemplate.SCALE_WIDTH;
         int max = (1 << (7 * width)) - 1;
+        int[] seconds = EvModelTemplate.TIME_S;
+        if (curveW != null) {
+            int[] po = EvModelTemplate.POWER_OFFSETS;
+            for (int i = 0; i < po.length; i++) {
+                writeFixedVarint(out, po[i], (int) Math.min(Math.round(curveW[i]), max), width);
+            }
+            seconds = ChargeCurve.tableSeconds(curveW);
+        }
+        if (capWh == ref && curveW == null) {
+            return out;
+        }
         int[] offs = EvModelTemplate.AXIS_OFFSETS;
         int[] wh = EvModelTemplate.AXIS_WH;
         for (int i = 0; i < offs.length; i++) {
@@ -566,7 +592,7 @@ public final class EvModelSender {
             writeFixedVarint(out, offs[i], (int) Math.min(v, max), width);
         }
         offs = EvModelTemplate.TIME_OFFSETS;
-        int[] s = EvModelTemplate.TIME_S;
+        int[] s = seconds;
         for (int i = 0; i < offs.length; i++) {
             long v = (s[i] * (long) capWh + ref / 2) / ref;
             writeFixedVarint(out, offs[i], (int) Math.min(v, max), width);
@@ -616,6 +642,15 @@ public final class EvModelSender {
             }
             for (int i = 0; i < offs.length; i++) {
                 if (readFixedVarint(template, offs[i], width) != EvModelTemplate.AXIS_WH[i]) {
+                    return false;
+                }
+            }
+            offs = EvModelTemplate.POWER_OFFSETS;
+            if (offs.length != EvModelTemplate.CURVE_W.length) {
+                return false;
+            }
+            for (int i = 0; i < offs.length; i++) {
+                if (readFixedVarint(template, offs[i], width) != EvModelTemplate.CURVE_W[i]) {
                     return false;
                 }
             }
