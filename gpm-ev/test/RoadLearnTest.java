@@ -108,6 +108,16 @@ public class RoadLearnTest {
         check(RoadLearn.scale() == 1f && RoadLearn.samples() == 0, "off: scale 1, no samples");
         RoadLearn.setEnabled(true);
 
+        // another EV: the shipped model counts for fewer stretches, so it learns faster
+        RoadLearn.resetForTest();
+        RoadLearn.setPrior(RoadLearn.PRIOR_OTHER);
+        s = new double[] {60000, 0};
+        drive(0, s, 102f, 110f, 0.85f, 25, false);
+        float other = (RoadLearn.PRIOR_OTHER + 10 * 0.85f) / (RoadLearn.PRIOR_OTHER + 10);
+        check(Math.abs(RoadLearn.scale() - other) < 0.01f && other < want - 0.04f,
+                "not E-GMP: " + RoadLearn.scale() + " ~ " + other + " after 100 km (E-GMP " + want + ")");
+        RoadLearn.resetForTest();
+
         // the same cold penalty as the sender's
         check(RoadLearn.coldDeltaA(15f) == 0f && Math.abs(RoadLearn.coldDeltaA(-6.7f) - 156f) < 0.01f
                 && RoadLearn.coldDeltaA(-50f) == 679f, "cold penalty matches COLD_DELTA_A");

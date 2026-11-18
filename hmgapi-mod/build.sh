@@ -72,7 +72,7 @@ python3 hmgapi-mod/variants.py full "$MOD" >/dev/null
 python3 hmgapi-mod/variants.py standalone "$SOLO" >/dev/null
 for d in "$MOD" "$SOLO"; do
     mkdir -p "$d/recipes" "$d/scripts"
-    cp hmgapi-mod/recipes/*.recipe "$d/recipes/"
+    cp hmgapi-mod/recipes/*.recipe hmgapi-mod/recipes/*.sites "$d/recipes/"
     cp hmgapi-mod/scripts/offload.sh "$d/scripts/"
     chmod 755 "$d/scripts/offload.sh"
 done

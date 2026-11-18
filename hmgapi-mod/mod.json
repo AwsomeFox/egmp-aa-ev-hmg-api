@@ -8,12 +8,13 @@
     "AwsomeFox"
   ],
   "license": "AGPL-3.0",
-  "description": "Needs HMG-API's Wireless CarPlay + Android Auto mod. Google Maps EV routing over Android Auto: battery and range, charge curves, EV plugs, battery preconditioning for DC chargers.",
+  "description": "Needs the Wireless CarPlay + Android Auto mod. Google Maps EV routing: battery, charge curves, EV plugs, DC preconditioning. Built for E-GMP; other EVs learn over a few drives.",
   "requires": ["wireless-carplay-aa >=2.1.0"],
   "conflicts": ["egmp-aa-ev-standalone"],
   "nemesis_conflicts": ["hmgapi.egmp-aa-ev-standalone", "aa.ev.model"],
   "system": {
-    "model": ["NEEV", "NEEV23", "NEEV23SE", "CVEV", "CEEV"]
+    "model": ["NEEV", "NEEV23", "NEEV23SE", "CVEV", "CEEV",
+              "OSEV", "SG2EV", "SG225EV", "DE20EV", "DE22EV", "DEEVPBV", "SK3EV", "SK3EV21", "SK3EV22", "AEPEEV"]
   },
   "hooks": {
     "jar": "hooks.jar",
@@ -30,6 +31,9 @@
         "recipes/ev-sensor-48ee793a.recipe",
         "recipes/ev-sensor-dbfe7bd2.recipe"
       ]
+    },
+    "native_sites": {
+      "libautoreceiver_infobank.so": ["recipes/ev-sensor.sites"]
     }
   },
   "projection": {

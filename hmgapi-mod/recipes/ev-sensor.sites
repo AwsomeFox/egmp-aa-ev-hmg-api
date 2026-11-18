@@ -1,0 +1,35 @@
+# Android Auto library: egmp-aa-ev's EV energy model path, as a relocatable recipe
+# (HMG-API "native_sites", hmgapi.engine.SiteFind): the same three patches as the fixed
+# ev-sensor-<md5>.recipe files, at offsets HMG-API finds on the unit by what the code
+# looks like. One recipe for every build of the library whose code around the patches is
+# the same, so a car gets the energy model without a recipe made for its build. HMG-API
+# tries it after the fixed recipes, and writes nothing unless every site matches exactly
+# once. Made from the US 260507 build (md5 48ee793a...); wildcards (mask) are the bytes
+# that move between builds: branch and call offsets, literal-pool offsets.
+#
+#   1. SensorType_IsValid: cmp r0,#20 -> cmp r0,#22 (sensor types 1..23: type 23 parses).
+#      Not #25 as the US 260507 fixed recipe writes: the battery % curve (sensor 26) is
+#      kept to the builds it has been checked on.
+#   2. SensorSource::handleSensorRequest, the unknown-type default: mvn.w r7,#8 ->
+#      mov.w r7,#0 (answer SUCCESS, not -9)
+#   3. SensorSource::reportDiagnosticsData: push.w -> b.w ProtocolEndpointBase::
+#      queueOutgoing (raw messages out; that function isn't exported, so it's a site too)
+#
+# Only md5s and the bytes this recipe writes: no manufacturer code.
+id ev-sensor-sites
+file /system/lib/libautoreceiver_infobank.so
+# 1. the last 4 bytes of the function before, then all of SensorType_IsValid (stock cmp r0,#20)
+site valid 16 05523270f3c48d3d812646d19fb57251 at sym:_Z18SensorType_IsValidi+-4
+# 2. movs r6,#1; b <wild>; movs r6,#0; mvn.w r7,#8; mov r0,r4; mov r1,r7; bl <wild>; cbz; mov; add
+site req 24 6415d81b3dcf25ddc5088f8b1b83640d mask cffc3f in _ZN12SensorSource19handleSensorRequestERK13SensorRequest
+# 3. reportDiagnosticsData's first instructions (its two literal loads' offsets wild)
+site diag 22 55957980843d0a2f231e3fd8c9c9fce8 mask f77ffc at sym:_ZN12SensorSource21reportDiagnosticsDataEPhj
+# ProtocolEndpointBase::queueOutgoing: its b.w MessageRouter::queueOutgoing wild, and the
+# start of the next function (queueOutgoingUnencrypted, the same code but for that b.w)
+site qo 32 7ac3fff355f0329dc6d9043ab6376539 mask fffffc3f
+verify valid+4 4
+verify req+4 8
+verify diag 4
+patch valid+6 1628
+patch req+6 4ff00007
+bw diag qo

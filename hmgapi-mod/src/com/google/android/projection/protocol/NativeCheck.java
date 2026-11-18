@@ -22,7 +22,14 @@ import java.util.List;
  * The sites come from the recipe files themselves (read in the zygote, where
  * the mod's folder is readable; see HmgApiEntry.zygoteInit), so supporting
  * another library build is one more recipe in recipes/ and mod.json, with no
- * change here. BUILT_IN is the US Ioniq 5 260507 recipe's, for a mod loaded
+ * change here.
+ *
+ * The relocatable recipe (recipes/*.sites, mod.json hooks.native_sites) has no
+ * offsets of its own: HMG-API (after 1.1.0-rc.2) finds them for this unit's
+ * library and keeps the plain recipe it made in /data/hmgapi/public/sites/<mod>/
+ * (hmgapi.engine.SiteRecipes), readable by apps. When no fixed recipe is in place,
+ * that result for this library's md5 is read back the same way. An HMG-API without
+ * native_sites never writes one, so nothing changes there. BUILT_IN is the US Ioniq 5 260507 recipe's, for a mod loaded
  * live (without a zygote start). Normal installed mods load both the Ioniq 5
  * and Ioniq 6 recipes from their folder in zygoteInit.
  */
@@ -40,6 +47,12 @@ final class NativeCheck {
         Recipe(String id) {
             this.id = id;
         }
+
+        Recipe(String id, Recipe from) {
+            this.id = id;
+            offsets.addAll(from.offsets);
+            bytes.addAll(from.bytes);
+        }
     }
 
     /** recipes/ev-sensor-48ee793a.recipe's patch lines (types up to 26: the energy model and the battery % curve) */
@@ -55,17 +68,45 @@ final class NativeCheck {
     }
 
     private static final List<Recipe> sRecipes = new ArrayList<Recipe>();
+    /** relocatable recipes: {name in the mod ("recipes/x.sites"), md5 of its text} */
+    private static final List<String[]> sSites = new ArrayList<String[]>();
+    private static String sMod = "egmp-aa-ev";
+    /** where HMG-API keeps resolved relocatable recipes (hmgapi.engine.SiteRecipes.DIR) */
+    static File sSitesDir = new File("/data/hmgapi/public/sites");
+    static File sLibFile = new File("/system/lib/" + LIB);
+    private static volatile String sLibMd5;
+    /** the relocatable recipes resolved for this library, once found */
+    private static final List<Recipe> sResolved = new ArrayList<Recipe>();
     private static volatile String sOk;   // the recipe found in place
     private static volatile String sWhy = "not checked";
 
-    /** Reads every recipes/*.recipe of the mod (in the zygote: its folder is readable there). */
-    static synchronized void load(File dir) {
+    static void load(File dir) {
+        load(dir, null);
+    }
+
+    /**
+     * Reads every recipes/*.recipe of the mod, and notes its recipes/*.sites (in the zygote:
+     * its folder is readable there). mod: the mod's id, the folder HMG-API keeps its
+     * resolved relocatable recipes in.
+     */
+    static synchronized void load(File dir, String mod) {
+        if (mod != null) {
+            sMod = mod;
+        }
         File[] files = dir == null ? null : dir.listFiles();
         if (files == null) {
             return;
         }
         java.util.Arrays.sort(files);
         for (File f : files) {
+            if (f.getName().endsWith(".sites")) {
+                try {
+                    sSites.add(new String[] {dir.getName() + "/" + f.getName(), md5(readBytes(f))});
+                } catch (Exception e) {
+                    android.util.Log.w("EvModelSender", "recipe " + f.getName() + " not read: " + e);
+                }
+                continue;
+            }
             if (!f.getName().endsWith(".recipe")) {
                 continue;
             }
@@ -111,9 +152,57 @@ final class NativeCheck {
 
     static List<Recipe> recipes() {
         synchronized (NativeCheck.class) {
-            return sRecipes.isEmpty() ? java.util.Collections.singletonList(BUILT_IN)
+            List<Recipe> all = sRecipes.isEmpty() ? new ArrayList<Recipe>(java.util.Collections.singletonList(BUILT_IN))
                     : new ArrayList<Recipe>(sRecipes);
+            all.addAll(sResolved);
+            return all;
         }
+    }
+
+    /** a file name in HMG-API's sites folder (SiteRecipes.safe) */
+    static String safe(String name) {
+        return name.replaceAll("[^A-Za-z0-9._-]", "_");
+    }
+
+    /**
+     * The relocatable recipes HMG-API resolved for this library (libMd5), as plain ones;
+     * why gets each one it hasn't (yet).
+     */
+    static List<Recipe> resolvedSites(String libMd5, StringBuilder why) {
+        List<Recipe> out = new ArrayList<Recipe>();
+        List<String[]> sites;
+        String mod;
+        synchronized (NativeCheck.class) {
+            sites = new ArrayList<String[]>(sSites);
+            mod = sMod;
+        }
+        for (String[] s : sites) {
+            File base = new File(new File(sSitesDir, safe(mod)), safe(s[0]) + "." + s[1].substring(0, 8) + "." + libMd5);
+            File ok = new File(base.getPath() + ".recipe"), no = new File(base.getPath() + ".why");
+            String miss;
+            try {
+                if (ok.isFile()) {
+                    Recipe r = parse(read(ok));
+                    if (!r.offsets.isEmpty()) {
+                        out.add(new Recipe(r.id + " (found for " + libMd5.substring(0, 8) + ")", r));
+                        continue;
+                    }
+                    miss = s[0] + ": empty result";
+                } else if (no.isFile()) {
+                    miss = s[0] + ": " + read(no).trim();
+                } else {
+                    miss = s[0] + ": not resolved for this library (md5 " + libMd5
+                            + ") yet; HMG-API with native_sites does it at its next start";
+                }
+            } catch (Exception e) {
+                miss = s[0] + ": " + e;
+            }
+            if (why.length() > 0) {
+                why.append("; ");
+            }
+            why.append(miss);
+        }
+        return out;
     }
 
     /** the library's memory, from its file offset 0 */
@@ -185,7 +274,7 @@ final class NativeCheck {
             final RandomAccessFile mem = new RandomAccessFile("/proc/self/mem", "r");
             try {
                 StringBuilder why = new StringBuilder();
-                String ok = find(recipes(), new Memory() {
+                Memory m = new Memory() {
                     @Override
                     public byte[] read(long offset, int len) throws Exception {
                         byte[] b = new byte[len];
@@ -193,7 +282,19 @@ final class NativeCheck {
                         mem.readFully(b);
                         return b;
                     }
-                }, why);
+                };
+                String ok = find(recipes(), m, why);
+                if (ok == null && sResolved.isEmpty() && !sSites.isEmpty()) {
+                    // no fixed recipe in place: the relocatable one, as HMG-API resolved it here
+                    if (sLibMd5 == null) {
+                        sLibMd5 = md5(readBytes(sLibFile));
+                    }
+                    List<Recipe> found = resolvedSites(sLibMd5, why);
+                    synchronized (NativeCheck.class) {
+                        sResolved.addAll(found);
+                    }
+                    ok = find(found, m, why);
+                }
                 if (ok == null) {
                     sWhy = why.toString();
                     return false;
@@ -245,6 +346,25 @@ final class NativeCheck {
             in.close();
         }
         return s.toString();
+    }
+
+    static byte[] readBytes(File f) throws Exception {
+        java.io.FileInputStream in = new java.io.FileInputStream(f);
+        try {
+            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+            byte[] b = new byte[65536];
+            int n;
+            while ((n = in.read(b)) > 0) {
+                out.write(b, 0, n);
+            }
+            return out.toByteArray();
+        } finally {
+            in.close();
+        }
+    }
+
+    static String md5(byte[] b) throws Exception {
+        return hex(java.security.MessageDigest.getInstance("MD5").digest(b));
     }
 
     static String hex(byte[] b) {
