@@ -34,7 +34,10 @@ import hmgapi.client.HmgApi;
  * mod stop it, and Precond also cancels after a start that was refused because
  * someone else (Launchpad, the owner) is conditioning, which must not end
  * theirs. A route refusal naming another holder (or "not conditioning": HMG-API
- * stopped it itself) clears it too. HMG-API keeps the guards: one conditioning
+ * stopped it itself) clears it too, and before a stop HMG-API's "conditioning
+ * status" (after 1.0.0) is asked who holds it now: the file alone can be stale
+ * after a restart, a time-out or the owner taking over. Status and stop are two
+ * calls, so this narrows the window rather than closing it. HMG-API keeps the guards: one conditioning
  * state for the unit, a manual stop wins over automatic starts, everything
  * stopped when the mod is turned off, and from 1.0.0 the car's own checks before
  * a start (READY, the Battery Conditioning setting, a warm pack) and a stop when
@@ -136,7 +139,8 @@ public final class RelayService {
                 if ("start".equals(w[0])) {
                     String r = api.command("conditioning", "auto-start", w[1], w[2]);
                     if (r.startsWith("ok already conditioning") && !r.contains("(" + MOD + ")")) {
-                        return "err " + r.substring(3);   // another mod (or the owner) holds it: not ours to stop
+                        owned.set(false);   // another mod (or the owner) holds it: not ours to stop
+                        return "err " + r.substring(3);
                     }
                     owned.set(true);
                     return r;
@@ -158,6 +162,13 @@ public final class RelayService {
                 if (!owned.owned) {
                     return "ok not ours to stop";
                 }
+                // The file can be stale (HMG-API timed it out, the owner took over, a
+                // restart): ask who holds it now, where this HMG-API says.
+                String now = holderNow(api);
+                if (now != null && !now.equals(MOD)) {
+                    owned.set(false);
+                    return "ok not ours to stop" + (now.isEmpty() ? "" : " (" + now + ")");
+                }
                 String r = api.command("conditioning", "stop");
                 owned.set(false);
                 return r;
@@ -166,6 +177,30 @@ public final class RelayService {
         } catch (Exception e) {
             return "err " + e.getMessage();
         }
+    }
+
+    private static final java.util.regex.Pattern STATUS =
+            java.util.regex.Pattern.compile("ok ([a-z_]+)(?: \\(([^()]+)\\))?");
+
+    /**
+     * Who holds a running conditioning request, by HMG-API's "conditioning status"
+     * ("ok active (egmp-aa-ev)"): its mod id, "" when none is running (off, stopping,
+     * ended, timed out), null when this HMG-API can't say (1.0.0 has no status).
+     */
+    static String holderNow(Commands api) {
+        String s;
+        try {
+            s = api.command("conditioning", "status");
+        } catch (Exception e) {
+            return null;
+        }
+        java.util.regex.Matcher m = STATUS.matcher(s == null ? "" : s.trim());
+        if (!m.matches()) {
+            return null;
+        }
+        String state = m.group(1);
+        boolean running = "requested".equals(state) || "waiting".equals(state) || "active".equals(state);
+        return running && m.group(2) != null ? m.group(2) : "";
     }
 
     static String answer(final HmgApi api, Owned owned, String line) {

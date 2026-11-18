@@ -14,7 +14,7 @@ This fork runs it as a mod for [HMG-API](https://github.com/VysseCodes/HMG-API),
 - For preconditioning, HMG-API's **Wireless CarPlay + Android Auto** mod, 2.1.0 or newer: its Android Auto library patch hands over Maps' route data, which preconditioning needs. Two builds:
   - **`egmp-aa-ev`**: everything, preconditioning included. Needs the Wireless mod (HMG-API won't load it without).
   - **`egmp-aa-ev-standalone`**: everything but preconditioning, without the Wireless mod: wired Android Auto, or the car's own wireless Android Auto. Install one or the other (each refuses the other).
-- The energy model needs a supported Android Auto library build: US 260507 (Ioniq 5 and EV6) or Ioniq 6 US 260903 (see [Limits](#limits)). Elsewhere preconditioning and the EV logs still run
+- The energy model needs a supported Android Auto library build: Ioniq 5 and EV6 US 260507, EV6 Canada 260206, or Ioniq 6 US 260903 and Canada 260206 (see [Limits](#limits)). Elsewhere preconditioning and the EV logs still run
 
 ## Features
 
@@ -44,7 +44,7 @@ Updates install the same way. To remove it: HMG-API app → the mod → remove. 
 
 ### Limits
 
-- **Energy model library builds:** US 260507, Ioniq 5 and EV6 (`libautoreceiver_infobank.so`, md5 `48ee793a…`), and Ioniq 6 US 260903 (md5 `dbfe7bd2…`). On another build (the Canadian cars' `a0bea1c4…`, and possibly the Ioniq 5 US 260903) nothing is patched and the model stays off; fuel type, connectors and live battery data still reach Maps, and preconditioning and the logs run. Another build needs a recipe ([`tools/mkrecipe.py`](hmgapi-mod/tools/mkrecipe.py)).
+- **Energy model library builds:** `libautoreceiver_infobank.so` md5 `48ee793a…` (Ioniq 5 and EV6 US 260507, and the EV6 Canada 260206) and `dbfe7bd2…` (Ioniq 6 US 260903 and Canada 260206). The Canadian EV6 and Ioniq 6 builds were identified by [Weab-chan's Canada test fork](https://github.com/Weab-chan/egmp-aa-ev-hmg-api/tree/ioniq-6), whose owner reported the Ioniq 6 working with this patch. On another build (the Canadian Ioniq 5's `a0bea1c4…`, and possibly the Ioniq 5 US 260903) nothing is patched and the model stays off; fuel type, connectors and live battery data still reach Maps, and preconditioning and the logs run. Another build needs a recipe ([`tools/mkrecipe.py`](hmgapi-mod/tools/mkrecipe.py)).
 - **Preconditioning and HMG-API 1.0's checks:** HMG-API refuses a start when the car isn't READY, Battery Conditioning is off, or the pack is already warm (21 °C / 70 °F on an Ioniq 5), and stops a request if the car's indicator doesn't come on within 2 minutes. After such a timeout, automatic starts wait for a manual one. egmp then cancels for that charging stop, and preconditions again after you start conditioning by hand once.
 - **EV6 calibration:** the EV6 uses the Ioniq 5 model: the same 77.4-kWh E-GMP pack and 800 V charging, with its usable capacity learned from the BMS. Its road load is close to the Ioniq 5's (a little more efficient), so arrival % should be slightly conservative. EV6 logs would let us tune it.
 - **Ioniq 6 calibration:** the Ioniq 6 initially uses the same 77.4-kWh E-GMP battery and charging model as the Ioniq 5. Live BMS energy immediately teaches it the car's usable capacity. Its Ioniq 5 road-load calibration is conservative for the more aerodynamic Ioniq 6; Ioniq 6 EV logs are needed to tune arrival-energy predictions precisely.
