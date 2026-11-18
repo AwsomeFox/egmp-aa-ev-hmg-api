@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 env:
-  WIRELESS_REF: v2.2.0-rc.3
+  WIRELESS_REF: v2.2.0-rc.5
 
 jobs:
   hmgapi-mod:

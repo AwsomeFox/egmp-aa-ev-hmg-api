@@ -89,7 +89,30 @@ public class R {
     }
 }
 J
-javac -cp "$CP" -d "$D" "$D/R.java"
+cat > "$D/C.java" <<'J'
+import hmgapi.engine.MemRecipe;
+import java.nio.file.*;
+import java.util.*;
+/** C <combined> <part>...: the combined recipe's regions are its parts' (that exist), none twice */
+public class C {
+    public static void main(String[] a) throws Exception {
+        MemRecipe all = MemRecipe.parse(new String(Files.readAllBytes(Paths.get(a[0]))));
+        List<String> want = new ArrayList<String>(), got = new ArrayList<String>();
+        for (long[] x : all.regions()) got.add(x[0] + "-" + x[1]);
+        for (int i = 1; i < a.length; i++) {
+            if (!Files.exists(Paths.get(a[i]))) continue;
+            for (long[] x : MemRecipe.parse(new String(Files.readAllBytes(Paths.get(a[i])))).regions()) want.add(x[0] + "-" + x[1]);
+        }
+        long[][] r = all.regions().toArray(new long[0][]);
+        for (int i = 0; i < r.length; i++) for (int j = i + 1; j < r.length; j++)
+            if (r[i][0] < r[j][1] && r[j][0] < r[i][1]) { System.out.println("OVERLAP inside " + all.id + " at 0x" + Long.toHexString(r[i][0])); System.exit(1); }
+        Collections.sort(want); Collections.sort(got);
+        System.out.println(want.equals(got) ? all.id + ": same regions (" + got.size() + ")" : all.id + ": regions differ " + got + " vs " + want);
+        System.exit(want.equals(got) ? 0 : 1);
+    }
+}
+J
+javac -cp "$CP" -d "$D" "$D/R.java" "$D/C.java"
 
 # check_mod <mod folder> <full|standalone>
 check_mod() {
@@ -107,13 +130,12 @@ check_mod() {
         has "$P: offload service" "offload" "$out"
         if [ $KIND = full ]; then
             has "$P: shares GPM's next-turn callback with the Wireless mod" "gpm.navigation_status.next_turn: " "$out"
-            has "$P: conditioning command" "conditioning" "$out"
-            has "$P: relay service" "relay" "$out"
         else
             hasnt "$P: no Wireless mod needed" "wireless-carplay-aa" "$out"
-            hasnt "$P: no conditioning command" "conditioning" "$out"
-            hasnt "$P: no relay service" "relay" "$out"
         fi
+        # both builds precondition: the standalone one with its own route data patch
+        has "$P: conditioning command" "conditioning" "$out"
+        has "$P: relay service" "relay" "$out"
         echo "$out" > "$T/plan-$ID-$P.txt"
     done
     # which cars the mod is for (mod.json "system"), by HMG-API's own check: every E-GMP
@@ -162,6 +184,7 @@ PY
 
     # the recipes: parse, and no region overlaps the Wireless mod's recipe for that library build
     for ours in "$MOD"/recipes/ev-sensor-*.recipe; do
+        case "$ours" in */ev-sensor-route-*) continue ;; esac
         suffix=${ours##*/ev-sensor-}; suffix=${suffix%.recipe}
         wireless="$WIRELESS/recipes/aa-tbt-$suffix.recipe"
         set +e
@@ -172,6 +195,18 @@ PY
         has "recipe ev-sensor-$suffix parses (4 verify, 3 patch)" "4 verify, 3 patch" "$r"
         [ -f "$wireless" ] && has "recipe ev-sensor-$suffix clear of the matching Wireless recipe" "clear of aa-tbt-$suffix" "$r"
         [ $rc -eq 0 ] || { echo "FAIL  recipe check: $r"; fail=1; }
+    done
+    # the standalone build's: the energy model's and the Wireless mod's route data in one, each
+    # as the Wireless mod has it (so its regions are the Wireless recipe's, and ours clear of them)
+    for ours in "$MOD"/recipes/ev-sensor-route-*.recipe "$MOD"/recipes/route-*.recipe; do
+        [ -f "$ours" ] || continue
+        [ $KIND = standalone ] || { echo "FAIL  ${ours##*/} in the full build"; fail=1; }
+        name=${ours##*/}; name=${name%.recipe}; md5=${name##*-}
+        set +e; r=$(java -cp "$CP:$D" C "$ours" "hmgapi-mod/route/aa-tbt-$md5.recipe" "hmgapi-mod/recipes/ev-sensor-$md5.recipe" 2>&1); rc=$?; set -e
+        has "recipe $name: the Wireless mod's route data recipe plus ours, no region twice" "same regions" "$r"
+        [ $rc -eq 0 ] || { echo "FAIL  recipe check: $r"; fail=1; }
+        has "$name listed in mod.json before the energy model's own" "recipes/$name.recipe" \
+            "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["hooks"]["native"]["libautoreceiver_infobank.so"][0:3])' "$MOD/mod.json")"
     done
 }
 sys() { HMGAPI_ROOT=$T/none HMGAPI_PRODUCT=$1 java -cp "$CP" hmgapi.engine.SystemCheck "$MOD" 2>&1 || true; }

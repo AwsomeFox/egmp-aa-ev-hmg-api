@@ -11,9 +11,9 @@ This fork runs it as a mod for [HMG-API](https://github.com/VysseCodes/HMG-API),
 
 - An E-GMP car HMG-API has a hook map for: Hyundai Ioniq 5 (NEEV, NEEV23, NEEV23SE), Kia EV6 (CVEV) or Hyundai Ioniq 6 (CEEV), any region and software. Today HMG-API maps the Ioniq 5 and EV6 in the US (260507) and Canada (260206) and the Ioniq 5 US 260903; the Ioniq 6 US 260903 runs with its own map. Another car: HMG-API's "Map this car from its files", then **Install anyway…**
 - [HMG-API](https://github.com/VysseCodes/HMG-API) 1.0.0 or newer, installed through [NEMESIS](https://github.com/xwtk/hmg_nemesis)
-- For preconditioning, HMG-API's **Wireless CarPlay + Android Auto** mod, 2.1.0 or newer: its Android Auto library patch hands over Maps' route data, which preconditioning needs. Two builds:
-  - **`egmp-aa-ev`**: everything, preconditioning included. Needs the Wireless mod (HMG-API won't load it without).
-  - **`egmp-aa-ev-standalone`**: everything but preconditioning, without the Wireless mod: wired Android Auto, or the car's own wireless Android Auto. Install one or the other (each refuses the other).
+- Preconditioning needs Maps' route data, which an Android Auto library patch hands over. Two builds, one or the other (each refuses the other):
+  - **`egmp-aa-ev`**: with HMG-API's **Wireless CarPlay + Android Auto** mod (2.1.0 or newer; HMG-API won't load this build without it), whose library patch gives the route data.
+  - **`egmp-aa-ev-standalone`**: without the Wireless mod: wired Android Auto, or the car's own wireless Android Auto. It carries the Wireless mod's route data patch itself ([credits](#credits)), on the library builds that patch exists for: US 260507 (Ioniq 5, EV6, Ioniq 6), the Canadian Ioniq 5's 260206, and the Ioniq 6's (US 260903, Canada). On another build everything but preconditioning runs. It stays off while the Wireless mod is on (it would take that mod's patch): use `egmp-aa-ev` then.
 - The energy model needs a supported Android Auto library build: Ioniq 5 and EV6 US 260507, EV6 Canada 260206, or Ioniq 6 US 260903 and Canada 260206 (see [Limits](#limits)). Elsewhere preconditioning and the EV logs still run
 
 ## Features
@@ -26,7 +26,7 @@ This fork runs it as a mod for [HMG-API](https://github.com/VysseCodes/HMG-API),
 - **Only on an EV it fits:** before anything goes to Maps, the mod checks the car reports a battery state of charge and a pack of 50–90 kWh (its nominal size, or the size its energy and charge imply). Otherwise the energy model and live battery data stay off, and HMG-API's log says why, so a car the model doesn't fit (an EV9's 99.8 kWh pack, a car without a traction battery) never gets a wrong range.
 - **EV connectors:** Maps is told the car is electric with CCS1 and J1772, for charger filtering.
 - **Live battery data for phone apps:** the battery %, the range the cluster shows and the odometer go to the phone as Android Auto's fuel and odometer data, so apps that read the car's data through Android Auto (A Better Route Planner, for one) show the live battery level. No library patch needed, so it works on any Android Auto library build.
-- **Preconditioning:** when the next stop is a charger over 50 kW within an hour, the car is asked to warm the battery, through HMG-API's reviewed `conditioning` command. The minimum power, the start window, the arrival distance and the starts per route are settings. Off with the mod's setting or the car's own *battery conditioning* setting.
+- **Preconditioning:** when the next stop is a charger over 50 kW within an hour, the car is asked to warm the battery, through HMG-API's reviewed `conditioning` command. The minimum power, the start window, the arrival distance and the starts per route are settings. Off with the mod's setting or the car's own *battery conditioning* setting. Both builds; the standalone one where it has the route data patch for the car's library build.
 - **Learns your car:** steady highway drives (10 km at 60 km/h or more) teach the model this car's real road load, between 0.7× and 1.3× the shipped one, used from the next Android Auto session. Needs EV logs on; turning the setting off forgets it.
 - **EV logs:** driving and charging, whenever the head unit is on; copied to any USB drive with an `egmp-aa-ev-logs` folder; share them through an [EV log issue](https://github.com/AwsomeFox/egmp-aa-ev-hmg-api/issues/new?template=log-submission.yml).
 - **Settings** in the HMG-API app: energy model, battery % curve, preconditioning (and its thresholds: chargers faster than 50 kW, start within 60 min, arrived within 200 m, 3 starts per route), live battery data, learning this car's highway consumption, EV logs. All on by default; the thresholds apply at once, the rest when Android Auto restarts.
@@ -113,6 +113,8 @@ sh tools/build_release.sh v0.2.0           # USB release zip
 ## Credits
 
 [HMG-API](https://github.com/VysseCodes/HMG-API) (VysseCodes), [NEMESIS](https://github.com/xwtk/hmg_nemesis) (xwtk), [HMG Leafia Plus](https://github.com/VysseCodes/HMG-Leafia-Plus) (including `lpatch`, GPL-3.0), [aa-proxy-rs](https://github.com/aa-proxy/aa-proxy-rs), [open-android-auto](https://github.com/mrmees/open-android-auto), [gen5w-preconditioning](https://github.com/paytondevs/gen5w-preconditioning).
+
+The standalone build's route data patch is the [Wireless CarPlay + Android Auto](https://github.com/Open-HMG/hmgapi-wireless-cp-aa) mod's turn-by-turn library recipes, copied unchanged ([hmgapi-mod/route/](hmgapi-mod/route/README.md)): US 260507 and the Canadian Ioniq 5 by **VysseCodes** (from NEMESIS's `projection.tbt` package), the Ioniq 6 by **Weab-chan**. Weab-chan's Canadian Ioniq 6 and EV6 test build also found the Android Auto shutdown crash and the other fixes in [#23](https://github.com/AwsomeFox/egmp-aa-ev-hmg-api/pull/23).
 
 ## License
 

@@ -71,7 +71,9 @@ final class NativeCheck {
             }
             try {
                 Recipe r = parse(read(f));
-                if (!r.offsets.isEmpty()) {
+                // only recipes with the energy model's patches (ev-sensor-*, and the standalone
+                // build's ev-sensor-route-*); a route-only one (route-*) must not turn it on
+                if (!r.offsets.isEmpty() && r.id.startsWith("ev-sensor")) {
                     sRecipes.add(r);
                 }
             } catch (Exception e) {

@@ -25,7 +25,7 @@ env:
   # The mod is built with the HMG-API mod SDK hmgapi-sdk.json pins (hmgapi-mod/sdk.sh), and
   # tested beside this Wireless CarPlay + Android Auto mod, in its own repo from HMG-API 1.1.0.
   # Move the two together, to what an HMG-API release ships.
-  WIRELESS_REF: v2.2.0-rc.3
+  WIRELESS_REF: v2.2.0-rc.5
 
 jobs:
   hmgapi-mod:

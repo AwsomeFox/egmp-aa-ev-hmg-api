@@ -91,20 +91,22 @@ public final class HmgApiEntry extends ModEntry {
     }
 
     /**
-     * Off when the mod has no "preconditioning" setting: the standalone build
-     * (hmgapi-mod/variants.py) leaves it out, with the relay service and the
-     * conditioning command, since without the Wireless mod there's no route data.
-     * The full build's settings.json gives its default (on).
+     * Both builds have the "preconditioning" setting (on by default). The full build gets
+     * Maps' route data from the Wireless mod's library patch; the standalone build carries
+     * that patch in its own library recipes (hmgapi-mod/route/, variants.py) on the builds
+     * it has one for. Without route data Precond never starts anything.
      */
     static final String FULL = "egmp-aa-ev", STANDALONE = "egmp-aa-ev-standalone";
     static final java.io.File STATE = new java.io.File("/data/hmgapi/public/state.json");
 
     /**
-     * The two builds declare each other in "conflicts", but HMG-API (1.1.0) checks that only
-     * for mods that change files, not hook-only ones like these, so both could run in GPM
-     * at once (two sensor offers, one library patch refused). When both are on, the
-     * standalone build stays off, as long as the full one can run: the Wireless mod it
-     * requires is on too. HMG-API's public state (its mods, enabled or not) says.
+     * The standalone build stays off while the Wireless mod is on. Its library recipes carry
+     * the Wireless mod's turn-by-turn patch, and HMG-API refuses the second of two mods'
+     * recipes on the same bytes: whichever asked first would win, and the Wireless mod
+     * could lose its own cluster directions. With the Wireless mod the full build is the
+     * one to use (it also keeps the two builds from both running: HMG-API 1.1.0 checks
+     * "conflicts" only for mods that change files). HMG-API's public state (its mods,
+     * enabled or not) says.
      */
     static boolean standDown(String id, java.io.File state) {
         if (!STANDALONE.equals(id)) return false;
@@ -118,8 +120,7 @@ public final class HmgApiEntry extends ModEntry {
                 in.close();
             }
             Object mods = hmgapi.engine.Json.object(new String(b, "UTF-8")).get("mods");
-            return mods instanceof java.util.Map && enabledIn((java.util.Map<?, ?>) mods, FULL)
-                    && enabledIn((java.util.Map<?, ?>) mods, "wireless-carplay-aa");
+            return mods instanceof java.util.Map && enabledIn((java.util.Map<?, ?>) mods, "wireless-carplay-aa");
         } catch (Exception e) {
             return false;   // no state: run
         }
@@ -155,7 +156,8 @@ public final class HmgApiEntry extends ModEntry {
             return;
         }
         if (standDown(mod.id, STATE)) {
-            mod.log("the full build (" + FULL + ") is on, with the Wireless mod it needs: this standalone build stays off");
+            mod.error("the Wireless CarPlay + Android Auto mod is on: this standalone build stays off (it would take"
+                    + " the Wireless mod's library patch). Use " + FULL + " with the Wireless mod", null);
             return;
         }
         sMod = mod;

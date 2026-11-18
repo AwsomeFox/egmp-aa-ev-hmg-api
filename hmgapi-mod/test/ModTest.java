@@ -268,6 +268,10 @@ public final class ModTest {
             java.nio.file.Files.write(st.toPath(), ("{\"mods\": {\"egmp-aa-ev\": {\"enabled\": true}, "
                     + "\"egmp-aa-ev-standalone\": {\"enabled\": true}, \"wireless-carplay-aa\": {\"enabled\": false}}}").getBytes("UTF-8"));
             check("both on, Wireless off (the full one can't run): the standalone one runs", !HmgApiEntry.standDown("egmp-aa-ev-standalone", st));
+            java.nio.file.Files.write(st.toPath(), ("{\"mods\": {\"egmp-aa-ev-standalone\": {\"enabled\": true}, "
+                    + "\"wireless-carplay-aa\": {\"enabled\": true}}}").getBytes("UTF-8"));
+            check("standalone with the Wireless mod on (no full build): off, so the Wireless mod keeps its library patch",
+                    HmgApiEntry.standDown("egmp-aa-ev-standalone", st));
             check("no state file: the standalone one runs", !HmgApiEntry.standDown("egmp-aa-ev-standalone", new java.io.File(st.getPath() + ".none")));
         } catch (java.io.IOException e) {
             check("state file for the two-builds checks: " + e, false);

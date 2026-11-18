@@ -48,6 +48,8 @@ import hmgapi.client.HmgApi;
  */
 public final class RelayService {
     static final String MOD = "egmp-aa-ev";
+    /** this mod's id as HMG-API names a holder: MOD, or egmp-aa-ev-standalone for that build */
+    static volatile String sMod = MOD;
     static final String SOCKET = "egmp-aa-ev.relay";
     static final String GPM = "com.google.android.projection.sink";
     static final int SYSTEM_UID = 1000;
@@ -84,6 +86,9 @@ public final class RelayService {
         String data = System.getenv("HMGAPI_DATA");
         sOwned = new Owned(data == null ? null : new java.io.File(data, "conditioning.owned"));
         String who = api.mod();
+        if (who != null && who.startsWith(MOD)) {
+            sMod = who;
+        }
         int gpm = uidOf(GPM);
         LocalServerSocket server = new LocalServerSocket(SOCKET);
         log("relay up as " + who + " on @" + SOCKET + " (GPM uid " + gpm + ")");
@@ -138,7 +143,7 @@ public final class RelayService {
                 }
                 if ("start".equals(w[0])) {
                     String r = api.command("conditioning", "auto-start", w[1], w[2]);
-                    if (r.startsWith("ok already conditioning") && !r.contains("(" + MOD + ")")) {
+                    if (r.startsWith("ok already conditioning") && !r.contains("(" + sMod + ")")) {
                         owned.set(false);   // another mod (or the owner) holds it: not ours to stop
                         return "err " + r.substring(3);
                     }
@@ -165,7 +170,7 @@ public final class RelayService {
                 // The file can be stale (HMG-API timed it out, the owner took over, a
                 // restart): ask who holds it now, where this HMG-API says.
                 String now = holderNow(api);
-                if (now != null && !now.equals(MOD)) {
+                if (now != null && !now.equals(sMod)) {
                     owned.set(false);
                     return "ok not ours to stop" + (now.isEmpty() ? "" : " (" + now + ")");
                 }
