@@ -68,27 +68,32 @@ final class LiveData {
         }
         if (t != null) {
             t.interrupt();
-            try {
-                t.join(2000);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
+            if (t != Thread.currentThread()) {
+                try {
+                    t.join(2000);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
             }
             Log.i(TAG, "stopped");
         }
     }
 
     private static void loop() {
-        while (sRunning) {
+        while (true) {
             try {
                 EvCar.pollNav();
-                Out out;
+                int soc = EvCar.hev(HEV_DISPLAY_SOC, MAX_AGE_MS), dte = EvCar.dteRaw();
+                int odo = EvCar.hev(HEV_ODOMETER, MAX_AGE_MS);
                 synchronized (LOCK) {
-                    out = sOut;
+                    // Sends hold LOCK, so stop() (also from SensorSource.shutdown) waits for
+                    // one under way. Only the current worker sends: after a quick reconnect
+                    // an old one ends here instead of sending for the new session.
+                    if (!sRunning || sThread != Thread.currentThread() || sOut == null) {
+                        break;
+                    }
+                    send(sOut, soc, dte, odo);
                 }
-                if (out == null) {
-                    break;
-                }
-                send(out, EvCar.hev(HEV_DISPLAY_SOC, MAX_AGE_MS), EvCar.dteRaw(), EvCar.hev(HEV_ODOMETER, MAX_AGE_MS));
             } catch (Throwable t) {
                 Log.w(TAG, "send failed: " + t);
             }

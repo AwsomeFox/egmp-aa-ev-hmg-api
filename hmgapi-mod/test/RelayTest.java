@@ -27,11 +27,15 @@ public final class RelayTest {
         final List<String> calls = new ArrayList<String>();
         String holder;   // who conditions (null: nobody)
         boolean auto, manualStop, timedOut, warmPack;
+        boolean status;   // answers "conditioning status" (HMG-API after 1.0.0)
 
         @Override
         public String command(String name, String... a) throws Exception {
             calls.add(name + " " + String.join(" ", a));
             if (!"conditioning".equals(name)) throw new Exception("not declared in mod.json (vehicle commands): " + name);
+            if ("status".equals(a[0]) && status) {
+                return holder == null ? (timedOut ? "ok timed_out (egmp-aa-ev)" : "ok off") : "ok active (" + holder + ")";
+            }
             if ("stop".equals(a[0])) {
                 if (holder == null) return "ok not conditioning";
                 if (!(auto && "egmp-aa-ev".equals(holder))) manualStop = true;
@@ -60,6 +64,14 @@ public final class RelayTest {
             holder = null;
             timedOut = true;
         }
+    }
+
+    static String holderOf(final String reply) {
+        return RelayService.holderNow(new RelayService.Commands() {
+            public String command(String name, String... a) {
+                return reply;
+            }
+        });
     }
 
     public static void main(String[] args) {
@@ -123,6 +135,32 @@ public final class RelayTest {
         r = RelayService.answer(patched, own3, "route 20 12");
         check("a route refusal naming another holder: err, and not ours any more: " + r, r.startsWith("err refused: only") && !own3.owned);
         check("... so the cancel that follows isn't sent", RelayService.answer(patched, own3, "stop").equals("ok not ours to stop"));
+
+        // HMG-API with "conditioning status": a stale ownership file doesn't stop someone else's
+        FakeHmgApi st = new FakeHmgApi();
+        st.status = true;
+        RelayService.Owned own5 = new RelayService.Owned(null);
+        RelayService.answer(st, own5, "start 30 20");
+        st.calls.clear();
+        r = RelayService.answer(st, own5, "stop");
+        check("status says ours: the stop goes: " + r + " " + st.calls, r.equals("ok conditioning stopped")
+                && st.calls.equals(java.util.Arrays.asList("conditioning status", "conditioning stop")));
+        RelayService.answer(st, own5, "start 30 20");
+        st.holder = "owner";   // the owner stopped ours by hand and started their own
+        st.calls.clear();
+        r = RelayService.answer(st, own5, "stop");
+        check("status names another holder: not sent, not ours any more: " + r, r.equals("ok not ours to stop (owner)")
+                && !st.calls.contains("conditioning stop") && !own5.owned && "owner".equals(st.holder));
+        FakeHmgApi st2 = new FakeHmgApi();
+        st2.status = true;
+        RelayService.Owned own6 = new RelayService.Owned(null);
+        RelayService.answer(st2, own6, "start 30 20");
+        st2.timeOut();
+        st2.calls.clear();
+        r = RelayService.answer(st2, own6, "stop");
+        check("timed out (nothing running): not sent: " + r, r.equals("ok not ours to stop") && !st2.calls.contains("conditioning stop") && !own6.owned);
+        check("holder parsing", "egmp-aa-ev".equals(holderOf("ok waiting (egmp-aa-ev)")) && "".equals(holderOf("ok stopping (egmp-aa-ev)"))
+                && "".equals(holderOf("ok off")) && holderOf("conditioning: what?") == null);
 
         check("km out of range", RelayService.answer(api, own, "start 2047 20").startsWith("err"));
         check("minutes out of range", RelayService.answer(api, own, "route 10 1023").startsWith("err"));
