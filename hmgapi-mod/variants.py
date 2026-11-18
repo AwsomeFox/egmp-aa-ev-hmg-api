@@ -24,9 +24,9 @@ def standalone(mod, settings):
     mod["id"] = STANDALONE
     mod["name"] = "EV routing for Android Auto (E-GMP), standalone"
     # (NEMESIS shows at most 256 characters, with "<name> <version>, a HMG-API mod (needs HMG-API). " first)
-    mod["description"] = ("Without the Wireless mod: wired or the car's own wireless Android Auto. "
-                          "Google Maps EV routing: battery and range, charge curves, EV plugs. "
-                          "No battery preconditioning.")
+    mod["description"] = ("Wired or the car's own wireless Android Auto. Google Maps EV routing: battery, "
+                          "charge curves, EV plugs; no preconditioning. Built for E-GMP; other EVs learn "
+                          "as they go.")
     mod.pop("requires", None)
     mod["conflicts"] = ["egmp-aa-ev"]
     mod["nemesis_conflicts"] = ["hmgapi.egmp-aa-ev", "aa.ev.model"]

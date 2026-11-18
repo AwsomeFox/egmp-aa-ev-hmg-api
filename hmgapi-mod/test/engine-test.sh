@@ -72,6 +72,10 @@ for e in "kia/ev6/usa/260507 CVEV.USA.0000.V015.012.260507" "kia/ev6/can/260206 
     set -- $e
     [ -f "$HMGAPI_MAPS/$1/car.json" ] && PRODUCTS="$PRODUCTS $2"
 done
+# an EV that isn't E-GMP (Niro EV): the standalone build runs on it; the full one only where
+# the Wireless mod it requires does, which is the Wireless mod's to say
+OTHER=""
+[ -f "$HMGAPI_MAPS/kia/sg2ev/usa/260507/car.json" ] && OTHER="SG2EV.USA.0000.V015.012.260507"
 
 cat > "$D/R.java" <<'J'
 import hmgapi.engine.MemRecipe;
@@ -96,7 +100,23 @@ check_mod() {
     MOD=$1; KIND=$2
     ID=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["id"])' "$MOD/mod.json")
     echo "=== $ID"
-    for P in $PRODUCTS; do
+    if [ $KIND = full ]; then
+        for P in $OTHER; do
+            unit $P "$MOD" "$WIRELESS"
+            eng plan
+            hasnt "$P: no mod.json errors, matches the car" "$ID: " "$(echo "$out" | grep -i 'error\|isn.t one\|must be\|needs \|matches none' || true)"
+            r=$(echo "$out" | grep "$ID won't load" || true)
+            case "$r" in
+                "") echo "ok    $P: hooks load (the Wireless mod runs here)" ;;
+                *"requires wireless-carplay-aa, which isn't loaded"*) echo "ok    $P: waits only for the Wireless mod, which doesn't run here (the standalone build does)" ;;
+                *) echo "FAIL  $P: won't load for its own reason: $r"; fail=1 ;;
+            esac
+        done
+        PLAN=$PRODUCTS
+    else
+        PLAN="$PRODUCTS $OTHER"
+    fi
+    for P in $PLAN; do
         if [ $KIND = full ]; then unit $P "$MOD" "$WIRELESS"; else unit $P "$MOD"; fi
         eng plan
         has "$P: plan runs" "$ID" "$out"
@@ -116,18 +136,22 @@ check_mod() {
         fi
         echo "$out" > "$T/plan-$ID-$P.txt"
     done
-    # which cars the mod is for (mod.json "system"), by HMG-API's own check: every E-GMP
-    # model HMG-API can map (Ioniq 5, EV6, Ioniq 6), any region and firmware. Whether it
+    # which cars the mod is for (mod.json "system"), by HMG-API's own check: every EV
+    # model HMG-API can map (E-GMP, and Kona Electric, Niro EV, Soul EV, Ioniq Electric),
+    # any region and firmware. Whether it
     # runs is then up to HMG-API's map for that unit (hooks off without one), the library
     # recipe for its Android Auto library build (no energy model without one), and the
     # mod's own EV check (EvCar.notAnEvWeFit). Any other model, gas cars included, isn't
     for P in NEEV23.USA.0000.V017.001.261201 NEEV23SE.USA.0000.V015.012.260507 CEEV.USA.0000.V016.010.260903 \
              CEEV.USA.0000.V017.001.261201 NEEV23.USA.0000.V014.005.250101 CVEV.USA.0000.V015.012.260507 \
-             CVEV.CAN.0000.V015.010.260206 NEEV.CAN.0000.V015.010.260206; do
+             CVEV.CAN.0000.V015.010.260206 NEEV.CAN.0000.V015.010.260206 OSEV.USA.0000.V015.012.260507 \
+             SG2EV.USA.0000.V015.012.260507 DE22EV.CAN.0000.V015.010.260206 SK3EV22.USA.0000.V015.012.260507; do
         has "$P: for this car" "ok: $ID supports this unit" "$(sys $P)"
     done
     has "a Kia K5 (gas): not for this car" "needs model" "$(sys DL3.USA.0000.V015.012.260507)"
     has "a K5 Hybrid: not for this car" "needs model" "$(sys DL3HEV.USA.0000.V015.012.260507)"
+    has "a Niro Hybrid: not for this car" "needs model" "$(sys SG2HEV.USA.0000.V015.012.260507)"
+    has "a Niro Plug-in Hybrid: not for this car" "needs model" "$(sys SG2PHEV.USA.0000.V015.012.260507)"
     P=NEEV23.USA.0000.V017.001.261201
     if [ $KIND = full ]; then unit $P "$MOD" "$WIRELESS"; else unit $P "$MOD"; fi
     eng plan
