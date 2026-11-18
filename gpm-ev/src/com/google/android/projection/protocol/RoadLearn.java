@@ -22,7 +22,8 @@ import android.util.Log;
  *
  * scale() = (PRIOR + sum of samples) / (PRIOR + n), clamped to
  * [SCALE_MIN, SCALE_MAX]: the shipped model counts as PRIOR stretches at
- * 1.0, so one odd drive moves it little. Replaying a 2022 EV6's logs
+ * 1.0, so one odd drive moves it little. On a car that isn't E-GMP the model
+ * is only a starting point, so it counts as PRIOR_OTHER (setPrior). Replaying a 2022 EV6's logs
  * (issue #13) from the Ioniq 5 values: the scale was 0.84 after the first
  * day, and the second day's highway energy went from +10% to -1% off. From
  * the EV6's own values it stays at ~1.0.
@@ -37,6 +38,8 @@ final class RoadLearn {
     static final float MIN_KPH = 60f;
     static final long MAX_GAP_S = 30;
     static final float PRIOR = 20f;
+    /** the prior for a car the model has no values of its own for (not E-GMP): learns faster */
+    static final float PRIOR_OTHER = 5f;
     static final float SCALE_MIN = 0.7f;
     static final float SCALE_MAX = 1.3f;
     static final float SAMPLE_MIN = 0.4f;   // a sample outside this is a bad stretch
@@ -46,6 +49,7 @@ final class RoadLearn {
 
     private static final Object LOCK = new Object();
     private static boolean sEnabled = true;
+    private static volatile float sPrior = PRIOR;
     private static boolean sLoaded;
     private static double sSum;
     private static int sN;
@@ -97,8 +101,21 @@ final class RoadLearn {
         }
     }
 
+    /**
+     * How many stretches the shipped model counts as: PRIOR for a car it was fitted to
+     * (E-GMP), PRIOR_OTHER for another EV, whose road load starts from the Ioniq 5's and
+     * should move to its own sooner. Read by scale(); set before the session starts.
+     */
+    static void setPrior(float prior) {
+        sPrior = prior;
+    }
+
     static float scaleOf(double sum, int n) {
-        float s = (float) ((PRIOR + sum) / (PRIOR + n));
+        return scaleOf(sum, n, sPrior);
+    }
+
+    static float scaleOf(double sum, int n, float prior) {
+        float s = (float) ((prior + sum) / (prior + n));
         return Math.max(SCALE_MIN, Math.min(SCALE_MAX, s));
     }
 
@@ -199,6 +216,7 @@ final class RoadLearn {
     static void resetForTest() {
         synchronized (LOCK) {
             sEnabled = true;
+            sPrior = PRIOR;
             sLoaded = true;
             sSum = 0;
             sN = 0;

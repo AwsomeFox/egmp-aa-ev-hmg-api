@@ -86,6 +86,17 @@ public final class HmgApiEntry extends ModEntry {
         return why == null;
     }
 
+    /** E-GMP model codes (ro.build.product's first field): the cars the model was made for */
+    static final java.util.List<String> EGMP = java.util.Arrays.asList("NEEV", "NEEV23", "NEEV23SE", "CVEV", "CEEV");
+
+    static boolean egmp(String product) {
+        if (product == null || product.isEmpty()) {
+            return true;   // unknown: as before
+        }
+        int dot = product.indexOf('.');
+        return EGMP.contains(dot < 0 ? product : product.substring(0, dot));
+    }
+
     static boolean modelOn() {
         return on("energy_model");
     }
@@ -146,7 +157,7 @@ public final class HmgApiEntry extends ModEntry {
     /** The mod's library recipes, while its folder is readable (the zygote runs as root). */
     @Override
     public void zygoteInit(ModContext mod) {
-        NativeCheck.load(new java.io.File(mod.dir, "recipes"));
+        NativeCheck.load(new java.io.File(mod.dir, "recipes"), mod.id);
     }
 
     @Override
@@ -168,6 +179,17 @@ public final class HmgApiEntry extends ModEntry {
             mod.nativePatch(app, "libautoreceiver_infobank.so");
         }
         RoadLearn.setEnabled(on("model_learning"));
+        String product = EvDriveLog.prop("ro.build.product");
+        if (egmp(product)) {
+            RoadLearn.setPrior(RoadLearn.PRIOR);
+        } else {
+            // another EV (mod.json "system"): E-GMP values to start from, learned faster
+            RoadLearn.setPrior(RoadLearn.PRIOR_OTHER);
+            mod.log("not an E-GMP car (" + product + "): the energy model starts from E-GMP values and learns"
+                    + " this car as it drives (road load from " + RoadLearn.samples() + " highway stretches so far"
+                    + (on("model_learning") ? "" : ", learning off") + "; capacity from charges above 60%)."
+                    + " Charge times are E-GMP's, too fast for a 400 V car");
+        }
         if (evLogOn()) {
             EvDriveLog.start();
         }

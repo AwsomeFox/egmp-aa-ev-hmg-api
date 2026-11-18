@@ -66,9 +66,10 @@ PY
 eng() { set +e; out=$(HMGAPI_ROOT=$R HMGAPI_HOST=1 HMGAPI_PRODUCT=$P1 java -cp "$CP" hmgapi.engine.Engine "$@" 2>&1); rc=$?; set -e; }
 
 PRODUCTS="NEEV23.USA.0000.V015.012.260507 NEEV.USA.0000.V015.012.260507 NEEV23.USA.0000.V016.010.260903"
-# and every other E-GMP car whose map the SDK's HMG-API has
+# and every other E-GMP car whose map the SDK's HMG-API has, and an EV that isn't E-GMP (Niro EV)
 for e in "kia/ev6/usa/260507 CVEV.USA.0000.V015.012.260507" "kia/ev6/can/260206 CVEV.CAN.0000.V015.010.260206" \
-         "hyundai/neev/can/260206 NEEV.CAN.0000.V015.010.260206" "hyundai/ceev/usa/260903 CEEV.USA.0000.V016.010.260903"; do
+         "hyundai/neev/can/260206 NEEV.CAN.0000.V015.010.260206" "hyundai/ceev/usa/260903 CEEV.USA.0000.V016.010.260903" \
+         "kia/sg2ev/usa/260507 SG2EV.USA.0000.V015.012.260507"; do
     set -- $e
     [ -f "$HMGAPI_MAPS/$1/car.json" ] && PRODUCTS="$PRODUCTS $2"
 done
@@ -116,18 +117,22 @@ check_mod() {
         fi
         echo "$out" > "$T/plan-$ID-$P.txt"
     done
-    # which cars the mod is for (mod.json "system"), by HMG-API's own check: every E-GMP
-    # model HMG-API can map (Ioniq 5, EV6, Ioniq 6), any region and firmware. Whether it
+    # which cars the mod is for (mod.json "system"), by HMG-API's own check: every EV
+    # model HMG-API can map (E-GMP, and Kona Electric, Niro EV, Soul EV, Ioniq Electric),
+    # any region and firmware. Whether it
     # runs is then up to HMG-API's map for that unit (hooks off without one), the library
     # recipe for its Android Auto library build (no energy model without one), and the
     # mod's own EV check (EvCar.notAnEvWeFit). Any other model, gas cars included, isn't
     for P in NEEV23.USA.0000.V017.001.261201 NEEV23SE.USA.0000.V015.012.260507 CEEV.USA.0000.V016.010.260903 \
              CEEV.USA.0000.V017.001.261201 NEEV23.USA.0000.V014.005.250101 CVEV.USA.0000.V015.012.260507 \
-             CVEV.CAN.0000.V015.010.260206 NEEV.CAN.0000.V015.010.260206; do
+             CVEV.CAN.0000.V015.010.260206 NEEV.CAN.0000.V015.010.260206 OSEV.USA.0000.V015.012.260507 \
+             SG2EV.USA.0000.V015.012.260507 DE22EV.CAN.0000.V015.010.260206 SK3EV22.USA.0000.V015.012.260507; do
         has "$P: for this car" "ok: $ID supports this unit" "$(sys $P)"
     done
     has "a Kia K5 (gas): not for this car" "needs model" "$(sys DL3.USA.0000.V015.012.260507)"
     has "a K5 Hybrid: not for this car" "needs model" "$(sys DL3HEV.USA.0000.V015.012.260507)"
+    has "a Niro Hybrid: not for this car" "needs model" "$(sys SG2HEV.USA.0000.V015.012.260507)"
+    has "a Niro Plug-in Hybrid: not for this car" "needs model" "$(sys SG2PHEV.USA.0000.V015.012.260507)"
     P=NEEV23.USA.0000.V017.001.261201
     if [ $KIND = full ]; then unit $P "$MOD" "$WIRELESS"; else unit $P "$MOD"; fi
     eng plan
