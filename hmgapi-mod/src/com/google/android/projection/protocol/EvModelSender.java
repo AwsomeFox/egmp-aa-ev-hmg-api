@@ -37,8 +37,8 @@ import android.util.Log;
  * reads this sender's state through the static getters (aaActive, roadA...).
  *
  * Threading: all sends happen holding LOCK; stop() takes LOCK and joins the
- * thread, and shutdown() calls stop() before nativeShutdown(), so a send never
- * touches the native object after it is freed.
+ * thread. HmgApiEntry calls stop() before SensorSource.shutdown() (and with it
+ * nativeShutdown()), so a send never touches the native object after it is freed.
  */
 public final class EvModelSender {
     private static final String TAG = "EvModelSender";
@@ -139,10 +139,13 @@ public final class EvModelSender {
             sRoadA = Float.NaN;
         }
         if (t != null) {
-            try {
-                t.join(2000);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
+            t.interrupt();   // wakes it from its sleep: it sees sRunning false and ends
+            if (t != Thread.currentThread()) {
+                try {
+                    t.join(2000);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
             }
             Log.i(TAG, "stopped");
         }
@@ -168,7 +171,9 @@ public final class EvModelSender {
     private static void loop() {
         while (true) {
             synchronized (LOCK) {
-                if (!sRunning) {
+                // A quick reconnect starts a new worker while this one may still be
+                // asleep: only the current worker sends, the old one ends here.
+                if (!sRunning || sThread != Thread.currentThread()) {
                     return;
                 }
                 if (sSource != null) {
@@ -182,7 +187,7 @@ public final class EvModelSender {
             try {
                 Thread.sleep(PERIOD_MS);
             } catch (InterruptedException e) {
-                // ignore
+                return;   // stop()
             }
         }
     }

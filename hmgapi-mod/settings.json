@@ -7,7 +7,7 @@
       "default": true,
       "title": "Battery data for Google Maps (EV energy model)",
       "apply": "restart",
-      "description": "Sends Maps the battery's real energy, its learned usable capacity, charge curves and the outside temperature every 5 s during Android Auto, for its arrival charge and charging stops. Needs an Android Auto library build the mod can patch: the ones it ships a patch for (Ioniq 5 and EV6 US 260507, Ioniq 6 US 260903), or any build with the same code, found by HMG-API after 1.1.0-rc.2. Made for E-GMP (Ioniq 5, Ioniq 6, EV6). Other EVs (Kona Electric, Niro EV, Soul EV) start from E-GMP values and need time to learn: highway driving at 60 km/h or more for the car's consumption (most of the way after about 200 km, with \"Learn this car's highway consumption\" on), and a charge above 60% for its battery size. Until then Maps' arrival charge can be off. Charge times stay E-GMP's, which are too fast for 400 V cars, so plan longer stops."
+      "description": "Sends Maps the battery's real energy, its learned usable capacity, charge curves and the outside temperature every 5 s during Android Auto, for its arrival charge and charging stops. Needs an Android Auto library build the mod can patch: the ones it ships a patch for (Ioniq 5 and EV6 US 260507, EV6 Canada 260206, Ioniq 6 US 260903 and Canada 260206), or any build with the same code, found by HMG-API after 1.1.0-rc.2. Made for E-GMP (Ioniq 5, Ioniq 6, EV6). Other EVs (Kona Electric, Niro EV, Soul EV) start from E-GMP values and need time to learn: highway driving at 60 km/h or more for the car's consumption (most of the way after about 200 km, with \"Learn this car's highway consumption\" on), and a charge above 60% for its battery size. Until then Maps' arrival charge can be off. Charge times stay E-GMP's, which are too fast for 400 V cars, so plan longer stops."
     },
     {
       "key": "battery_curve",
@@ -15,7 +15,7 @@
       "default": true,
       "title": "Maps' battery % matches the car's",
       "apply": "restart",
-      "description": "Sends Maps how the car's battery % relates to the battery's energy (Android Auto sensor 26), so the percentages Maps shows (now, on arrival, at charging stops) match the dash. On E-GMP the energy runs out at about 2% on the dash, so without it Maps reads up to 2 points low near empty. Needs the energy model on and a library build whose recipe takes sensor 26 (Ioniq 5 US 260507)."
+      "description": "Sends Maps how the car's battery % relates to the battery's energy (Android Auto sensor 26), so the percentages Maps shows (now, on arrival, at charging stops) match the dash. On E-GMP the energy runs out at about 2% on the dash, so without it Maps reads up to 2 points low near empty. Needs the energy model on and a library build whose recipe takes sensor 26 (Ioniq 5 and EV6 US 260507, EV6 Canada 260206)."
     },
     {
       "key": "preconditioning",

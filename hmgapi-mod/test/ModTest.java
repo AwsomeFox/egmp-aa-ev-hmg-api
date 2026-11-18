@@ -178,6 +178,43 @@ public final class ModTest {
                 HmgApiEntry.withSensor(HmgApiEntry.withSensor(HmgApiEntry.withSensor(new int[] {1, 13}, 6), 5), 6), new int[] {1, 13, 6, 5}));
     }
 
+    public static class FakeSource {
+        public void shutdown() {}
+    }
+
+    public static class NoShutdown {
+        void shutdown() {}   // not public: not the one
+    }
+
+    /** The shutdown guard: stop() waits for a send under way, and finds SensorSource.shutdown(). */
+    static void testLifecycle() throws Exception {
+        check("SensorSource.shutdown() found by name and shape", HmgApiEntry.sensorShutdown(FakeSource.class) != null);
+        check("... not a package-private one", HmgApiEntry.sensorShutdown(NoShutdown.class) == null);
+        check("... nor a class without one", HmgApiEntry.sensorShutdown(Object.class) == null);
+
+        final java.util.concurrent.CountDownLatch inSend = new java.util.concurrent.CountDownLatch(1);
+        final boolean[] done = {false};
+        final int[] sends = {0};
+        LiveData.Out slow = new LiveData.Out() {
+            public void fuel(int percent, int rangeMeters, boolean low) throws Exception {
+                sends[0]++;
+                inSend.countDown();
+                Thread.sleep(300);
+                done[0] = true;
+            }
+
+            public void odometer(double km) {}
+        };
+        EvCar.cacheHev(0x19, 150);
+        LiveData.start(slow);
+        check("live data sends at once", inSend.await(2, java.util.concurrent.TimeUnit.SECONDS));
+        LiveData.stop();
+        check("stop() returns only after the send under way (a native call) finished", done[0]);
+        int before = sends[0];
+        Thread.sleep(100);
+        check("... and nothing is sent after it", sends[0] == before);
+    }
+
     static void testNoHmgApi() {
         check("no hook map: not ready", !HmgCar.ready());
         check("HEV read unknown", EvCar.hev(0x19, 0) == -1);
@@ -219,6 +256,7 @@ public final class ModTest {
         testLiveData();
         testNoHmgApi();
         testEvCheck();
+        testLifecycle();
         // the two builds on one unit (HMG-API doesn't enforce their conflicts for hook-only mods)
         try {
             java.io.File st = java.io.File.createTempFile("state", ".json");

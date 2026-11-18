@@ -245,8 +245,9 @@ public final class HmgApiEntry extends ModEntry {
         });
 
         // A clean end calls destroy; a phone that's just gone (Wi-Fi off, ping
-        // timeout) only onDisconnected. Both stop the sender before GPM frees
-        // the connection's native objects.
+        // timeout) only onDisconnected. Both end the session's senders; the
+        // native sensor object is freed earlier, in SensorSource.shutdown(),
+        // which hookSensorShutdown covers.
         MethodHook ended = new MethodHook() {
             @Override
             protected void beforeHookedMethod(Param p) {
@@ -261,6 +262,7 @@ public final class HmgApiEntry extends ModEntry {
         };
         mod.hook(cl, "gpm.receiver.destroy", ended);
         mod.hook(cl, "gpm.receiver_service.disconnected", ended);
+        hookSensorShutdown(mod, cl);
 
         mod.hook(cl, "gpm.navigation_status.next_turn", new MethodHook() {
             @Override
@@ -286,6 +288,59 @@ public final class HmgApiEntry extends ModEntry {
                 + (mod.settingBoolean("ev_log", true) ? "on" : "off") + ", learning "
                 + (mod.settingBoolean("model_learning", true) ? "on" : "off") + ", live data "
                 + (mod.settingBoolean("live_data", true) ? "on" : "off") + ")");
+    }
+
+    /**
+     * GalReceiver.stop() runs doStop(), which calls SensorSource.shutdown() and with it
+     * nativeShutdown(), before destroy() runs (stock GPM, at least US 260507 and Canada
+     * 260206). Without this hook the sender and live data could send on the freed native
+     * object in between, and a native crash there ends GPM and Android Auto with it.
+     * Stopping takes the senders' locks, so a send under way finishes first.
+     *
+     * HMG-API maps the class (gpm.sensor_source) but not this method. The class is a JNI
+     * class that keeps its method names, so shutdown() is found by name and shape; a
+     * "gpm.sensor_source.shutdown" point is used instead once a map has one.
+     */
+    static void hookSensorShutdown(final ModContext mod, ClassLoader cl) {
+        MethodHook stop = new MethodHook() {
+            @Override
+            protected void beforeHookedMethod(Param p) {
+                try {
+                    EvModelSender.stop();
+                    LiveData.stop();
+                } catch (Throwable t) {
+                    mod.error("sensor shutdown", t);
+                }
+            }
+        };
+        try {
+            if (Points.has("gpm.sensor_source.shutdown")) {
+                mod.hook(cl, "gpm.sensor_source.shutdown", stop);
+                return;
+            }
+            Method m = sensorShutdown(Points.cls(cl, "gpm.sensor_source"));
+            if (m == null) {
+                mod.error("no SensorSource.shutdown(): the senders stop at the session's end only", null);
+                return;
+            }
+            hmgapi.hook.Bridge.hookMethod(m, stop);
+        } catch (Throwable t) {
+            mod.error("SensorSource.shutdown hook failed: the senders stop at the session's end only", t);
+        }
+    }
+
+    /** public void shutdown() declared on the sensor source class, or null */
+    static Method sensorShutdown(Class<?> source) {
+        try {
+            Method m = source.getDeclaredMethod("shutdown");
+            int f = m.getModifiers();
+            boolean ok = m.getReturnType() == void.class && java.lang.reflect.Modifier.isPublic(f)
+                    && !java.lang.reflect.Modifier.isStatic(f) && !java.lang.reflect.Modifier.isAbstract(f)
+                    && !java.lang.reflect.Modifier.isNative(f);
+            return ok ? m : null;
+        } catch (NoSuchMethodException e) {
+            return null;
+        }
     }
 
     /**

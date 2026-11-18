@@ -17,7 +17,7 @@ while it runs and patches its library in memory.
 |---|---|
 | `mod.json` | id `egmp-aa-ev`; every EV model HMG-API can map, any region and firmware: the E-GMP cars it's made for, Ioniq 5 (NEEV, NEEV23, NEEV23SE), EV6 (CVEV), Ioniq 6 (CEEV), and the other EVs, which start from E-GMP values (Kona Electric, Niro EV, Soul EV, Ioniq Electric; `HmgApiEntry.egmp` tells them apart, and `RoadLearn` learns them faster). Hooks run where HMG-API has a map, the energy model where a recipe matches the library and the EV check passes; hook points, library recipes, Android Auto fuel/connector types, the `conditioning` command, the USB folder, two services |
 | `hooks.jar` (`src/`) | in GPM: `HmgApiEntry` (the hooks), `EvModelSender`, `Precond`, `EvCar` over `HmgCar` (the car's services by name through HMG-API's hook map), `NativeCheck`, `Relay`; plus NavProto, PrecondCore, EvRowAgg, EvLogger, EvModelTemplate and EvDriveLog shared with the NEMESIS build (`gpm-ev/src`) |
-| `recipes/*.recipe` | egmp's three Android Auto library patches as HMG-API memory recipes, one per library build (`tools/mkrecipe.py`; US 260507, Ioniq 5 and EV6, and Ioniq 6 US 260903), each clear of the matching Wireless mod turn-by-turn recipe. `NativeCheck` reads them itself, so another build is one more recipe here and in `mod.json`. `recipes/ev-sensor.sites`: the same patches as one relocatable recipe (`native_sites`, HMG-API after 1.1.0-rc.2), for any other build with the same code there; `NativeCheck` reads back what HMG-API resolved for this library (`/data/hmgapi/public/sites/<mod>/`), and `test/sites-test.sh` resolves it with HMG-API's `SiteFind` on a stock library |
+| `recipes/*.recipe` | egmp's three Android Auto library patches as HMG-API memory recipes, one per library build (`tools/mkrecipe.py`; `48ee793a`: Ioniq 5 and EV6 US 260507, EV6 Canada 260206; `dbfe7bd2`: Ioniq 6 US 260903 and Canada 260206), each clear of the matching Wireless mod turn-by-turn recipe. `NativeCheck` reads them itself, so another build is one more recipe here and in `mod.json`. `recipes/ev-sensor.sites`: the same patches as one relocatable recipe (`native_sites`, HMG-API after 1.1.0-rc.2), for any other build with the same code there; `NativeCheck` reads back what HMG-API resolved for this library (`/data/hmgapi/public/sites/<mod>/`), and `test/sites-test.sh` resolves it with HMG-API's `SiteFind` on a stock library |
 | `relay.jar` (`service/`) | service `relay` (user `system`): sends Precond's requests as HMG-API's `conditioning` command, which HMG-API answers only for a mod's own service |
 | `scripts/offload.sh` | service `offload` (root): copies EV logs to a USB drive with an `egmp-aa-ev-logs` folder |
 | `settings.json` | `energy_model`, `preconditioning`, `live_data`, `model_learning`, `ev_log` (all on), and the preconditioning thresholds `precond_min_kw` (50), `precond_window_min` (60), `precond_arrival_m` (200), `precond_max_starts` (3): `PrecondCore.Config`, applied at once |
@@ -82,8 +82,8 @@ sh hmgapi-mod/build.sh ~/hmg-keys/egmp.key
 What to look at on the car: HMG-API's log for `[egmp-aa-ev]` lines (the native patch
 "applied", "EV routing hooks in ..."), logcat tags `EvModelSender` ("energy model sent")
 and `EvPrecond`, and `hmgapid service-log relay`. "energy model off: the Android Auto
-library patch isn't in place" means neither a fixed recipe (US 260507 for the Ioniq 5
-and EV6, Ioniq 6 US 260903) nor the relocatable one fits this car's library; the reason
+library patch isn't in place" means neither a fixed recipe (`48ee793a`: Ioniq 5 and EV6
+US 260507, EV6 Canada 260206; `dbfe7bd2`: Ioniq 6 US 260903 and Canada 260206) nor the relocatable one fits this car's library; the reason
 after it says which (for `recipes/ev-sensor.sites`: not resolved yet, or which site
 HMG-API didn't find). "energy model and live battery data off on this car: ..." is the EV
 check, with the reason. "not an E-GMP car (...)" means another EV, starting from E-GMP
