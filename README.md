@@ -33,8 +33,6 @@ An exact `libiap2session.so` hash and a resolving HMG-API map are required. `lib
 
 Live SOC and range are sent every ten seconds while subscribed. Auxiliary power is sampled at the same cadence, averaged over one-minute windows, rounded to the nearest 25 W and changed in the sent consumption contract only once per minute. Energy and full-charge range are estimates. Charging state, active connector and temperature are omitted. Renaming and other contract updates are not implemented.
 
-**Experimental mitigation:** an owner reported Apple Maps recalculating routes with the earlier five-second cadence and continuously changing auxiliary value. The current release slows status updates and stabilizes auxiliary power as described above. Apple's required cadence and contract-change behavior remain under investigation.
-
 Logs rotate between two 512 KiB files and can be exported by NEMESIS. The optional NEMESIS wrapper also writes USB install diagnostics; native HMG-API imports do not run that hook.
 
 [Compatibility](docs/COMPATIBILITY.md) · [Contracts](docs/CONTRACTS.md) · [Logs](docs/LOGGING.md) · [Build](docs/BUILDING.md) · [Validation](docs/VALIDATION.md)
