@@ -8,7 +8,11 @@ public final class ReleasePlanHost {
   Path up=Paths.get(args[0]),out=Paths.get(args[1]),wireless=Paths.get(args[2]);
   for(String[] car:new String[][]{{"NEEV","hyundai/neev/usa/260507"},{"NEEV23","hyundai/neev/usa/260507"},{"CVEV","kia/ev6/usa/260507"}}){
    Path map=up.resolve("maps/"+car[1]);Map<String,Object> meta=read(map.resolve("car.json"));Map<String,Object> points=new LinkedHashMap<String,Object>();
-   for(Object app:(List<Object>)meta.get("apps"))points.putAll(read(map.resolve(app+".json")));
+   for(Object app:(List<Object>)meta.get("apps")){
+    Path base=up.resolve("maps/base/"+app+".json"),local=map.resolve(app+".json");
+    if(Files.isRegularFile(base))points.putAll(read(base));
+    if(Files.isRegularFile(local))points.putAll(read(local));
+   }
    Map<String,Map<String,Object>> mods=new LinkedHashMap<String,Map<String,Object>>();mods.put("wireless-carplay-aa",read(wireless.resolve("wireless-carplay-aa/mod.json")));mods.put("egmp-carplay-ev-routing",read(out.resolve("mod/mod.json")));
    HookPlan plan=HookPlan.of(mods,points.keySet(),Collections.<String,String>emptyMap());
    if(!plan.refused.isEmpty())throw new AssertionError(plan.refused);

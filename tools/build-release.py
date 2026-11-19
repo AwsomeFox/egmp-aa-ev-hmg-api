@@ -19,10 +19,11 @@ def classjar(folder,path):
  with zipfile.ZipFile(path,'w',zipfile.ZIP_DEFLATED) as z:
   for p in sorted(folder.rglob('*.class')):z.write(p,p.relative_to(folder).as_posix())
 def version_key(value):
- m=re.fullmatch(r'(\d+)\.(\d+)\.(\d+)(?:-beta\.(\d+))?',value)
+ m=re.fullmatch(r'(\d+)\.(\d+)\.(\d+)(?:-(alpha|beta|rc)\.(\d+))?',value)
  if not m:raise SystemExit('Unsupported HMG-API version: '+value)
- major,minor,patch,beta=m.groups()
- return (int(major),int(minor),int(patch),1 if beta is None else 0,int(beta or 0))
+ major,minor,patch,stage,number=m.groups()
+ order={None:3,'alpha':0,'beta':1,'rc':2}
+ return (int(major),int(minor),int(patch),order[stage],int(number or 0))
 def main():
  ap=argparse.ArgumentParser(description=__doc__)
  for arg in ('hmgapi-source','wireless-source','android-jar','d8-jar','json-jar','key'):ap.add_argument('--'+arg,required=True,type=Path)
@@ -90,7 +91,7 @@ def main():
  with tempfile.TemporaryDirectory() as t:
   usb=Path(t);(usb/'packages').mkdir();shutil.copyfile(package,usb/'packages'/package.name)
   (usb/'NEMESIS.data').write_text('[nemesis]\nversion=1.0\ntype=install\npath=packages/'+package.name+'\n')
-  (usb/'README.txt').write_text('Install NEMESIS, then official HMG-API beta6 or newer through NEMESIS. Enable its Wireless CarPlay + Android Auto mod and check the map. Unzip this archive onto the USB root; insert after Android starts. Remove USB and fully reboot after successful installation. See the repository README.\n')
+  (usb/'README.txt').write_text('Install NEMESIS, then official HMG-API 1.1.0-rc.3 or newer through NEMESIS. Enable Wireless CarPlay + Android Auto 2.2.0-rc.4 or newer and check the map. Unzip this archive onto the USB root; insert after Android starts. Remove USB and fully reboot after successful installation. See the repository README.\n')
   archive(usb,testing/(name+'-nemesis-usb.zip'))
  # Explicit source roots; no tools, keys, host binaries, previous builds or captures.
  with tempfile.TemporaryDirectory() as t:

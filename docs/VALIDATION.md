@@ -6,6 +6,8 @@ Offline checks cover Java producer fixtures/lifecycle, native ARM serialization,
 
 Version 0.4.3 experimentally mitigates repeated route recalculation by sending status every ten seconds and changing the one-minute, 25 W-rounded auxiliary average only at minute boundaries. We still send both contracts each cycle. Apple's expected update/contract policy is not established, so this behavior requires on-car validation. Reconnect/long-drive reliability and energy-model calibration need further testing.
 
+The shared-identity implementation requires HMG-API 1.1.0-rc.3 or newer and Wireless CarPlay + Android Auto 2.2.0-rc.4 or newer. Wireless rc.4 is the first release containing the shared CarPlay identification API; HMG-API rc.3 is its core dependency. This integration is covered by off-car compilation, hook-plan, signing and package-engine checks but still requires an on-car release test.
+
 ## Making-mods guide review
 
 Checked against the upstream [Making mods guide](https://github.com/VysseCodes/HMG-API/wiki/Making-mods) for beta6:

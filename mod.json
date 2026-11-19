@@ -2,7 +2,7 @@
   "id": "egmp-carplay-ev-routing",
   "name": "E-GMP CarPlay EV Routing",
   "version": "0.4.3",
-  "hmgapi": ">=1.0.0-beta.6 <2.0.0",
+  "hmgapi": ">=1.1.0-rc.3 <2.0.0",
   "authors": [
     "E-GMP CarPlay EV Routing contributors"
   ],

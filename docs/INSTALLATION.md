@@ -1,6 +1,6 @@
 # Installation through HMG-API
 
-Requires official HMG-API **1.0.0-beta.6 or newer**, a checked car map, and its enabled/applied **Wireless CarPlay + Android Auto 2.2.0-rc.4 or newer** mod. HMG-API itself may be installed through NEMESIS. Confirm ordinary CarPlay works first. Uninstall older Leafia-based EV extensions and Leafia before migrating.
+Requires official HMG-API **1.1.0-rc.3 or newer**, a checked car map, and its enabled/applied **Wireless CarPlay + Android Auto 2.2.0-rc.4 or newer** mod. Wireless rc.4 is the first release with the shared CarPlay identification API; it requires HMG-API rc.3. HMG-API itself may be installed through NEMESIS. Confirm ordinary CarPlay works first. Uninstall older Leafia-based EV extensions and Leafia before migrating.
 
 ## USB
 
@@ -12,7 +12,7 @@ Requires official HMG-API **1.0.0-beta.6 or newer**, a checked car map, and its 
 
 These follow the upstream [mod installation directions](https://github.com/VysseCodes/HMG-API/wiki/Installing-and-removing-mods). The wireless mod is also imported from a signed upstream ZIP in `HMGAPI/updates/`; the HMG-API NEMESIS installer does not bundle it.
 
-Our author key is not in beta6’s trusted-author list, so first import may show an unfamiliar-author warning. Expected UUID: `b45fb2d9-e6e8-83a2-bce9-cd5c40d2232d`. Updates require the same signing key. The mod ID is `egmp-carplay-ev-routing`; the download, signing key and code are shared by both vehicles.
+If our author key is not in HMG-API’s trusted-author list, first import may show an unfamiliar-author warning. Expected UUID: `b45fb2d9-e6e8-83a2-bce9-cd5c40d2232d`. Updates require the same signing key. The mod ID is `egmp-carplay-ev-routing`; the download, signing key and code are shared by both vehicles.
 
 ## Computer alternative
 
