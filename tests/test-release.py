@@ -102,7 +102,7 @@ class Lifecycle(unittest.TestCase):
  def test_disabled_wireless_refused(self):self.change(wireless='disabled');self.invoke('pre.sh',False)
  def test_bad_map_refused(self):self.change(bad_map=True);self.invoke('pre.sh',False)
  def test_unknown_hash_refused(self):
-  self.change(hashes={'libiap2session.so':'0'*32,'libiap2client.so':CONFIG['native_md5']['libiap2client.so']});self.assertIn('UNKNOWN_HASH',self.invoke('pre.sh',False));self.assertFalse(self.mod.exists())
+  self.change(hashes={'libiap2session.so':'0'*32});self.assertIn('UNKNOWN_HASH',self.invoke('pre.sh',False));self.assertFalse(self.mod.exists())
  def test_unknown_model_refused(self):self.change(product='OTHER.USA.260507');self.invoke('pre.sh',False)
  def test_unknown_firmware_refused(self):self.change(product='NEEV23.USA.0000.260903');self.invoke('pre.sh',False)
  def test_ev6_profile_selected(self):

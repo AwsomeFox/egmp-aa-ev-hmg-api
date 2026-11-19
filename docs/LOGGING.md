@@ -18,4 +18,4 @@ When the optional NEMESIS wrapper can identify its actual USB source, it writes 
 
 Native HMG-API imports do not run the NEMESIS USB-report hook. They do not automatically copy OEM inputs onto USB. HMG-API owns package installation logs; the runtime collector above still runs.
 
-If native-library hashes are unsupported, the mod stays inactive and reports `libiap2session.so_md5=…` and `libiap2client.so_md5=…` in its `CarPlayEV: unsupported native hashes` error. An unreadable library is reported as `unavailable`. Include that line when reporting compatibility problems.
+If the native library hash is unsupported, the mod stays inactive and reports `libiap2session.so_md5=…` in its `CarPlayEV: unsupported native hashes` error. An unreadable library is reported as `unavailable`. Include that line when reporting compatibility problems. `libiap2client.so` is not used or checked.

@@ -9,16 +9,13 @@ public final class EvRouting extends ModEntry {
     private String profile;
     private boolean librariesMatch;
     private String sessionMd5;
-    private String clientMd5;
     private ModContext runningMod;
     private Class<?> part;
     private CarPlayIdentification identityApi;
     private CarPlayIdentification.VehicleIdentity identityContribution;
     public void zygoteInit(ModContext mod) throws Throwable {
         sessionMd5=ModContext.md5("/system/lib/libiap2session.so");
-        clientMd5=ModContext.md5("/system/lib/libiap2client.so");
-        librariesMatch="fc7cb675b46a44bd893a1edc054c5e71".equals(sessionMd5)
-            && "153a97fd6d2c62dc58286aa47c35feb3".equals(clientMd5);
+        librariesMatch="fc7cb675b46a44bd893a1edc054c5e71".equals(sessionMd5);
         // Read before dropping root: app processes cannot traverse the mod folder.
         File f=new File("/system/etc/carplay.ev-routing/profile.json");
         java.io.InputStream in=new java.io.FileInputStream(f);
@@ -56,8 +53,7 @@ public final class EvRouting extends ModEntry {
     public void appLoaded(final ModContext mod,final LoadedApp app) throws Throwable {
         if(!"com.tcc.iap2server".equals(app.packageName))return;
         if(!librariesMatch){mod.error("CarPlayEV: unsupported native hashes; inactive"
-            +" libiap2session.so_md5="+(sessionMd5==null?"unavailable":sessionMd5)
-            +" libiap2client.so_md5="+(clientMd5==null?"unavailable":clientMd5),null);return;}
+            +" libiap2session.so_md5="+(sessionMd5==null?"unavailable":sessionMd5),null);return;}
         String[] points={"iap2.service.on_create","iap2.service.on_destroy","iap2.service.on_bind","iap2.service.native_handle","iap2.service.native_lock"};
         for(String id:points)if(!Points.has(id)){mod.error("CarPlayEV: missing hook map "+id+"; inactive",null);return;}
         runningMod=mod;part=mod.appPart(app,"org.egmp.carplay.ev.app.AppProvider");

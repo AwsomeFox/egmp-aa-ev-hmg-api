@@ -29,7 +29,7 @@ After adding your vehicle, select it when planning driving directions. Maps can 
 | 2022 Ioniq 5 US, 77.4 kWh | NEEV.USA / 260507 | Integration tested on one HU; energy model accuracy pending. |
 | Kia EV6 US | CVEV.USA / 260507 | Integration tested on one HU. **Consumption and Charging contract values copied from Ioniq 5, but appear to be accurate within 1-2%** |
 
-Exact native-library hashes and a resolving HMG-API map are required. Other firmware/battery configurations are unsupported, including 260903 until our native integration is validated there.
+An exact `libiap2session.so` hash and a resolving HMG-API map are required. `libiap2client.so` is not used or checked. Other firmware/battery configurations are unsupported, including 260903 until our native integration is validated there.
 
 Live SOC and range are sent every ten seconds while subscribed. Auxiliary power is sampled at the same cadence, averaged over one-minute windows, rounded to the nearest 25 W and changed in the sent consumption contract only once per minute. Energy and full-charge range are estimates. Charging state, active connector and temperature are omitted. Renaming and other contract updates are not implemented.
 

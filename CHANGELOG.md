@@ -1,3 +1,7 @@
+# Unreleased
+
+- Remove the stale `libiap2client.so` hash requirement. The mod does not load, patch or call that library; only the firmware-sensitive `libiap2session.so` EV-status bridge remains gated.
+
 # 0.5.0 — experimental
 
 - Move the CarPlay vehicle identity contribution to Wireless CarPlay + Android Auto's shared identification API. This release no longer patches `libiap2session.so` itself, avoiding competing native identity patches.

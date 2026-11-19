@@ -6,8 +6,7 @@
   "minimum_hmgapi": "1.1.0-rc.3",
   "minimum_hmgapi_package": "1.0.99.3",
   "native_md5": {
-    "libiap2session.so": "fc7cb675b46a44bd893a1edc054c5e71",
-    "libiap2client.so": "153a97fd6d2c62dc58286aa47c35feb3"
+    "libiap2session.so": "fc7cb675b46a44bd893a1edc054c5e71"
   },
   "profiles": [
     {
