@@ -4,7 +4,7 @@ Requires official HMG-API **1.1.0-rc.3 or newer**, a checked car map, and its en
 
 ## USB
 
-1. Download [egmp-carplay-ev-routing-v5.0.0.zip](https://github.com/isaacwisdom/egmp-carplay-ev-routing/releases/download/v5.0.0/egmp-carplay-ev-routing-v5.0.0.zip). This single signed ZIP supports the listed Ioniq 5 and EV6 configurations. EV6 values are copied and unvalidated; both profiles use 77.4 kWh.
+1. Download [egmp-carplay-ev-routing-v0.5.0.zip](https://github.com/isaacwisdom/egmp-carplay-ev-routing/releases/download/v0.5.0/egmp-carplay-ev-routing-v0.5.0.zip). This single signed ZIP supports the listed Ioniq 5 and EV6 configurations. EV6 values are copied and unvalidated; both profiles use 77.4 kWh.
 2. Copy the ZIP unchanged into `HMGAPI/updates/` on a USB stick. Do not unzip it. HMG-API chooses the applicable profile at Apply using the HU’s model/region/firmware; the routing code reads one active file at `/system/etc/carplay.ev-routing/profile.json`.
 3. Open HMG-API > **Check USB updates**, select the package and install. Enable it and review **Apply changes**. Do not use **Install anyway** for an unsupported car/firmware.
 4. After successful apply, remove the stick and fully reboot.
@@ -19,7 +19,7 @@ If our author key is not in HMG-API’s trusted-author list, first import may sh
 From the source/release directory, for either supported vehicle:
 
 ```sh
-adb push dist/egmp-carplay-ev-routing-v5.0.0.zip /data/local/tmp/carplay-ev-routing.zip
+adb push dist/egmp-carplay-ev-routing-v0.5.0.zip /data/local/tmp/carplay-ev-routing.zip
 adb shell hmgapid engine install /data/local/tmp/carplay-ev-routing.zip --uuid b45fb2d9-e6e8-83a2-bce9-cd5c40d2232d
 adb shell hmgapid engine plan
 ```

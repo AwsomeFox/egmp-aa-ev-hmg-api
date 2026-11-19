@@ -1,4 +1,4 @@
-# v5.0.0 — Experimental
+# v0.5.0 — Experimental
 
 This release moves E-GMP vehicle information into Wireless CarPlay + Android Auto's shared CarPlay identification API. It no longer carries its own `libiap2session.so` patch, so the wireless mod owns the native identification change and this mod contributes the vehicle data through the published API.
 
