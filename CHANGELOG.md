@@ -1,3 +1,10 @@
+# 5.0.0 — experimental
+
+- Move the CarPlay vehicle identity contribution to Wireless CarPlay + Android Auto's shared identification API. This release no longer patches `libiap2session.so` itself, avoiding competing native identity patches.
+- Require HMG-API 1.1.0-rc.3 or newer and Wireless CarPlay + Android Auto 2.2.0-rc.4 or newer. Wireless rc.4 is the first release containing the shared identity API; HMG-API rc.3 is its required core.
+- Retain 0.4.2's Hyundai-style whole-percent SOC flooring and 0.4.3's ten-second status cadence with one-minute, 25 W-rounded auxiliary-power averages.
+- Validate the signed package off-car against the exact HMG-API rc.3 and Wireless rc.4 tags for all three supported product profiles.
+
 # 0.4.3 — experimental
 
 - Send vehicle status every ten seconds instead of every five seconds.

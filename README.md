@@ -1,17 +1,17 @@
 # E-GMP CarPlay EV Routing
 
-Experimental Apple Maps EV routing for Gen5W, installed as a **native HMG-API mod**. Current version: **0.4.3** (experimental).
+Experimental Apple Maps EV routing for Gen5W, installed as a **native HMG-API mod**. Current version: **5.0.0** (experimental).
 
 ## Install
 
 1. Install [NEMESIS](https://github.com/xwtk/hmg_nemesis) and [HMG-API 1.1.0-rc.3 or newer](https://github.com/Open-HMG/HMG-API/releases). NEMESIS can install HMG-API itself.
 2. Download HMG-API’s **[Wireless CarPlay + Android Auto](https://github.com/Open-HMG/hmgapi-wireless-cp-aa)** mod **2.2.0-rc.4 or newer** from its **[releases page](https://github.com/Open-HMG/hmgapi-wireless-cp-aa/releases)**, install/enable it, apply, verify the car map and reboot. It is a separate download; confirm CarPlay works.
-3. Download **[egmp-carplay-ev-routing-v0.4.1.zip](https://github.com/isaacwisdom/egmp-carplay-ev-routing/releases/download/v0.4.1/egmp-carplay-ev-routing-v0.4.1.zip)** and copy it unchanged into `HMGAPI/updates/` on a USB stick. In HMG-API, use **Check USB updates**, install it, enable it and **Apply changes**. Remove the USB and fully reboot.
+3. Download **[egmp-carplay-ev-routing-v5.0.0.zip](https://github.com/isaacwisdom/egmp-carplay-ev-routing/releases/download/v5.0.0/egmp-carplay-ev-routing-v5.0.0.zip)** and copy it unchanged into `HMGAPI/updates/` on a USB stick. In HMG-API, use **Check USB updates**, install it, enable it and **Apply changes**. Remove the USB and fully reboot.
 4. **Manually delete the existing iPhone–HU pairing and pair again.** Remove the iPhone from the HU’s paired-device list, forget the HU in the iPhone’s Bluetooth and CarPlay settings, then pair again and allow CarPlay. This step is required after installation; reconnecting the existing pairing is not enough.
 
 5. On your iPhone, open Apple Maps, tap your profile picture, then **Vehicles**. Follow the prompts to add your detected vehicle, or select it if it is already listed. See the [illustrated setup steps](docs/INSTALLATION.md#add-your-vehicle-in-apple-maps).
 
-There is **one mod download** for both supported vehicles. HMG-API selects the correct bundled profile when applying the mod and writes one active profile file; the routing code always reads that file. No manual profile choice is needed. [Detailed directions](docs/INSTALLATION.md). The [NEMESIS store rollout is on hold](docs/NEMESIS-RELEASE.md) pending investigation and HU verification of upstream HMG-API v1.0.0 issues. Our tested HU baseline is beta.6; v1.0.0 has only been checked off the car. The existing native mod installation route remains available.
+There is **one mod download** for both supported vehicles. HMG-API selects the correct bundled profile when applying the mod and writes one active profile file; the routing code always reads that file. No manual profile choice is needed. [Detailed directions](docs/INSTALLATION.md). The [NEMESIS store rollout remains on hold](docs/NEMESIS-RELEASE.md); use the native HMG-API installation route.
 
 ## Apple Maps EV routing
 
@@ -31,7 +31,7 @@ Exact native-library hashes and a resolving HMG-API map are required. Other firm
 
 Live SOC and range are sent every ten seconds while subscribed. Auxiliary power is sampled at the same cadence, averaged over one-minute windows, rounded to the nearest 25 W and changed in the sent consumption contract only once per minute. Energy and full-charge range are estimates. Charging state, active connector and temperature are omitted. Renaming and other contract updates are not implemented.
 
-**Experimental mitigation:** an owner reported Apple Maps recalculating routes with the earlier five-second cadence and continuously changing auxiliary value. Version 0.4.3 slows status updates and stabilizes auxiliary power as described above. Apple's required cadence and contract-change behavior remain under investigation.
+**Experimental mitigation:** an owner reported Apple Maps recalculating routes with the earlier five-second cadence and continuously changing auxiliary value. The current release slows status updates and stabilizes auxiliary power as described above. Apple's required cadence and contract-change behavior remain under investigation.
 
 Logs rotate between two 512 KiB files and can be exported by NEMESIS. The optional NEMESIS wrapper also writes USB install diagnostics; native HMG-API imports do not run that hook.
 
@@ -39,4 +39,4 @@ Logs rotate between two 512 KiB files and can be exported by NEMESIS. The option
 
 ## Credits
 
-Special credit to [augard/evmaps](https://github.com/augard/evmaps) for the charging/consumption dictionaries and reference material. Built on [HMG-API](https://github.com/VysseCodes/HMG-API) and NEMESIS, with vehicle-data research from [egmp-aa-ev-feat](https://github.com/willemcvu/egmp-aa-ev-feat). Original code: GPL-3.0-or-later; see [NOTICE](NOTICE.md). No OEM binaries are distributed.
+Special credit to [augard/evmaps](https://github.com/augard/evmaps) for the charging/consumption dictionaries and reference material. Built on [HMG-API](https://github.com/Open-HMG/HMG-API) and NEMESIS, with vehicle-data research from [egmp-aa-ev-feat](https://github.com/willemcvu/egmp-aa-ev-feat). Original code: GPL-3.0-or-later; see [NOTICE](NOTICE.md). No OEM binaries are distributed.

@@ -1,3 +1,16 @@
+# v5.0.0 — Experimental
+
+This release moves E-GMP vehicle information into Wireless CarPlay + Android Auto's shared CarPlay identification API. It no longer carries its own `libiap2session.so` patch, so the wireless mod owns the native identification change and this mod contributes the vehicle data through the published API.
+
+- Requires **HMG-API 1.1.0-rc.3 or newer**.
+- Requires **Wireless CarPlay + Android Auto 2.2.0-rc.4 or newer**. Wireless rc.4—not rc.3—is the first release with the shared CarPlay identification API.
+- Keeps live SOC and range updates at ten-second intervals.
+- Floors half-percent SOC readings to the whole percentage shown by Hyundai's EV display.
+- Averages auxiliary power over one-minute windows, rounds it to 25 W, and retains the last published value when samples are missing.
+- Uses the same signing identity and mod ID, so HMG-API can update an existing installation in place.
+
+The signed ZIP was built and checked off-car against the exact HMG-API rc.3 and Wireless rc.4 tags. The shared-identity release still needs an on-car installation and drive test; EV6 energy values remain copied from the Ioniq 5.
+
 # v0.4.3 — Experimental
 
 - Send vehicle status to Apple Maps every ten seconds instead of every five seconds.
