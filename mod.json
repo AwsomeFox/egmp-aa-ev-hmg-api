@@ -2,7 +2,7 @@
   "id": "egmp-carplay-ev-routing",
   "name": "E-GMP CarPlay EV Routing",
   "version": "0.4.3",
-  "hmgapi": ">=1.0.0-beta.6 <2.0.0",
+  "hmgapi": ">=1.1.0-rc.3 <2.0.0",
   "authors": [
     "E-GMP CarPlay EV Routing contributors"
   ],
@@ -32,7 +32,7 @@
     }
   ],
   "requires": [
-    "wireless-carplay-aa"
+    "wireless-carplay-aa >=2.2.0-rc.4 <3.0.0"
   ],
   "logs": {
     "tags": [
@@ -46,14 +46,8 @@
     "jar": "egmp-carplay-ev-routing.jar",
     "entry": "org.egmp.carplay.ev.EvRouting",
     "points": {
-      "iap2.init_info.check_supports_features": "change",
       "iap2.service.on_create": "observe",
       "iap2.service.on_destroy": "observe"
-    },
-    "native": {
-      "libiap2session.so": [
-        "recipes/native-fc7.recipe"
-      ]
     }
   },
   "services": [

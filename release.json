@@ -3,8 +3,8 @@
   "nemesis_id": "carplay.ev-routing",
   "mod_id": "egmp-carplay-ev-routing",
   "author_uuid": "b45fb2d9-e6e8-83a2-bce9-cd5c40d2232d",
-  "minimum_hmgapi": "1.0.0-beta.6",
-  "minimum_hmgapi_package": "0.99.6",
+  "minimum_hmgapi": "1.1.0-rc.3",
+  "minimum_hmgapi_package": "1.0.99.3",
   "native_md5": {
     "libiap2session.so": "fc7cb675b46a44bd893a1edc054c5e71",
     "libiap2client.so": "153a97fd6d2c62dc58286aa47c35feb3"

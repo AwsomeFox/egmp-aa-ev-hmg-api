@@ -4,7 +4,6 @@
 extern void *dlopen(const char *,int);
 extern void *dlsym(void *,const char *);
 
-#include "identity.c"
 /* No implicit NativeClient layout guessing on unknown builds: Java gates both
  * native files by exact hash before calling open. These offsets are ARM32-only. */
 static u32 session_from_client(jlong client){
@@ -24,8 +23,7 @@ JNIEXPORT jint JNICALL Java_org_egmp_carplay_ev_app_NativeBridge_open(JNIEnv *en
     a.table=dlsym(lib,"iAP2VehicleStatusSendList");
     a.lookup=dlsym(lib,"iAP2ControlVehicleStatusGetUpdatesPointer");
     Builder entry=dlsym(lib,"iAP2SessionPacketMakePacketUsingParamListNew");
-    int identity=identity_bind(lib,c,entry);if(identity)return identity;
-    a.build=raw_builder;
+    a.build=entry;
     a.context=dlsym(lib,"iAP2SessionGetControlContext");
     a.send=dlsym(lib,"iAP2ControlSessionSendCmd");
     a.lock=dlsym(c,"pthread_mutex_lock");a.unlock=dlsym(c,"pthread_mutex_unlock");
@@ -34,7 +32,6 @@ JNIEXPORT jint JNICALL Java_org_egmp_carplay_ev_app_NativeBridge_open(JNIEnv *en
 JNIEXPORT jint JNICALL Java_org_egmp_carplay_ev_app_NativeBridge_send(JNIEnv *env,jclass cls,jlong client,jintArray values,jbyteArray charging,jbyteArray consumption){
     (void)cls;
     if(!api.context)return -10;
-    if(!__atomic_load_n(&configured,__ATOMIC_ACQUIRE))return -18;
     if(!values || !charging || !consumption)return -12;
     if((*env)->GetArrayLength(env,values)!=9)return -12;
     jsize n=(*env)->GetArrayLength(env,charging),m=(*env)->GetArrayLength(env,consumption);
@@ -65,18 +62,8 @@ JNIEXPORT void JNICALL Java_org_egmp_carplay_ev_app_NativeBridge_reset(JNIEnv *e
     for(u32 i=0;i<CONTEXTS;i++){ev_disable(i);states[i].key=0;states[i].original=0;states[i].original_count=0;keys[i]=0;handles[i]=0;}
 }
 
-JNIEXPORT jint JNICALL Java_org_egmp_carplay_ev_app_NativeBridge_configure(JNIEnv *env,jclass cls,jbyteArray name,jint dc,jint ac){
-    (void)cls;
-    if(!api.context || !name)return -10;
-    jsize n=(*env)->GetArrayLength(env,name);if(n<1 || n>320 || dc<1 || ac<1)return -12;
-    char bytes[321];(*env)->GetByteArrayRegion(env,name,0,n,(jbyte*)bytes);
-    if((*env)->ExceptionCheck(env))return -12;
-    return identity_configure(bytes,(u32)n,(u32)dc,(u32)ac);
-}
 JNIEXPORT void JNICALL Java_org_egmp_carplay_ev_app_NativeBridge_shutdown(JNIEnv *env,jclass cls){
     Java_org_egmp_carplay_ev_app_NativeBridge_reset(env,cls);
-    __atomic_store_n(&configured,0,__ATOMIC_RELEASE);
-    if(hook_mailbox)set_handler(0);
 }
 /* ARM EABI helper emitted for zeroed table entries; no host libc dependency. */
 void __aeabi_memclr(void *dest,u32 n){volatile unsigned char *p=dest;while(n--)*p++=0;}

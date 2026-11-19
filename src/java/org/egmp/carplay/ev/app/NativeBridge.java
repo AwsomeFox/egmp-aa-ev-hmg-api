@@ -8,7 +8,6 @@ public final class NativeBridge {
     public static void load(String path){System.load(path);}
     public static native int open();
     public static native void reset();
-    public static native int configure(byte[] name,int dcW,int acW);
     public static native void shutdown();
     public static native int send(long clientHandle, int[] sample, byte[] charging, byte[] consumption);
     public static native int stop(long clientHandle);

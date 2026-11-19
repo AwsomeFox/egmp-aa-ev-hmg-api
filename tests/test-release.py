@@ -144,7 +144,7 @@ class Package(unittest.TestCase):
   for line in (STAGE/'payload/profiles.tsv').read_text().splitlines():
    prefix,firmware,name,expected=line.split();p=STAGE/'payload'/name;self.assertEqual(hashlib.md5(p.read_bytes()).hexdigest(),expected)
    with zipfile.ZipFile(p) as z:
-    self.assertIsNone(z.testzip());meta=json.loads(z.read('mod.json'));self.assertEqual(meta['version'],CONFIG['version']);self.assertEqual(meta['hmgapi'],'>=1.0.0-beta.6 <2.0.0');self.assertNotIn('hooks.jar',z.namelist());manifest=json.loads(z.read('META-HMGAPI/manifest.json'));self.assertEqual(manifest['uuid'],CONFIG['author_uuid'])
+    self.assertIsNone(z.testzip());meta=json.loads(z.read('mod.json'));self.assertEqual(meta['version'],CONFIG['version']);self.assertEqual(meta['hmgapi'],'>=1.1.0-rc.3 <2.0.0');self.assertEqual(meta['requires'],['wireless-carplay-aa >=2.2.0-rc.4 <3.0.0']);self.assertNotIn('hooks.jar',z.namelist());manifest=json.loads(z.read('META-HMGAPI/manifest.json'));self.assertEqual(manifest['uuid'],CONFIG['author_uuid'])
     for n,h in manifest['files'].items():self.assertEqual(hashlib.sha256(z.read(n)).hexdigest(),h)
     self.assertEqual(hashlib.sha256(z.read('files/libcarplayev.so')).hexdigest(),json.loads((R/'out/build-report.json').read_text())['native_sha256'])
  def test_single_native_download_contains_both_profiles(self):

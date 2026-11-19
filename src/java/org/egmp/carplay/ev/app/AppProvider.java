@@ -32,10 +32,7 @@ public final class AppProvider {
         if(instance!=null)return;
         AppProvider next=new AppProvider(mod,app,service,profile);
         try {
-        // Arm the verified native identification extension before registering.
         int opened=NativeBridge.open();if(opened!=0)throw new IllegalStateException("native open="+opened);
-        int configured=NativeBridge.configure(next.source.displayName.getBytes("UTF-8"),next.source.dcW,next.source.acW);
-        if(configured!=0)throw new IllegalStateException("native identification="+configured);
         Object raw=Points.call(app.classLoader,"iap2.service.on_bind",service,new Intent());
         next.binder=IIap2Service.Stub.asInterface((IBinder)raw);
         Iap2ListenerInfo info=new Iap2ListenerInfo();info.onSetListenerName("CarPlayEV");info.onSetSupportType(0x100);

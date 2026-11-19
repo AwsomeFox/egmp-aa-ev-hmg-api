@@ -1,9 +1,0 @@
-# ARM32 260507 serializer extension gate + existing group13 enable.
-id carplay-ev-native-fc7
-file /system/lib/libiap2session.so
-verify 0x129c6 26 5c765cb2d7f9419dfa166e4e76a2db20 4b4a4768e64d32b15a63bea2d937af37
-verify 0x1aa04 4 92f20d7715dc751e34cfb9ae51a4a65b -
-segment 0x500000 dff818c0bcf1000f00f00a8060470000314756450100000021000000000000002de9f04fdff804c0fc44604700000000
-rel32 0x2c 0x2c 0x1aa09
-patch 0x129c6 2046132101220123fff7e3fc20460ef08cfbc4f8145638bd00bf
-branch 0x1aa04 0x0
