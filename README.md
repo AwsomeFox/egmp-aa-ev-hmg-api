@@ -2,6 +2,8 @@
 
 Experimental Apple Maps EV routing for Gen5W, installed as a **native HMG-API mod**. Current version: **0.5.0** (experimental).
 
+**v0.5.0 has now been installed and tested successfully on-car.** The shared CarPlay identification path, vehicle detection and EV routing are working with the required HMG-API and Wireless CarPlay releases below.
+
 ## Install
 
 1. Install [NEMESIS](https://github.com/xwtk/hmg_nemesis) and [HMG-API 1.1.0-rc.3 or newer](https://github.com/Open-HMG/HMG-API/releases). NEMESIS can install HMG-API itself.
