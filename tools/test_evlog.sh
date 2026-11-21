@@ -107,6 +107,21 @@ for c in summary charges drive capacity; do
     $PY tools/analyze_drive_logs.py $c tools/testdata/sample-ev-log.csv > "$T/an-$c.txt" || fail "analyze $c exit $?"
 done
 grep -q "sample-ev-log.csv" "$T/an-summary.txt" || fail "analyze summary"
+# a log with no speed (HMG-API build up to 0.8.2): speed from the odometer
+$PY - <<'PY' || fail "analyze: odometer speed"
+import sys
+sys.path.insert(0, "tools")
+import analyze_drive_logs as A
+rows = [{"t_s": 5.0 * i, "odo_delta_km": round(0.15 * i, 1)} for i in range(40)]
+A.odometer_speed(rows)
+v = A.speed(rows[20])
+assert v is not None and abs(v - 108) < 4, v          # 0.15 km per 5 s
+rows[20]["speed_avg_kph"] = 99.0
+assert A.speed(rows[20]) == 99.0                       # the logged speed wins
+gap = [{"t_s": 0.0, "odo_delta_km": 0.0}, {"t_s": 600.0, "odo_delta_km": 9.0}]
+A.odometer_speed(gap)
+assert A.speed(gap[0]) is None                         # not across a gap
+PY
 
 
 echo "PASS"

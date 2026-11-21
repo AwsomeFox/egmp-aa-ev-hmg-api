@@ -28,6 +28,8 @@ import hmgapi.hook.Points;
  *   framework.hev_service.hev_status              getHEVStatus(flag)
  *   framework.hev_flag(.display_soc, .ev_ready, .battery_conditioning, .odometer)
  *   framework.hscan_service.car_speed, .hv_health
+ *     (hscan's classes come from the com.hkmc.ext.hcan library, which isn't on
+ *     the boot class path: hcanLoader())
  *   framework.bcm_service.register_listener, framework.bcm_listener(_stub)
  * Not in HMG-API's catalogue yet (called by method name on the mapped
  * interface, see docs/HMG-API-COMPARISON.md): IDATCService.getVRClimateStatus,
@@ -43,6 +45,16 @@ final class HmgCar {
     private static final String TAG = "EvCar";
 
     private static volatile Object sHev, sHscan, sDatc, sBcm;
+
+    /**
+     * The telematics CAN library: tm_hscan_service's interface and adapter classes.
+     * It isn't on the boot class path and GPM doesn't load it, so resolving the
+     * hscan points from the boot class loader fails (speed and SOH were never
+     * read up to 0.8.2). HMG-API's vehicle service loads the same jar.
+     */
+    static final String HCAN_JAR = "/system/framework/com.hkmc.ext.hcan.jar";
+    private static volatile ClassLoader sHcan;
+    private static volatile boolean sHscanLogged;
     private static final Map<String, Integer> FLAGS = new HashMap<String, Integer>();
     private static final Map<String, Method> METHODS = new HashMap<String, Method>();
 
@@ -57,13 +69,18 @@ final class HmgCar {
     // ---- services -------------------------------------------------------------
 
     private static Object service(String namePoint, String asInterfacePoint) throws Exception {
-        String name = (String) Points.get(null, namePoint, null);
+        return service(null, namePoint, asInterfacePoint);
+    }
+
+    /** A car service's proxy, its classes resolved through cl (null: the boot class path). */
+    private static Object service(ClassLoader cl, String namePoint, String asInterfacePoint) throws Exception {
+        String name = (String) Points.get(cl, namePoint, null);
         IBinder b = (IBinder) Class.forName("android.os.ServiceManager")
                 .getMethod("getService", String.class).invoke(null, name);
         if (b == null || !b.isBinderAlive()) {
             throw new IllegalStateException(name + " unavailable");
         }
-        Object proxy = Points.call(null, asInterfacePoint, null, b);
+        Object proxy = Points.call(cl, asInterfacePoint, null, b);
         if (proxy == null) {
             throw new IllegalStateException(name + ": no interface");
         }
@@ -81,9 +98,39 @@ final class HmgCar {
     static Object hscan() throws Exception {
         Object s = sHscan;
         if (s == null) {
-            sHscan = s = service("framework.hscan_adapter.service_name", "framework.hscan_service_stub.as_interface");
+            sHscan = s = service(hcanLoader(), "framework.hscan_adapter.service_name",
+                    "framework.hscan_service_stub.as_interface");
         }
         return s;
+    }
+
+    /**
+     * Where hscan's classes resolve: the hcan library's jar, parent first, so a
+     * build that has them on the boot class path still gets those. Once per
+     * process; this class's own loader if the jar can't be opened.
+     */
+    static ClassLoader hcanLoader() {
+        ClassLoader l = sHcan;
+        if (l == null) {
+            ClassLoader parent = HmgCar.class.getClassLoader();
+            try {
+                l = new dalvik.system.PathClassLoader(HCAN_JAR, parent);
+            } catch (Throwable t) {
+                android.util.Log.w(TAG, "no " + HCAN_JAR + ": " + t);
+                l = parent;
+            }
+            sHcan = l;
+        }
+        return l;
+    }
+
+    /** The first hscan failure in this process, in the log (later ones are the same). */
+    private static void hscanFailed(Exception e) {
+        reset("hscan");
+        if (!sHscanLogged) {
+            sHscanLogged = true;
+            android.util.Log.w(TAG, "hscan read failed (speed, SOH): " + e);
+        }
     }
 
     static Object datc() throws Exception {
@@ -174,9 +221,9 @@ final class HmgCar {
     /** Display speed, km/h (getCarSpeed(0)). */
     static float speedKph() throws Exception {
         try {
-            return num(Points.call(null, "framework.hscan_service.car_speed", hscan(), (byte) 0));
+            return num(Points.call(hcanLoader(), "framework.hscan_service.car_speed", hscan(), (byte) 0));
         } catch (Exception e) {
-            reset("hscan");
+            hscanFailed(e);
             throw e;
         }
     }
@@ -184,9 +231,9 @@ final class HmgCar {
     /** BMS SOH raw (getXEV_Bms_GDS_SOH). */
     static int sohRaw() throws Exception {
         try {
-            return (int) num(Points.call(null, "framework.hscan_service.hv_health", hscan()));
+            return (int) num(Points.call(hcanLoader(), "framework.hscan_service.hv_health", hscan()));
         } catch (Exception e) {
-            reset("hscan");
+            hscanFailed(e);
             throw e;
         }
     }

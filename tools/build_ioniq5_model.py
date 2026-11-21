@@ -97,8 +97,17 @@ ROAD_LOAD = (196.0, 0.0, 0.493)
 #   a lower, sleeker body than the Ioniq 5's ~0.80) and A = 180 N (rolling
 #   resistance ~0.0085 at ~2150 kg) are the physical pair.
 #   tools/analyze_drive_logs.py reproduces the fit.
+#   Ioniq 5 (NEEV, NEEV23, NEEV23SE): fitted on 81 stretches of a 2023 Ioniq 5's
+#   logs (issue #22, ~780 km, interstate out and back at ~114 km/h, 16-38 C;
+#   one motor drove, by its trip counters). The rolldown values above came out
+#   16% high (18% at 90 km/h and up), the same either way, so not wind. With
+#   C = 0.40, A = 190 N fits all stretches; it comes out 1% high (2% at 90 km/h
+#   and up), a little margin for AWD cars, whose second motor this one lacked.
+#   The rolldown car was a 2120 kg AWD; real cars on both E-GMP bodies run
+#   close to A 180-190 N, C 0.40 so far.
 CAR_ROAD_LOAD = [
     ("CV", 180.0, 0.40),
+    ("NEEV", 190.0, 0.40),
 ]
 
 # Drivetrain loss: spin(v) + 6% of wheel power. Spin grows with speed like

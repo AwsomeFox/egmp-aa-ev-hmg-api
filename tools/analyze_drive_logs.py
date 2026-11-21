@@ -15,6 +15,9 @@ drivetrain and battery loss, aux table, charge curve), so a change there shows
 up here. Climate power is the logged hvac_raw (~20 W/unit) for the fit, the
 aux table for the model.
 
+Logs from the HMG-API build up to 0.8.2 have no speed (its hscan reads failed),
+so speed falls back to the odometer over a ~60 s window (speed()).
+
 Standard library only. Logs are data: nothing in them is executed.
 """
 import csv
@@ -52,11 +55,31 @@ def load(path):
                 out[k] = None
         if out.get("t_s") is not None:
             rows.append(out)
+    odometer_speed(rows)
     return hdr, rows
+
+
+def odometer_speed(rows, half=6):
+    """speed_odo_kph on each row: the odometer's distance over the rows half
+    either side (~60 s at 5 s rows; it counts in 0.1 km), None across a gap."""
+    for i, r in enumerate(rows):
+        a, b = rows[max(0, i - half)], rows[min(len(rows) - 1, i + half)]
+        oa, ob, dt = a.get("odo_delta_km"), b.get("odo_delta_km"), b["t_s"] - a["t_s"]
+        ok = oa is not None and ob is not None and 0 < dt <= (2 * half + 3) * 5
+        r["speed_odo_kph"] = (ob - oa) * 3600 / dt if ok else None
 
 
 def g(r, k):
     return r.get(k)
+
+
+def speed(r):
+    """km/h: the logged display speed (row mean, else last sample), else the
+    odometer's; None if neither."""
+    for k in ("speed_avg_kph", "speed_kph", "speed_odo_kph"):
+        if r.get(k) is not None:
+            return r[k]
+    return None
 
 
 def temp_c(r):
@@ -118,7 +141,7 @@ def charge_sessions(rows):
     """[(first, last)] row indexes of parked charging runs over 2 min."""
     out, cur = [], None
     for i, r in enumerate(rows):
-        if charging(r) and (g(r, "speed_kph") or 0) < 1:
+        if charging(r) and (speed(r) or 0) < 1:
             cur = [i, i] if cur is None else [cur[0], i]
         elif cur is not None:
             out.append(cur)
@@ -156,7 +179,7 @@ def stretch_stats(w, a, c):
     temps = []
     for p, r in zip(w, w[1:]):
         dt = r["t_s"] - p["t_s"]
-        v = (g(r, "speed_avg_kph") or g(r, "speed_kph") or 0) / 3.6
+        v = (speed(r) or 0) / 3.6
         tc = temp_c(r)
         if tc is not None:
             temps.append(tc)
@@ -302,7 +325,7 @@ def cmd_capacity(files):
         pts = by.setdefault(name, {})
         for r in rows:
             s, e = g(r, "soc_half_pct"), g(r, "avlbl_enrg_raw")
-            if s and e and 0 < e < 45000 and (g(r, "speed_kph") or 0) == 0 and not charging(r):
+            if s and e and 0 < e < 45000 and (speed(r) or 0) < 1 and not charging(r):
                 pts.setdefault(s / 2, []).append(e * 2)
     for name, pts in sorted(by.items()):
         if len(pts) < 3:
