@@ -151,6 +151,15 @@ public final class HmgApiEntry extends ModEntry {
         return on("battery_curve");
     }
 
+    /** settings arrival_charger_pct / arrival_dest_pct: Maps' minimum arrival % at charging stops and target % at the destination (0: Maps' own) */
+    static void tripSettings(ModContext mod) {
+        EvModelSender.setTripSettings(mod.settingInt("arrival_charger_pct", 0), mod.settingInt("arrival_dest_pct", 0));
+    }
+
+    static boolean tripSettingsSet(ModContext mod) {
+        return mod.settingInt("arrival_charger_pct", 0) > 0 || mod.settingInt("arrival_dest_pct", 0) > 0;
+    }
+
     static boolean liveDataOn() {
         return on("live_data");
     }
@@ -212,12 +221,17 @@ public final class HmgApiEntry extends ModEntry {
                     sEvFits = evFits(mod);
                     if (sEvFits && modelOn() && p.args[2] instanceof int[] && NativeCheck.patched()) {
                         p.args[2] = withSensor((int[]) p.args[2], SENSOR_EV_MODEL);
-                        // the battery % curve, where this build's recipe lets the library take it
-                        boolean curve = batteryCurveOn() && NativeCheck.maxSensorType() >= SocCurve.SENSOR;
-                        if (curve) {
+                        // sensor 26 (the battery % curve and the arrival % settings), where this
+                        // build's recipe lets the library take it
+                        boolean can26 = NativeCheck.maxSensorType() >= SocCurve.SENSOR;
+                        boolean curve = batteryCurveOn() && can26;
+                        boolean trip = can26 && tripSettingsSet(mod);
+                        if (curve || trip) {
                             p.args[2] = withSensor((int[]) p.args[2], SocCurve.SENSOR);
                         }
                         EvModelSender.setBatteryCurve(curve);
+                        EvModelSender.setSensor26(curve || trip);
+                        tripSettings(mod);
                     }
                     if (sEvFits && liveDataOn() && p.args[2] instanceof int[]) {
                         // types the stock library takes (1..21): no patch needed
@@ -461,6 +475,7 @@ public final class HmgApiEntry extends ModEntry {
     @Override
     public void onSettingsChanged(ModContext mod) {
         Precond.configure(precondConfig(mod));
+        tripSettings(mod);   // at once when sensor 26 is already offered; else from the next session
         if (!mod.settingBoolean("energy_model", true)) {
             EvModelSender.stop();
         }

@@ -244,9 +244,53 @@ public final class ScaleTest {
         }
     }
 
+    /**
+     * VEM v1.2 fields in block 1: mass 1.2 (kg), hvac_status 1.5 (live, one byte), battery
+     * temperature 1.8 (live float), max charging rate 1.10; and hvacStep's hysteresis.
+     */
+    static void checkVemV12(byte[] tmpl) {
+        check(tmpl[EvModelTemplate.HVAC_OFFSET - 1] == (5 << 3) && tmpl[EvModelTemplate.HVAC_OFFSET] == 0,
+                "1.5 hvac_status placeholder 0 at HVAC_OFFSET");
+        check(tmpl[EvModelTemplate.BATT_TEMP_OFFSET - 1] == (8 << 3 | 5), "1.8 battery_temp_c is a float at BATT_TEMP_OFFSET");
+        int bits = (tmpl[EvModelTemplate.BATT_TEMP_OFFSET] & 0xff) | (tmpl[EvModelTemplate.BATT_TEMP_OFFSET + 1] & 0xff) << 8
+                | (tmpl[EvModelTemplate.BATT_TEMP_OFFSET + 2] & 0xff) << 16 | (tmpl[EvModelTemplate.BATT_TEMP_OFFSET + 3] & 0xff) << 24;
+        check(Float.intBitsToFloat(bits) == EvModelTemplate.BATT_TEMP_PLACEHOLDER_C, "1.8 placeholder value");
+        // mass 2200 kg: 1.2 = {1: 2200} right after the battery header (batch 80 03, tag BA 01, len, tag 0A, len)
+        boolean mass = false;
+        for (int i = 0; i + 4 < 40; i++) {
+            if (tmpl[i] == 0x12 && tmpl[i + 1] == 3 && tmpl[i + 2] == 0x08
+                    && ((tmpl[i + 3] & 0x7f) | (tmpl[i + 4] & 0x7f) << 7) == 2200) {
+                mass = true;
+            }
+        }
+        check(mass, "1.2 mass_kg = 2200");
+        // max charging rate 1.10 = 235000: tag 0x50, varint
+        boolean rate = false;
+        for (int i = 0; i + 3 < 80; i++) {
+            if (tmpl[i] == 0x50 && ((tmpl[i + 1] & 0x7f) | (tmpl[i + 2] & 0x7f) << 7 | (tmpl[i + 3] & 0x7f) << 14) == 235000) {
+                rate = true;
+            }
+        }
+        check(rate, "1.10 max_charging_rate_w = 235000");
+
+        EvModelSender.resetHvac();
+        int on = (int) Math.ceil(EvModelSender.HVAC_ON_W / EvModelSender.CLIMATE_W_PER_UNIT);
+        check(EvModelSender.hvacStep(-1, 0) == EvModelSender.HVAC_UNKNOWN, "hvac: unknown before any reading");
+        check(EvModelSender.hvacStep(on, 1000) == EvModelSender.HVAC_ON, "hvac: first reading sent at once");
+        check(EvModelSender.hvacStep(0, 2000) == EvModelSender.HVAC_ON, "hvac: off not sent before the hold");
+        check(EvModelSender.hvacStep(-1, 30000) == EvModelSender.HVAC_ON, "hvac: unknown keeps the last state");
+        check(EvModelSender.hvacStep(0, 40000) == EvModelSender.HVAC_ON, "hvac: off again restarts the hold");
+        check(EvModelSender.hvacStep(0, 40000 + EvModelSender.HVAC_HOLD_MS) == EvModelSender.HVAC_OFF,
+                "hvac: off sent after the hold");
+        check(EvModelSender.hvacStep(on, 200000) == EvModelSender.HVAC_OFF, "hvac: brief on ignored");
+        check(EvModelSender.hvacStep(0, 201000) == EvModelSender.HVAC_OFF, "hvac: still off");
+        EvModelSender.resetHvac();
+    }
+
     public static void main(String[] args) throws Exception {
         byte[] tmpl = java.util.Base64.getMimeDecoder().decode(EvModelTemplate.TEMPLATE_B64);
         check(EvModelSender.checkPlaceholders(tmpl), "template offsets match");
+        checkVemV12(tmpl);
 
         // k = 1 is the identity
         byte[] same = EvModelSender.scaleTemplate(tmpl, REF);
