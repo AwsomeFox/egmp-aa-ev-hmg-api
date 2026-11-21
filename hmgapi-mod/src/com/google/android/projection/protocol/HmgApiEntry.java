@@ -242,6 +242,9 @@ public final class HmgApiEntry extends ModEntry {
                         EvModelSender.setBatteryCurve(curve);
                         EvModelSender.setSensor26(curve || trip);
                         tripSettings(mod);
+                        // test settings: the winter add-on, and block 4 flattened (docs/AA-INTEGRATION.md)
+                        EvModelSender.setWinter(mod.settingBoolean("winter_model", false));
+                        EvModelSender.setBlock4Flat(mod.settingBoolean("block4_flat_test", false));
                         // NACS (14) for adapter owners: mod.json lists CCS1 and J1772; HMG-API set
                         // those just before this hook. Only where the recipe lets the library take 14
                         if (mod.settingBoolean("ev_connector_nacs", false) && NativeCheck.nacs()

@@ -40,6 +40,22 @@
       "description": "Tells Maps the car can also use NACS (Tesla Supercharger) plugs, besides CCS1 and J1772, so its charging stops can include Superchargers that take adapters. Needs a library build whose patch takes it (Ioniq 5 and EV6 US 260507). Not yet checked on a car: see Maps' Compatible plugs screen."
     },
     {
+      "key": "winter_model",
+      "type": "toggle",
+      "default": false,
+      "title": "Winter model for Maps (test)",
+      "apply": "restart",
+      "description": "Also sends Maps the live heater and climate power, charge times for a cold pack (by the battery temperature it now gets), and a battery preconditioning model (assumed E-GMP values). For cold-weather arrival charge and charging-stop times. Untested on Maps: compare its plan with this off on the same route. Needs the energy model on."
+    },
+    {
+      "key": "block4_flat_test",
+      "type": "toggle",
+      "default": false,
+      "title": "Test: flat block 4 (charge or regen limit?)",
+      "apply": "restart",
+      "description": "For one car test only: sends a flat 150 kW in the energy model's block 4, which Google's schema calls the regen limit and egmp fills with the charge curve. If Maps' planned charging minutes change, block 4 is a charge limit. Leave off otherwise."
+    },
+    {
       "key": "preconditioning",
       "type": "toggle",
       "default": true,
