@@ -115,7 +115,7 @@ Raw columns (`_raw`) are logged as the car reports them where the unit isn't pro
 |---|---|---|
 | `aa_active` | 0/1 | an Android Auto session (the energy-model sender) was running |
 | `energy_rate_w` | number | battery power derived from energy: (last valid `avlbl_enrg_raw` of this row − the last valid one before it) × 2 Wh ÷ the time between those samples, W. **Positive = into the battery (charging), negative = discharge.** The energy signal is coarse (2 Wh steps, updated about once a second, often in bigger jumps), so single rows are noisy: average several rows, or difference `energy_wh` over longer windows |
-| `speed_avg_kph` | number | mean of the 1 s speed samples in the row, km/h (hscan `getCarSpeed`, display speed) |
+| `speed_avg_kph` | number | mean of the 1 s speed samples in the row, km/h (hscan `getCarSpeed`, display speed). Empty in the HMG-API build up to 0.8.2 (as are `speed_kph`, `speed_max_kph` and `soh_raw`); `tools/analyze_drive_logs.py` then takes speed from the odometer |
 | `speed_max_kph` | number | max of the 1 s speed samples in the row, km/h |
 | `alt_delta_m` | number | GPS altitude change since the file started, m (head unit GPS, last fix under 10 s old). Only the altitude is used; no position or fix time is logged |
 | `drive_mode_raw` | int | drive mode pushed by the BCM service: 0 default, 1 normal, 2 sport, 3 eco, 4 snow (`BCMConstants.DriveMode`) |

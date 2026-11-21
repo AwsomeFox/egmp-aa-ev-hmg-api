@@ -242,7 +242,7 @@ Issue #13 (AwsomeFox/egmp-aa-ev-hmg-api): a 2022 EV6 AWD, US 260507, ~90k mi. 28
 - Highway data can't separate A from C. Any C from 0.35 to 0.45 with its fitted A matches within ~3 Wh/km.
 - The EV6 now gets **A = 180 N, C = 0.40 N/(m/s)²** (`CAR_ROAD_LOAD`). That is CdA ~0.65 m² against the Ioniq 5's ~0.80, and rolling resistance ~0.0085. With it, the model comes out 4 % high on the same stretches.
 - The sender picks the pair once per session from `ro.build.product` (`EvModelSender.carIndex`) and patches it into 2.1.1 (A, plus the cold penalty) and 2.3.1 (C, `ROAD_C_OFFSET`).
-- Other models keep the Ioniq 5 values until their logs say otherwise. The Ioniq 6 is the obvious next one: it is much sleeker, but there are no logs yet.
+- Other models keep the rolldown values until their logs say otherwise. The Ioniq 5 got its own pair from issue #22 (see "Field findings (2026-11-21)"). The Ioniq 6 is the obvious next one: it is much sleeker, but there are no logs yet.
 
 Not changed:
 - **Stop-and-go city driving:** it uses ~20 % more than the steady-speed model on both the EV6 and a 2023 Ioniq 5's city logs. Maps plans that part itself.
@@ -265,10 +265,32 @@ Not changed:
 - A sample is now energy × (100 − 2.3) ÷ (SOC − 2.3): the energy at 100 % display. That is 63.4 kWh on the EV6, 82 % of 77.4. The car's own health index reads 92–93 %, so it is not usable capacity.
 - The BMS energy dropped 1.6 kWh at ~13 % while parked (a recalibration). Low-SOC readings can jump.
 
+## Field findings (2026-11-21, a 2023 Ioniq 5's logs)
+
+Issue #22 (AwsomeFox/egmp-aa-ev-hmg-api): a 2023 Ioniq 5 SEL, US 260507, ~23k mi, egmp-aa-ev 0.7.0 on HMG-API. 58 logs over five days: ~780 km of interstate, out on one day and back two days later at ~114 km/h, 16–38 °C, mostly flat. Three DC stops and two AC sessions. `tools/analyze_drive_logs.py` reproduces every number here.
+
+**No speed in the logs.** The HMG-API build up to 0.8.2 never read speed or SOH: `speed_kph`, `speed_avg_kph`, `speed_max_kph` and `soh_raw` are empty in all 18,134 rows.
+- hscan's classes are in the `com.hkmc.ext.hcan` library, which isn't on the boot class path, and `HmgCar` resolved them from there. The NEMESIS build talks to `tm_hscan_service` by transaction number, so its logs (issue #13) have speed.
+- `HmgCar.hcanLoader()` now opens `/system/framework/com.hkmc.ext.hcan.jar`, as HMG-API's own vehicle service does, and the first failure is logged.
+- Road-load learning needs speed, so it never learned on the HMG-API build until this fix.
+- The analysis tool now falls back to the odometer's speed over ~60 s (`speed()`), so these logs can still be fitted.
+
+**Road load: the Ioniq 5 gets its own pair.** On 81 stretches of 10 km at 40 km/h and up, with the logged climate power taken out:
+- The rolldown values came out 16 % high (18 % at 90 km/h and up). It is the same out (+15 %) and back (+21 %), so not wind.
+- With C = 0.40, the fit is A = 190 N. The EV6's 180 N comes out 0.6 % low; 190 N comes out 1 % high (2 % at 90 km/h and up), a little margin.
+- This car's second-motor counters (`trip_mot2_raw`, `trip_gen2_raw`) read 0, so one motor drove. The rolldown car was a 2120 kg AWD. An AWD Ioniq 5's logs would show whether it needs more.
+- The Ioniq 5 (`NEEV`: NEEV, NEEV23 and NEEV23SE, US and Canada) now gets **A = 190 N, C = 0.40** (`CAR_ROAD_LOAD`). Other models keep the rolldown values.
+
+Not changed:
+- **Outside temperature:** these logs are all above 15 °C, so the cold road load and the heater table are untested. Climate power read 100–300 W from 15 to 35 °C, in line with the 400 W table (which includes electronics).
+- **DC:** 110–125 kW battery-side from 50 to 80 % on two stops (135–147 after a restart), against the model's 135 kW charger-side (~128 battery-side). Below 50 % it reached 195–204 kW battery-side with the pack at 23–29 °C, against 230 kW. A stop from 19 % with the pack at 17 °C ran 95–165 kW: Maps planned 10 min, it took 18.8.
+- **Preconditioning** never ran on these trips: each time it went from waiting to cancelling to done without the car reporting active. Worth its own look.
+- **Capacity:** parked rows fit 718 Wh/% × (SOC − 2.85 %), 69.7 kWh at 100 % display (OBD's SOH reads 100 %). The zero point is near the 2.3 % the model uses; low-SOC rows are few.
+
 ## On-car learning (road load)
 
 `RoadLearn` (gpm-ev/src, both builds) learns one number per car: a scale on the model's wheel power, A and C together.
-- **Input:** EvDriveLog hands it each 5 s log row, so it needs EV logs on.
+- **Input:** EvDriveLog hands it each 5 s log row, so it needs EV logs on, and rows with speed: the HMG-API build has them from the hscan fix (see "Field findings (2026-11-21)").
 - **Stretches:** a stretch is 10 km of driving with no charging and no gap over 30 s. One at an average of 60 km/h or more gives a sample: (energy used − drivetrain spin − measured climate) ÷ (the model's wheel power × 1.06).
 - **Speed:** the model's wheel power uses the logged speed scaled to the odometer distance. The display speed reads a few percent high, and v³ would carry that into the scale.
 - **Rejected samples:** a sample outside 0.4–2.0 is a bad stretch, such as a BMS energy jump, and is dropped.

@@ -173,7 +173,7 @@ confirmation) are routing logic, not plumbing; they stay in the mod. The log for
 - **Model list:** Ioniq 5 (NEEV, NEEV23, NEEV23SE; US; firmware 260507 or newer) and
   Ioniq 6 (CEEV; US 260903). The Ioniq 6 shares the 77.4-kWh E-GMP battery and charge
   baseline; live BMS energy learns its usable capacity. Until Ioniq 6 logs provide a
-  dedicated fit, its road load uses the conservative Ioniq 5 calibration. A new
+  dedicated fit, its road load uses the conservative Ioniq 5 rolldown. A new
   firmware needs HMG-API's map plus a new recipe (`tools/mkrecipe.py --sites ...`)
   if its Android Auto library changed.
 

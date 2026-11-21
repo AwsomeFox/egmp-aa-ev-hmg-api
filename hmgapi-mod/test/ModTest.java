@@ -238,6 +238,10 @@ public final class ModTest {
         check("no hook map: not ready", !HmgCar.ready());
         check("HEV read unknown", EvCar.hev(0x19, 0) == -1);
         check("speed unknown", Float.isNaN(EvCar.speedKph()));
+        // hscan's classes live in the hcan library, off the boot class path: they
+        // resolve through its jar (Dalvik), or this class's loader where it can't open
+        check("hscan classes: from the hcan library's jar", HmgCar.HCAN_JAR.equals("/system/framework/com.hkmc.ext.hcan.jar"));
+        check("no Dalvik: hscan falls back to the mod's loader", HmgCar.hcanLoader() == HmgCar.class.getClassLoader());
         check("climate unknown", Float.isNaN(EvCar.climate(EvCar.DATC_TEMP)));
         check("unit unknown", EvCar.climateUnitIsCelsius(1) == -1);
         check("no VIN", EvCar.vinModel().isEmpty());
