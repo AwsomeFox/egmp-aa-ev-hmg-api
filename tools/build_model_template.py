@@ -5,7 +5,7 @@ Starts from the Ford sample (reference/ford_ev_model.bin, a canonical protobuf
 per docs/ENERGY-MODEL.md) and:
 
   * battery.capacity_wh (1.4)        := 77400  (Ioniq 5 LR, 2022 US)
-  * battery.reserve_energy_wh (1.2)  := 2400   (~3% of capacity)
+  * battery.mass_kg (1.2)            := 2400   (vehicle mass, kg; was read as a Wh reserve)
   * battery.current_energy_wh (1.3)  := PLACEHOLDER, re-encoded as a 5-byte
                                         (non-canonical but legal) varint so the
                                         Java sender can overwrite it in place

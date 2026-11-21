@@ -226,8 +226,16 @@ public final class EvModelSender {
                 : Integer.MIN_VALUE) * sScale;
         writeFloatLe(msg, EvModelTemplate.ROAD_A_OFFSET, roadA);
         writeFloatLe(msg, EvModelTemplate.ROAD_C_OFFSET, sBaseC * sScale);
+        int hvac = hvacStep(EvCar.hev(HEV_FLAG_CLIMATE_W, SHARED_MAX_AGE_MS), EvCar.now());
+        msg[EvModelTemplate.HVAC_OFFSET] = (byte) hvac;
+        int packC = EvCar.packMinC();
+        if (packC != Integer.MIN_VALUE) {
+            sPackC = packC;
+        }
+        writeFloatLe(msg, EvModelTemplate.BATT_TEMP_OFFSET, sPackC != Integer.MIN_VALUE
+                ? (float) sPackC : EvModelTemplate.BATT_TEMP_PLACEHOLDER_C);
         int rc = sSource.send(msg);
-        if (sBatteryCurve) {
+        if (sSensor26) {
             sendBatteryCurve(wh, cap, halfPct);
         }
         sRoadA = roadA;
@@ -235,30 +243,99 @@ public final class EvModelSender {
                 + " Wh (" + capacitySource() + "), soc=" + halfPct
                 + "/200, enrg=" + sEnergyRaw + ", rc=" + rc
                 + ", out=" + (outOk ? String.valueOf(outC) : "?")
-                + "C, A=" + Math.round(roadA) + "N, " + EvCar.navSummary());
+                + "C, A=" + Math.round(roadA) + "N, hvac=" + hvac + ", pack="
+                + (sPackC != Integer.MIN_VALUE ? sPackC + "C" : "?") + ", " + EvCar.navSummary());
+    }
+
+    // ---- VEM v1.2 1.5 hvac_status and 1.8 battery_temp_c ----------------------
+
+    /** HEV DATC_CLMTPWRCNSMPTN_W: live climate power, ~20 W per unit (EvDriveLog, RoadLearn) */
+    static final int HEV_FLAG_CLIMATE_W = 0x4f;
+    static final float CLIMATE_W_PER_UNIT = 20f;
+    /** climate power at or above this is "on" (fans alone draw less) */
+    static final float HVAC_ON_W = 150f;
+    /** a new on/off state must hold this long before it is sent (Maps may re-route on a change) */
+    static final long HVAC_HOLD_MS = 60000;
+    /** VehicleInfo.HvacStatus */
+    static final int HVAC_UNKNOWN = 0, HVAC_OFF = 1, HVAC_ON = 2;
+
+    private static int sHvacSent = HVAC_UNKNOWN, sHvacSeen = -1;
+    private static long sHvacSeenAt;
+    /** last known pack temperature (cluster XEV_MIN_BATT_TEMP), C; kept when the packet goes stale */
+    private static volatile int sPackC = Integer.MIN_VALUE;
+
+    /**
+     * The hvac_status to send for this climate power reading (raw < 0: unknown), with
+     * HVAC_HOLD_MS of hysteresis. The first known state is sent at once.
+     */
+    static synchronized int hvacStep(int raw, long now) {
+        int s = raw < 0 ? HVAC_UNKNOWN : raw * CLIMATE_W_PER_UNIT >= HVAC_ON_W ? HVAC_ON : HVAC_OFF;
+        if (s == HVAC_UNKNOWN || s == sHvacSent) {
+            sHvacSeen = -1;
+            return sHvacSent;
+        }
+        if (sHvacSent == HVAC_UNKNOWN) {
+            sHvacSent = s;
+            sHvacSeen = -1;
+            return s;
+        }
+        if (s != sHvacSeen) {
+            sHvacSeen = s;
+            sHvacSeenAt = now;
+        } else if (now - sHvacSeenAt >= HVAC_HOLD_MS) {
+            sHvacSent = s;
+            sHvacSeen = -1;
+        }
+        return sHvacSent;
+    }
+
+    /** test hook */
+    static synchronized void resetHvac() {
+        sHvacSent = HVAC_UNKNOWN;
+        sHvacSeen = -1;
+        sPackC = Integer.MIN_VALUE;
     }
 
     // ---- the battery % curve (SocCurve) -------------------------------------
 
-    /** set by HmgApiEntry when sensor 26 is offered (setting on, library accepts it) */
+    /** set by HmgApiEntry: the curve is on (setting on, library accepts sensor 26) */
     private static volatile boolean sBatteryCurve;
+    /** set by HmgApiEntry: sensor 26 was offered (curve or trip settings) */
+    private static volatile boolean sSensor26;
+    /** the EV trip settings in sensor 26 (minimum arrival % at chargers, target % at the destination); 0: Maps' own */
+    private static volatile int sChargerPct, sDestPct;
 
     static void setBatteryCurve(boolean on) {
         sBatteryCurve = on;
     }
 
-    /** Sends the curve as its own 0x8003 message; never throws (the model went out already). */
+    static void setSensor26(boolean offered) {
+        sSensor26 = offered;
+    }
+
+    /** Can change mid-session (settings apply at once); 0 leaves the user's own Maps setting. */
+    static void setTripSettings(int chargerPct, int destPct) {
+        sChargerPct = SocCurve.clampPct(chargerPct, SocCurve.CHARGER_PCT_MAX);
+        sDestPct = SocCurve.clampPct(destPct, SocCurve.DEST_PCT_MAX);
+        sBatteryCurveLogged = false;
+    }
+
+    /** Sends sensor 26 (curve and/or trip settings) as its own 0x8003 message; never throws. */
     private static void sendBatteryCurve(int wh, int cap, int halfPct) {
         try {
-            if (cap <= 0 || halfPct <= 0) {
+            boolean curve = sBatteryCurve && cap > 0 && halfPct > 0;
+            int chg = sChargerPct, dst = sDestPct;
+            if (!curve && chg == 0 && dst == 0) {
                 return;
             }
-            float raw = wh * 100f / cap;
-            int rc = sSource.send(SocCurve.message(raw, halfPct / 2f));
+            float raw = curve ? wh * 100f / cap : 0f;
+            int rc = sSource.send(SocCurve.message(raw, halfPct / 2f, curve, chg, dst));
             if (rc != 0 || !sBatteryCurveLogged) {
                 sBatteryCurveLogged = true;
-                Log.i(TAG, "battery % curve sent: raw " + Math.round(raw * 10) / 10f
-                        + "% shows as " + halfPct / 2f + "%, rc=" + rc);
+                Log.i(TAG, "sensor 26 sent: " + (curve ? "battery % curve (raw " + Math.round(raw * 10) / 10f
+                        + "% shows as " + halfPct / 2f + "%)" : "no curve") + ", arrival at chargers "
+                        + (chg > 0 ? chg + "%" : "Maps'") + ", at the destination " + (dst > 0 ? dst + "%" : "Maps'")
+                        + ", rc=" + rc);
             }
         } catch (Throwable t) {
             Log.w(TAG, "battery % curve not sent: " + t);
@@ -629,11 +706,19 @@ public final class EvModelSender {
             writeFloatLe(aWant, 0, EvModelTemplate.ROAD_A_N);
             byte[] cWant = new byte[4];
             writeFloatLe(cWant, 0, EvModelTemplate.ROAD_C_N);
+            byte[] tWant = new byte[4];
+            writeFloatLe(tWant, 0, EvModelTemplate.BATT_TEMP_PLACEHOLDER_C);
             for (int i = 0; i < 4; i++) {
                 if (template[EvModelTemplate.ROAD_A_OFFSET + i] != aWant[i]
-                        || template[EvModelTemplate.ROAD_C_OFFSET + i] != cWant[i]) {
+                        || template[EvModelTemplate.ROAD_C_OFFSET + i] != cWant[i]
+                        || template[EvModelTemplate.BATT_TEMP_OFFSET + i] != tWant[i]) {
                     return false;
                 }
+            }
+            // hvac_status: tag (field 5, varint) then the placeholder byte 0
+            if (template[EvModelTemplate.HVAC_OFFSET - 1] != (byte) (5 << 3)
+                    || template[EvModelTemplate.HVAC_OFFSET] != 0) {
+                return false;
             }
             int width = EvModelTemplate.SCALE_WIDTH;
             int[] offs = EvModelTemplate.AXIS_OFFSETS;

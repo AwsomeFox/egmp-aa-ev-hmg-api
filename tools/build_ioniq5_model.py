@@ -4,13 +4,17 @@
 Replaces the Ford-derived prototype template with Ioniq 5 values per
 docs/ENERGY-MODEL.md:
 
-  block 1   battery: 77.4 kWh LR pack, ~3% reserve, live energy patched in
-            at runtime (fixed-width 5-byte varint, see placeholder below)
+  block 1   vehicle info (Google's VEM v1.2 VehicleInfo): mass, 77.4 kWh LR
+            pack, live energy patched in at runtime (fixed-width 5-byte
+            varint, see placeholder below), live HVAC state (1.5) and pack
+            temperature (1.8), max charging rate (1.10)
   block 2   road load from the owner's rolldown test:
             F(v) = 196 N + 0.493 N/(m/s)^2 * v^2   (B unfittable, set 0)
   block 3   drivetrain loss map: spin loss 300 W + 40 W/(m/s) plus 6% of
             wheel power  (~91% battery->wheel at 100 kW, matching Ford's map)
-  block 4   max DC charge power vs energy: E-GMP 800 V curve, ~235 kW peak,
+  block 4   (v1.2: max REGEN power vs energy; egmp has always sent the charge
+            curve here, the Ford sample's shape: car test #4 settles it)
+            max DC charge power vs energy: E-GMP 800 V curve, ~235 kW peak,
             160 kW to 80%, then the voltage taper (~50 kW avg 80-90%, ~22 kW
             avg 90-100%, the car's own charge-time estimate)
   block 5   battery internal loss: I^2R with R = 0.1 ohm at 650 V
@@ -25,7 +29,8 @@ docs/ENERGY-MODEL.md:
             97 kW to 90%).
             Each point is (Wh still needed to reach full, seconds to full),
             descending, like Ford's DC rows - NOT (energy, seconds from empty)
-  omitted   1.5, 1.8-1.12, 6, 9, 10 (the Ford sample works without them)
+  omitted   1.9 peak motor power and 1.11 heat pump (trim-dependent; v1.2
+            needs them only for "lightweight predictions"), 1.12, 6, 9, 10
 
 Capacity scaling: blocks 4.1 and 8.1 are defined for the 77.4 kWh reference
 pack, but charging limits follow SOC (BMS taper by cell voltage), not absolute
@@ -75,7 +80,14 @@ OUT_JAVA = (
 )
 
 CAPACITY_WH = 77400  # 2022 Ioniq 5 LR (US) reference pack; runtime sends the learned capacity
-RESERVE_WH = 2400    # ~3% of capacity
+# 1.2 is the vehicle's mass in kg (Google's VEM v1.2: VehicleInfo.mass_kilograms; Maps' demo
+# models send 2000-3175). Until 0.8.x egmp sent 2400 here as a "~3% reserve" Wh. A 2023 US
+# Ioniq 5 weighs 1,950 kg (RWD LR) to 2,115 kg (AWD LR) at curb; plus a driver and some load:
+MASS_KG = 2200
+# 1.5 HVAC status (0 unknown, 1 off, 2 on) and 1.8 battery temperature (C): live, patched
+# by EvModelSender (one byte at HVAC_OFFSET, float bits at BATT_TEMP_OFFSET).
+HVAC_PLACEHOLDER = 0
+BATT_TEMP_PLACEHOLDER_C = 25.0
 PLACEHOLDER_WH = 50000
 ENERGY_WIDTH = 5
 CAPACITY_WIDTH = 5   # runtime-patchable too (learned from BMS energy / SOC)
@@ -155,6 +167,9 @@ CHARGE_CURVE = [
     (75852, 17000),    # 98%
     (77400, 12000),    # 100% (90->100% at k = 0.813: 18.0 min)
 ]
+
+# 1.10 max charging rate (v1.2 VehicleInfo.maximum_charging_rate_watts): the curve's peak.
+MAX_CHARGING_RATE_W = max(p for _, p in CHARGE_CURVE)
 
 # Battery internal loss: I^2R, R = 0.1 ohm, ~650 V nominal.
 BL_OHM = 0.1
@@ -312,11 +327,14 @@ def gen_text() -> str:
     L = []
     a = L.append
     a("battery {")
-    a(f"  reserve_energy_wh {{ value: {RESERVE_WH} }}")
+    a(f"  mass_kg {{ value: {MASS_KG} }}")
     a(f"  current_energy_wh {{ value: {PLACEHOLDER_WH} }}")
     a(f"  capacity_wh {{ value: {CAPACITY_WH} }}")
+    a(f"  hvac_status: {HVAC_PLACEHOLDER}")
     a(f"  air_density: {AIR_DENSITY}")
     a(f"  outside_temp_c: {OUTSIDE_TEMP_C}")
+    a(f"  battery_temp_c: {BATT_TEMP_PLACEHOLDER_C}")
+    a(f"  max_charging_rate_w: {MAX_CHARGING_RATE_W}")
     a("}")
     a("road_load {")
     a(f"  a_n {{ value: {ROAD_LOAD[0]} }}")
@@ -332,9 +350,9 @@ def gen_text() -> str:
             a(f"    points {{ x: {p} y {{ value: {loss} }} }}")
         a("  }")
     a("}")
-    a("charge_limits {")
+    a("max_regen_power {")
     for e, p in CHARGE_CURVE:
-        a(f"  max_charge_power {{ energy_wh: {e} power_w: {p} }}")
+        a(f"  at_energy {{ energy_wh: {e} power_w: {p} }}")
     a("}")
     a("battery_loss {")
     for p in BL_POWERS_W:
@@ -342,7 +360,7 @@ def gen_text() -> str:
         a(f"  points {{ x: {p} y {{ value: {loss} }} }}")
     a("}")
     for t, w in AUX_TABLE:
-        a(f"aux_power {{ outside_temp_c: {t} power4_w {{ value: {w} }} }}")
+        a(f"aux_drain_at_temp {{ outside_temp_c: {t} total_drain_w {{ value: {w} }} }}")
     a("charge_time {")
     for c in CHARGERS_W:
         a("  by_charger_power {")
@@ -386,7 +404,7 @@ def widen_runtime_fields(model: bytearray) -> tuple[int, int]:
     assert set(top) == {1, 2, 3, 4, 5, 7, 8}, f"unexpected top fields {sorted(top)}"
     batt = top[1]
     bf = parse_fields(model, batt.val_off, batt.val_off + batt.val_len)
-    assert set(bf) == {2, 3, 4, 6, 7}, f"unexpected battery fields {sorted(bf)}"
+    assert set(bf) == {2, 3, 4, 5, 6, 7, 8, 10}, f"unexpected battery fields {sorted(bf)}"
     energy_off = widen_quantity(model, bf, batt, 3, ENERGY_WIDTH)
     bf = parse_fields(model, batt.val_off, batt.val_off + batt.val_len)
     cap_off = widen_quantity(model, bf, batt, 4, CAPACITY_WIDTH)
@@ -396,8 +414,8 @@ def widen_runtime_fields(model: bytearray) -> tuple[int, int]:
 # Message fields to descend into, and the varints to widen, by field path.
 _SCALE_MSGS = {(4,), (4, 1), (8,), (8, 1), (8, 1, 2)}
 _SCALE_VARINTS = {
-    (4, 1, 1): "axis",      # charge_limits.max_charge_power.energy_wh
-    (4, 1, 2): "power",     # charge_limits.max_charge_power.power_w (learned per car: ChargeLearn)
+    (4, 1, 1): "axis",      # max_regen_power.at_energy.energy_wh (filled with the charge curve)
+    (4, 1, 2): "power",     # max_regen_power.at_energy.power_w (learned per car: ChargeLearn)
     (8, 1, 2, 1): "axis",   # charge_time...points.energy_wh (headroom to full)
     (8, 1, 2, 2): "time",   # charge_time...points.seconds (time to full)
 }
@@ -498,12 +516,13 @@ def verify(model: bytes, canonical: bytes) -> None:
     for num in (2, 3, 4):
         q = parse_fields(model, bf[num].val_off, bf[num].val_off + bf[num].val_len)[1]
         vals[num] = read_varint(model, q.val_off)[0]
-    assert vals == {2: RESERVE_WH, 3: PLACEHOLDER_WH, 4: CAPACITY_WH}, vals
+    assert vals == {2: MASS_KG, 3: PLACEHOLDER_WH, 4: CAPACITY_WH}, vals
     # protoc must accept the widened result and see exactly the values of the
     # canonical encoding (i.e. unchanged at k = 1)
     txt = protoc_decode(model)
     assert txt == protoc_decode(canonical), "widened model decodes differently"
-    for want in (f"value: {RESERVE_WH}", f"value: {PLACEHOLDER_WH}",
+    for want in (f"value: {MASS_KG}", f"value: {PLACEHOLDER_WH}",
+                 f"max_charging_rate_w: {MAX_CHARGING_RATE_W}", "hvac_status: 0",
                  f"value: {CAPACITY_WH}", "value: 196", "value: 0.493"):
         assert want in txt, want
 
@@ -534,6 +553,12 @@ def main() -> int:
     bf = parse_fields(model, batt.val_off, batt.val_off + batt.val_len)
     assert bf[7].wire == 5 and bf[7].val_len == 4
     temp_off_in_model = bf[7].val_off
+    # battery.hvac_status (field 5, varint, one byte) and battery_temp_c (field 8, float)
+    assert bf[5].wire == 0 and bf[5].val_len == 1 and model[bf[5].val_off] == HVAC_PLACEHOLDER
+    hvac_off_in_model = bf[5].val_off
+    assert bf[8].wire == 5 and bf[8].val_len == 4
+    assert struct.unpack("<f", model[bf[8].val_off:bf[8].val_off + 4])[0] == BATT_TEMP_PLACEHOLDER_C
+    btemp_off_in_model = bf[8].val_off
     # road_load.a_n.value (2.1.1, float) - cold road load patch point
     rl = top[2]
     rf = parse_fields(model, rl.val_off, rl.val_off + rl.val_len)
@@ -557,11 +582,14 @@ def main() -> int:
     energy_off += hdr
     cap_off += hdr
     temp_off = temp_off_in_model + hdr
+    hvac_off = hvac_off_in_model + hdr
+    btemp_off = btemp_off_in_model + hdr
     a_off = a_off_in_model + hdr
     c_off = c_off_in_model + hdr
     print(f"model {len(model)} bytes, batch {len(batch)} bytes "
           f"(model {size_battery_only} before widening the 4.1/8.1 varints); "
           f"offsets: energy@{energy_off} capacity@{cap_off} temp@{temp_off} "
+          f"hvac@{hvac_off} packTemp@{btemp_off} "
           f"roadA@{a_off} roadC@{c_off}; {len(axis_marks)} energy-axis + {len(time_marks)} "
           f"seconds varints scaled at runtime")
     scale_java = (
@@ -619,6 +647,9 @@ def main() -> int:
         "    static final int ENERGY_WIDTH = %d;\n"
         "    static final int ENERGY_PLACEHOLDER_WH = %d;\n"
         "    static final int TEMP_OFFSET = %d;  // outside_temp_c float bits\n"
+        "    static final int HVAC_OFFSET = %d;  // hvac_status, one varint byte: 0 unknown, 1 off, 2 on\n"
+        "    static final int BATT_TEMP_OFFSET = %d;  // battery_temp_c float bits\n"
+        "    static final float BATT_TEMP_PLACEHOLDER_C = %rf;\n"
         "    static final String MODEL_REV = \"%s\";  // sha1 of the batch, short\n"
         "    static final int ROAD_A_OFFSET = %d;  // road_load.a_n float bits\n"
         "    static final float ROAD_A_N = %rf;\n"
@@ -648,7 +679,7 @@ def main() -> int:
         "    private EvModelTemplate() {}\n"
         "}\n"
         % (CAPACITY_WH, cap_off, CAPACITY_WIDTH, energy_off, ENERGY_WIDTH,
-           PLACEHOLDER_WH, temp_off, model_rev, a_off, ROAD_LOAD[0], c_off, ROAD_LOAD[2],
+           PLACEHOLDER_WH, temp_off, hvac_off, btemp_off, BATT_TEMP_PLACEHOLDER_C, model_rev, a_off, ROAD_LOAD[0], c_off, ROAD_LOAD[2],
            car_p, car_a, car_c, DL_SPIN_W, DL_SPIN_W_PER_MPS, DL_FRACTION,
            ENERGY_ZERO_PCT, cold_t, cold_a,
            SCALE_WIDTH, scale_java, lines[0], concat)
