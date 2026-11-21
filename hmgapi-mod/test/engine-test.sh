@@ -216,7 +216,9 @@ PY
         else r=$(java -cp "$CP:$D" R "$ours" 2>&1); rc=$?
         fi
         set -e
-        has "recipe ev-sensor-$suffix parses (4 verify, 3 patch)" "4 verify, 3 patch" "$r"
+        # 4 verify / 3 patch, plus one of each where the recipe also widens the connector types (NACS)
+        nv=$(grep -c '^verify' "$ours"); np=$(grep -c '^patch' "$ours")
+        has "recipe ev-sensor-$suffix parses ($nv verify, $np patch)" "$nv verify, $np patch" "$r"
         [ -f "$wireless" ] && has "recipe ev-sensor-$suffix clear of the matching Wireless recipe" "clear of aa-tbt-$suffix" "$r"
         [ $rc -eq 0 ] || { echo "FAIL  recipe check: $r"; fail=1; }
     done
