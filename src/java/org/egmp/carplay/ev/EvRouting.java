@@ -14,6 +14,7 @@ public final class EvRouting extends ModEntry {
     private Class<?> part;
     private CarPlayIdentification identityApi;
     private CarPlayIdentification.VehicleIdentity identityContribution;
+    private int batteryCapacityOverrideWh;
     public void zygoteInit(ModContext mod) throws Throwable {
         sessionMd5=ModContext.md5("/system/lib/libiap2session.so");
         librariesMatch=SESSION_MD5.equals(sessionMd5);
@@ -25,7 +26,14 @@ public final class EvRouting extends ModEntry {
         } finally {in.close();}
         identityApi=identityApi(mod);
         identityContribution=vehicleIdentity(new JSONObject(profile));
+        batteryCapacityOverrideWh=batteryCapacityOverride(mod.settingString("battery_capacity_wh_override","auto"));
+        mod.log("CarPlayEV battery_capacity_setting="+(batteryCapacityOverrideWh==0?"automatic_bms":batteryCapacityOverrideWh+"_wh_override"));
         if(identityApi!=null)identityApi.registerVehicle(mod.id,identityContribution);
+    }
+    private static int batteryCapacityOverride(String value) {
+        if(value==null || "auto".equals(value))return 0;
+        try {int wh=Integer.parseInt(value);if(wh>0)return wh;}catch(NumberFormatException ignored){}
+        throw new IllegalArgumentException("invalid battery_capacity_wh_override="+value);
     }
     private static CarPlayIdentification identityApi(ModContext mod) {
         Object published=mod.use("wireless-carplay-aa",CarPlayIdentification.SERVICE);
@@ -66,7 +74,7 @@ public final class EvRouting extends ModEntry {
                 // All native calls must resolve in the app-part loader.
                 Class<?> bridge=mod.appPart(app,"org.egmp.carplay.ev.app.NativeBridge");
                 bridge.getMethod("load",String.class).invoke(null,"/system/lib/libcarplayev.so");
-                part.getMethod("start",ModContext.class,LoadedApp.class,Object.class,String.class).invoke(null,mod,app,p.thisObject,profile);
+                part.getMethod("start",ModContext.class,LoadedApp.class,Object.class,String.class,int.class).invoke(null,mod,app,p.thisObject,profile,Integer.valueOf(batteryCapacityOverrideWh));
             }
         });
         mod.hook(app.classLoader,"iap2.service.on_destroy",new MethodHook(){

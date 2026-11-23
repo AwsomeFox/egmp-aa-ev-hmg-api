@@ -12,7 +12,9 @@ To watch while connected:
 adb logcat -v threadtime -s HMG-API:I CarPlayEV:I AndroidRuntime:E
 ```
 
-`native_send=0` means the stock native sender accepted the message; it does not independently prove receipt/acceptance by the iPhone. Sent SOC, energy, range, selected BMS capacity profile, warning, full-range estimate, auxiliary watts/source and contract model IDs are logged. Before capacity resolves, the retry error names `BMS_EVENERGYCAPA`, reports an unlisted detected capacity when applicable, and confirms that no EV status was sent.
+`status sent: result=0` means the stock native sender accepted the message; it does not independently prove receipt/acceptance by the iPhone. The compact recurring line contains SOC, energy, range, optional full-range estimate, auxiliary watts/source and the low-battery state. Contract model IDs and battery-profile details are not repeated.
+
+Battery-profile selection is logged once. Automatic selection reports the BMS energy capacity, selected profile and difference; a manual override identifies itself as the source. An unexpected BMS capacity is emitted through HMG-API's error channel, so it appears red in HMG-API's log viewer. Identical retry failures are suppressed until the condition changes. The error reports the nearest profile, difference and ±1,000 Wh tolerance when applicable, and confirms that EV status is unavailable.
 
 When the optional NEMESIS wrapper can identify its actual USB source, it writes `NEMESIS-report-carplay.ev-routing/` there, including product, expected/observed hashes and input copies of Iap2ServerApp APK/ODEX and libiap2session.so. Keep those OEM files private; send them only intentionally for compatibility analysis. USB removal or an unidentified source prevents USB export, not installation logging. Nothing is uploaded automatically.
 

@@ -2,7 +2,7 @@
 
 While subscribed, read SOC/range from HSCAN and auxiliary power from the HEV service every ten seconds. Auxiliary watts = 20 × climate + 10 × electronics + 20 × battery compressor + 100 × battery heater. Reject invalid/sentinel readings instead of treating them as zero. Source CAN-cache freshness is not independently established.
 
-Nominal capacity comes from the HEV service's `BMS_EVENERGYCAPA` value (transaction 3, flag `0x35`, raw value × 2 Wh). Runtime uses the exact result to select a pre-generated capacity profile: Ioniq 5 accepts 58,000, 72,600, 77,400 or 84,000 Wh; EV6 accepts 58,000, 77,400 or 84,000 Wh. Until a listed capacity is available, no EV status is sent and the worker retries every ten seconds. Once resolved, the selection is retained for the session and logged as `max_wh=... battery_source=bms_evenergycapa_profile_<Wh>`.
+Nominal capacity comes from the HEV service's `BMS_EVENERGYCAPA` value (transaction 3, flag `0x35`, raw value × 2 Wh). Runtime selects the nearest pre-generated capacity profile within ±1,000 Wh: Ioniq 5 offers 58,000, 72,600, 77,400 or 84,000 Wh; EV6 offers 58,000, 77,400 or 84,000 Wh. Ties and larger differences are rejected. Until a profile resolves, no EV status is sent and the worker retries every ten seconds. When a profile is selected, one log event records the reported Wh, selected profile Wh and their difference; the recurring status message does not repeat them.
 
 HSCAN failures omit live battery/range fields; auxiliary reads remain independent. A successful SOC/range sample expires after 15 seconds within a polling operation. Current Wh and full-charge range are estimates from SOC and the BMS-reported nominal capacity.
 

@@ -145,7 +145,7 @@ class Package(unittest.TestCase):
   for line in (STAGE/'payload/profiles.tsv').read_text().splitlines():
    prefix,firmware,name,expected=line.split();p=STAGE/'payload'/name;self.assertEqual(hashlib.md5(p.read_bytes()).hexdigest(),expected)
    with zipfile.ZipFile(p) as z:
-    self.assertIsNone(z.testzip());meta=json.loads(z.read('mod.json'));self.assertEqual(meta['version'],CONFIG['version']);self.assertEqual(meta['hmgapi'],'>=1.1.0-rc.3 <2.0.0');self.assertEqual(meta['requires'],['wireless-carplay-aa >=2.2.0-rc.4 <3.0.0']);self.assertNotIn('hooks.jar',z.namelist());manifest=json.loads(z.read('META-HMGAPI/manifest.json'));self.assertEqual(manifest['uuid'],CONFIG['author_uuid'])
+    self.assertIsNone(z.testzip());meta=json.loads(z.read('mod.json'));self.assertEqual(meta['version'],CONFIG['version']);self.assertEqual(meta['hmgapi'],'>=1.1.0-rc.3 <2.0.0');self.assertEqual(meta['requires'],['wireless-carplay-aa >=2.2.0-rc.4 <3.0.0']);self.assertNotIn('hooks.jar',z.namelist());manifest=json.loads(z.read('META-HMGAPI/manifest.json'));self.assertEqual(manifest['uuid'],CONFIG['author_uuid']);self.assertIn('settings.json',z.namelist());self.assertIn('settings.json',manifest['files'])
     for n,h in manifest['files'].items():self.assertEqual(hashlib.sha256(z.read(n)).hexdigest(),h)
     self.assertEqual(hashlib.sha256(z.read('files/libcarplayev.so')).hexdigest(),json.loads((R/'out/build-report.json').read_text())['native_sha256'])
  def test_single_native_download_contains_both_profiles(self):
@@ -154,10 +154,13 @@ class Package(unittest.TestCase):
   with zipfile.ZipFile(native) as z:
    self.assertIn('mod.json',z.namelist());self.assertIn('META-HMGAPI/signature',z.namelist());self.assertNotIn('NEMESIS.data',z.namelist())
    meta=json.loads(z.read('mod.json'));self.assertEqual(meta['system'],[{'model':['NEEV23','NEEV','CVEV']}])
+   setting=json.loads(z.read('settings.json'))['settings'][0];self.assertEqual(setting['key'],'battery_capacity_wh_override');self.assertEqual(setting['default'],'auto')
+   offered={o['value'] for o in setting['options']};self.assertEqual(offered,{'auto','58000','72600','77400','84000'})
    expected={'NEEV23':[58000,72600,77400,84000],'NEEV':[58000,72600,77400,84000],'CVEV':[58000,77400,84000]}
    for entry in CONFIG['profiles']:
     name='profiles/'+entry['model'].lower()+'.json';self.assertIn(name,z.namelist());profile=json.loads(z.read(name));self.assertEqual(profile['supported_capacities_wh'],expected[entry['model']]);self.assertEqual(sorted(map(int,profile['capacity_profiles'])),expected[entry['model']])
     for capacity in expected[entry['model']]:self.assertEqual(profile['capacity_profiles'][str(capacity)]['charging_contract']['vehicle_parameters']['vehicle_energy_axis_wh'][-1],capacity)
+   self.assertEqual(offered-{'auto'},set().union(*(set(map(str,v)) for v in expected.values())))
   for entry in CONFIG['profiles']:self.assertFalse((R/'dist'/(stem+'-'+entry['model'].lower()+'-usa-'+entry['firmware']+'.zip')).exists())
  def test_usb_and_source_allowlist(self):
   stem='egmp-carplay-ev-routing-v'+CONFIG['version']

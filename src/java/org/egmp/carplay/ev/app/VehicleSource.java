@@ -7,6 +7,7 @@ import org.json.*;
 public final class VehicleSource {
     static final long AUXILIARY_WINDOW_NS=60000000000L;
     static final int AUXILIARY_ROUND_W=25;
+    static final int CAPACITY_TOLERANCE_WH=1000;
     public static final class Snapshot {
         public final int[] values;
         public final byte[] charging,consumption;
@@ -21,6 +22,7 @@ public final class VehicleSource {
     private final String consumption;
     private int maxWh;
     private String charging,batterySource="unresolved";
+    private String batterySelectionEvent;
     public final String displayName;
     public final int dcW,acW;
     private Object adapter,binder;
@@ -43,7 +45,8 @@ public final class VehicleSource {
         }
         boolean hasAverage(){return averaged;}
     }
-    public VehicleSource(Object service,String source) throws Exception {
+    public VehicleSource(Object service,String source) throws Exception {this(service,source,0);}
+    public VehicleSource(Object service,String source,int batteryCapacityOverrideWh) throws Exception {
         this.service=service;JSONObject p=new JSONObject(source);
         if(p.getInt("schema_version")!=1)throw new IllegalArgumentException("profile schema");
         displayName=p.getJSONObject("vehicle").getString("display_name");
@@ -65,6 +68,18 @@ public final class VehicleSource {
         double aux=co.getJSONObject("vehicle_parameters").getDouble("vehicle_auxiliary_power_w");
         if(Double.isNaN(aux) || Double.isInfinite(aux) || aux<0 || aux>30000)throw new IllegalArgumentException("auxiliary default");
         auxiliaryAverage=new AuxiliaryAverage((int)Math.round(aux));
+        if(batteryCapacityOverrideWh!=0)resolveOverride(batteryCapacityOverrideWh);
+    }
+    static int selectCapacity(JSONObject profiles,int reported) throws Exception {
+        JSONArray names=profiles.names();if(names==null || names.length()==0)throw new IOException("no capacity profiles");
+        int best=0,bestDifference=Integer.MAX_VALUE;boolean tied=false;
+        for(int i=0;i<names.length();i++){
+            int candidate=Integer.parseInt(names.getString(i));int difference=Math.abs(candidate-reported);
+            if(difference<bestDifference){best=candidate;bestDifference=difference;tied=false;}
+            else if(difference==bestDifference)tied=true;
+        }
+        if(tied || bestDifference>CAPACITY_TOLERANCE_WH)throw new IOException("unexpected BMS energy capacity: reported="+reported+" Wh, nearest profile="+best+" Wh, difference="+bestDifference+" Wh, tolerance="+CAPACITY_TOLERANCE_WH+" Wh, supported="+names+(tied?", ambiguous tie":""));
+        return best;
     }
     static String selectCharging(JSONObject profiles,int capacity) throws Exception {
         JSONObject selected=profiles.optJSONObject(String.valueOf(capacity));
@@ -74,9 +89,20 @@ public final class VehicleSource {
         if(contract.getInt("model_id")!=12582922 || values.getJSONArray("vehicle_energy_axis_wh").getInt(10)!=capacity)throw new IOException("invalid capacity profile "+capacity);
         String encoded=contract.toString();bounded(encoded);return encoded;
     }
-    private void resolveBattery(int capacity) throws Exception {
-        charging=selectCharging(capacityProfiles,capacity);maxWh=capacity;batterySource="bms_evenergycapa_profile_"+capacity;
+    private void resolveBattery(int reported) throws Exception {
+        int selected=selectCapacity(capacityProfiles,reported),difference=Math.abs(selected-reported);
+        charging=selectCharging(capacityProfiles,selected);maxWh=selected;
+        batterySource="bms_evenergycapa_reported_"+reported+"_profile_"+selected+"_difference_"+difference;
+        batterySelectionEvent="battery profile selected: source=BMS reported="+reported+" Wh, profile="+selected+" Wh, difference="+difference+" Wh";
     }
+    private void resolveOverride(int selected) throws Exception {
+        try {charging=selectCharging(capacityProfiles,selected);}
+        catch(IOException failure){throw new IOException("unsupported battery capacity override capacity_wh="+selected+" supported="+capacityProfiles.names());}
+        maxWh=selected;batterySource="settings_override_profile_"+selected;
+        batterySelectionEvent="battery profile selected: source=settings override, profile="+selected+" Wh";
+    }
+    String batterySelection(){return maxWh==0?"automatic_bms":batterySource;}
+    synchronized String takeBatterySelectionEvent(){String event=batterySelectionEvent;batterySelectionEvent=null;return event;}
     public static String readFile(String path) throws Exception {
         InputStream in=new FileInputStream(path);
         try {ByteArrayOutputStream out=new ByteArrayOutputStream();byte[] b=new byte[4096];int n;
@@ -127,10 +153,10 @@ public final class VehicleSource {
         Exception capacityFailure=null;
         try {
             if(hev(27,null)!=2)throw new IOException("CAN generation");
-            if(maxWh==0){int raw=hev(3,0x35);long wh=(long)raw*2L;if(wh<10000 || wh>200000)throw new IOException("BMS_EVENERGYCAPA invalid raw="+raw+" wh="+wh);resolveBattery((int)wh);}
+            if(maxWh==0){int raw=hev(3,0x35);long wh=(long)raw*2L;if(wh<10000 || wh>200000)throw new IOException("unexpected BMS energy capacity: raw="+raw+", reported="+wh+" Wh");resolveBattery((int)wh);}
             auxiliarySample=Integer.valueOf(auxiliary(hev(3,0x4f),hev(3,0x24),hev(3,0x33),hev(3,0x43)));
         } catch(Exception failure){binder=null;capacityFailure=failure;}
-        if(maxWh==0)throw new IOException("battery capacity unresolved; no EV status sent; will retry: "+(capacityFailure==null?"BMS_EVENERGYCAPA unavailable":capacityFailure.getMessage()));
+        if(maxWh==0)throw new IOException(capacityFailure==null?"BMS energy capacity unavailable":capacityFailure.getMessage());
         long now=System.nanoTime();if(!fresh(sampledNs,now)){soc=null;range=null;}
         int publishedAuxiliary=auxiliaryAverage.update(auxiliarySample,now);
         return encode(minWh,maxWh,charging,consumption,soc,range,Integer.valueOf(publishedAuxiliary),auxiliaryAverage.hasAverage(),batterySource);
