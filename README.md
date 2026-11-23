@@ -30,6 +30,8 @@ After adding your vehicle, select it when planning driving directions. Maps can 
 
 The installer no longer rejects these model families solely because of region or firmware version. An exact `libiap2session.so` hash and a resolving HMG-API map are still required, so an unknown native layout remains inactive. `libiap2client.so` is not used or checked. Broader installation compatibility does not establish calibration accuracy for every battery, region or firmware.
 
+Battery capacity is selected at runtime from pre-generated profiles using the car's `BMS_EVENERGYCAPA` signal. Ioniq 5 includes 58, 72.6, 77.4 and 84 kWh variants; EV6 includes 58, 77.4 and 84 kWh variants. An unavailable or unlisted capacity is retried and no EV status is sent until an exact profile is selected.
+
 Live SOC and range are sent every ten seconds while subscribed. Auxiliary power is sampled at the same cadence, averaged over one-minute windows, rounded to the nearest 25 W and changed in the sent consumption contract only once per minute. Energy and full-charge range are estimates. Charging state, active connector and temperature are omitted. Renaming and other contract updates are not implemented.
 
 Logs rotate between two 512 KiB files and can be exported by NEMESIS. The optional NEMESIS wrapper also writes USB install diagnostics; native HMG-API imports do not run that hook.

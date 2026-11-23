@@ -2,7 +2,9 @@
 
 - Accept Ioniq 5 (`NEEV23`, `NEEV`) and EV6 (`CVEV`) by model family without restricting region or firmware version.
 - Retain the resolving HMG-API map, required hook points and both exact native-library hashes as mandatory fail-closed compatibility checks.
-- Continue using the existing fixed 77.4 kWh profiles; broader installation compatibility does not establish battery-profile or calibration accuracy on every vehicle.
+- Add checked-in Ioniq 5 profiles for 58, 72.6, 77.4 and 84 kWh and EV6 profiles for 58, 77.4 and 84 kWh, generated once from the existing 77.4 kWh model.
+- Read `BMS_EVENERGYCAPA` at runtime to select an exact prepared capacity profile. No profile scaling occurs on the head unit; unavailable, invalid or unlisted values cause a retry without sending EV status.
+- Broader installation compatibility and capacity selection do not establish calibration accuracy on every vehicle.
 - Reject other model families, including Ioniq 6 (`CEEV`).
 
 The code and runtime behavior are otherwise unchanged from v0.5.0.

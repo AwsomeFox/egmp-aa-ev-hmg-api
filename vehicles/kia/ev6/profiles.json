@@ -1,0 +1,288 @@
+{
+  "schema_version": 1,
+  "profile_id": "kia.ev6.us.77kwh",
+  "profile_version": 1,
+  "vehicle": {
+    "manufacturer": "Kia",
+    "model": "EV6",
+    "market": "US",
+    "default_display_name": "Kia EV6",
+    "display_name": "Kia EV6"
+  },
+  "battery": {
+    "minimum_energy_wh": 0,
+    "maximum_energy_wh": 77400
+  },
+  "connectors": [
+    {
+      "type": "ccs1",
+      "maximum_power_w": 235000
+    },
+    {
+      "type": "j1772",
+      "maximum_power_w": 10900
+    }
+  ],
+  "charging_contract": {
+    "model_id": 12582922,
+    "vehicle_parameters": {
+      "vehicle_energy_axis_wh": [
+        0,
+        20000,
+        38700,
+        41022,
+        61920,
+        62694,
+        65790,
+        69660,
+        73530,
+        75852,
+        77400
+      ],
+      "vehicle_charge_axis_w": [
+        230000,
+        235000,
+        228000,
+        160000,
+        160000,
+        70000,
+        48500,
+        33500,
+        25500,
+        17000,
+        12000
+      ],
+      "energy_w_per_h": [
+        0,
+        3650,
+        7350,
+        11300,
+        15100,
+        18700,
+        22600,
+        26350,
+        30150,
+        34050,
+        37850,
+        41600,
+        45400,
+        49400,
+        53050,
+        57150,
+        60950,
+        64950,
+        68750,
+        72750,
+        77050
+      ],
+      "efficiency_factor": 0.95
+    }
+  },
+  "consumption_contract": {
+    "model_id": 12582921,
+    "vehicle_parameters": {
+      "vehicle_auxiliary_power_w": 400.0,
+      "vehicle_consumption_values_wh_per_m": [
+        0.2254000186920166,
+        0.18230000734329224,
+        0.19320000410079957,
+        0.21390001773834227,
+        0.1721000075340271,
+        0.1721000075340271,
+        0.18310000896453857,
+        0.2052000045776367,
+        0.2266000032424927,
+        0.25840001106262206
+      ],
+      "vehicle_altitude_gain_consumption_wh_per_m": 6.42,
+      "vehicle_altitude_loss_consumption_wh_per_m": 4.33
+    }
+  },
+  "calibration": {
+    "status": "unvalidated",
+    "copied_from": "hyundai.ioniq5.us.77kwh",
+    "note": "Temporary Ioniq 5 values; likely inaccurate for EV6."
+  },
+  "reference_capacity_wh": 77400,
+  "supported_capacities_wh": [
+    58000,
+    77400,
+    84000
+  ],
+  "capacity_profiles": {
+    "58000": {
+      "maximum_energy_wh": 58000,
+      "charging_contract": {
+        "model_id": 12582922,
+        "vehicle_parameters": {
+          "vehicle_energy_axis_wh": [
+            0,
+            14987,
+            29000,
+            30740,
+            46400,
+            46980,
+            49300,
+            52200,
+            55100,
+            56840,
+            58000
+          ],
+          "vehicle_charge_axis_w": [
+            230000,
+            235000,
+            228000,
+            160000,
+            160000,
+            70000,
+            48500,
+            33500,
+            25500,
+            17000,
+            12000
+          ],
+          "energy_w_per_h": [
+            0,
+            2735,
+            5508,
+            8468,
+            11315,
+            14013,
+            16935,
+            19745,
+            22593,
+            25516,
+            28363,
+            31173,
+            34021,
+            37018,
+            39753,
+            42826,
+            45673,
+            48671,
+            51518,
+            54516,
+            57738
+          ],
+          "efficiency_factor": 0.95
+        }
+      }
+    },
+    "77400": {
+      "maximum_energy_wh": 77400,
+      "charging_contract": {
+        "model_id": 12582922,
+        "vehicle_parameters": {
+          "vehicle_energy_axis_wh": [
+            0,
+            20000,
+            38700,
+            41022,
+            61920,
+            62694,
+            65790,
+            69660,
+            73530,
+            75852,
+            77400
+          ],
+          "vehicle_charge_axis_w": [
+            230000,
+            235000,
+            228000,
+            160000,
+            160000,
+            70000,
+            48500,
+            33500,
+            25500,
+            17000,
+            12000
+          ],
+          "energy_w_per_h": [
+            0,
+            3650,
+            7350,
+            11300,
+            15100,
+            18700,
+            22600,
+            26350,
+            30150,
+            34050,
+            37850,
+            41600,
+            45400,
+            49400,
+            53050,
+            57150,
+            60950,
+            64950,
+            68750,
+            72750,
+            77050
+          ],
+          "efficiency_factor": 0.95
+        }
+      }
+    },
+    "84000": {
+      "maximum_energy_wh": 84000,
+      "charging_contract": {
+        "model_id": 12582922,
+        "vehicle_parameters": {
+          "vehicle_energy_axis_wh": [
+            0,
+            21705,
+            42000,
+            44520,
+            67200,
+            68040,
+            71400,
+            75600,
+            79800,
+            82320,
+            84000
+          ],
+          "vehicle_charge_axis_w": [
+            230000,
+            235000,
+            228000,
+            160000,
+            160000,
+            70000,
+            48500,
+            33500,
+            25500,
+            17000,
+            12000
+          ],
+          "energy_w_per_h": [
+            0,
+            3961,
+            7977,
+            12264,
+            16388,
+            20295,
+            24527,
+            28597,
+            32721,
+            36953,
+            41078,
+            45147,
+            49271,
+            53612,
+            57574,
+            62023,
+            66147,
+            70488,
+            74612,
+            78953,
+            83620
+          ],
+          "efficiency_factor": 0.95
+        }
+      }
+    }
+  }
+}

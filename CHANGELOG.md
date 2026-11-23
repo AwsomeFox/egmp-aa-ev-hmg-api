@@ -3,6 +3,7 @@
 - Accept the existing Ioniq 5 (`NEEV23`, `NEEV`) and EV6 (`CVEV`) profiles without restricting the firmware region or version. A resolving HMG-API map and the exact `libiap2session.so` hash remain mandatory.
 - Make native-hash refusal logs identify the mismatched file and show its expected and actual hashes explicitly.
 - Remove the stale `libiap2client.so` hash requirement. The mod does not load, patch or call that library.
+- Add pre-generated 58, 72.6, 77.4 and 84 kWh Ioniq 5 profiles and 58, 77.4 and 84 kWh EV6 profiles. Runtime reads `BMS_EVENERGYCAPA` to select an exact bundled profile; it performs no on-car scaling and retries without sending EV status while the signal is unavailable, invalid or unsupported.
 
 # 0.5.0 — experimental
 

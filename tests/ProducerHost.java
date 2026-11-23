@@ -30,6 +30,15 @@ public final class ProducerHost {
         new VehicleSource(null,profile);
         JSONObject p=new JSONObject(profile);
         String ch=p.getJSONObject("charging_contract").toString(),co=p.getJSONObject("consumption_contract").toString();
+        JSONObject variants=p.getJSONObject("capacity_profiles");
+        check(p.getJSONArray("supported_capacities_wh").toString().equals("[58000,72600,77400,84000]"),"Ioniq 5 compiled capacity list");
+        JSONObject scaledValues=variants.getJSONObject("84000").getJSONObject("charging_contract").getJSONObject("vehicle_parameters");
+        check(scaledValues.getJSONArray("vehicle_energy_axis_wh").getInt(10)==84000,"compiled capacity energy axis");
+        check(scaledValues.getJSONArray("energy_w_per_h").getInt(20)==83620,"compiled secondary Wh axis");
+        check(scaledValues.getJSONArray("vehicle_charge_axis_w").getInt(1)==235000,"compiled capacity does not scale charging power");
+        JSONObject selected=new JSONObject(VehicleSource.selectCharging(variants,58000)).getJSONObject("vehicle_parameters");
+        check(selected.getJSONArray("vehicle_energy_axis_wh").getInt(10)==58000,"runtime selects compiled 58 kWh profile");
+        try{VehicleSource.selectCharging(variants,63000);throw new AssertionError("accepted unsupported capacity");}catch(java.io.IOException expected){check(expected.getMessage().indexOf("capacity_wh=63000")>=0,"unsupported capacity diagnostic");}
         VehicleSource.Snapshot held=VehicleSource.encode(0,77400,ch,co,Double.valueOf(50),Integer.valueOf(206),Integer.valueOf(310),false);
         check(held.auxiliarySource.equals("profile_default") && held.auxiliaryW==310,"profile auxiliary before first average");
         check(VehicleSource.fresh(1,15000000001L) && !VehicleSource.fresh(1,15000000002L) && !VehicleSource.fresh(2,1),"sample freshness");
@@ -38,6 +47,6 @@ public final class ProducerHost {
         gate.stop();check(!gate.current(a),"stop invalidates worker");long b=gate.start();check(b!=a && gate.current(b),"rapid resubscribe");
         gate.connected(5);check(!gate.current(b),"new transport invalidates old worker");long c=gate.start();check(gate.disconnected(5) && !gate.current(c),"matching disconnect");
         gate.close();check(gate.start()==0,"closed provider cannot restart");
-        System.out.println("PASS nine producer reference fixtures, Hyundai SOC flooring, one-minute auxiliary averaging, and semantic subscription lifecycle");
+        System.out.println("PASS producer fixtures, compiled capacity-profile selection, Hyundai SOC flooring, auxiliary averaging, and subscription lifecycle");
     }
 }

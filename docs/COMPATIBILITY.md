@@ -1,6 +1,6 @@
 # Compatibility
 
-One mod ZIP accepts the Ioniq 5 model families NEEV23 and NEEV and the EV6 family CVEV without restricting region or firmware. The tested baseline remains USA 260507. EV6 numerical values are copied from Ioniq 5 and may be inaccurate. All profiles currently use a 77.4 kWh battery model.
+One mod ZIP accepts the Ioniq 5 model families NEEV23 and NEEV and the EV6 family CVEV without restricting region or firmware. The tested baseline remains USA 260507. Runtime selects a prepared profile by exact BMS nominal capacity: Ioniq 5 supports 58, 72.6, 77.4 and 84 kWh; EV6 supports 58, 77.4 and 84 kWh. EV6 numerical values are copied from Ioniq 5 and may be inaccurate.
 
 Required on-disk MD5s:
 

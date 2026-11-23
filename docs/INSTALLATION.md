@@ -4,7 +4,7 @@ Requires official HMG-API **1.1.0-rc.3 or newer**, a checked car map, and its en
 
 ## USB
 
-1. Download `egmp-carplay-ev-routing-v0.5.1.zip` from the v0.5.1 release. This single signed ZIP supports the Ioniq 5 (`NEEV23`, `NEEV`) and EV6 (`CVEV`) model families. EV6 values are copied and unvalidated; all profiles use 77.4 kWh.
+1. Download `egmp-carplay-ev-routing-v0.5.1.zip` from the v0.5.1 release. This single signed ZIP supports the Ioniq 5 (`NEEV23`, `NEEV`) and EV6 (`CVEV`) model families. Ioniq 5 includes prepared 58, 72.6, 77.4 and 84 kWh profiles; EV6 includes 58, 77.4 and 84 kWh profiles. EV6 calibration remains copied and unvalidated.
 2. Copy the ZIP unchanged into `HMGAPI/updates/` on a USB stick. Do not unzip it. HMG-API chooses the applicable profile at Apply using the HU’s model code; the routing code reads one active file at `/system/etc/carplay.ev-routing/profile.json`.
 3. Open HMG-API > **Check USB updates**, select the package and install. Enable it and review **Apply changes**. Do not use **Install anyway** for an unsupported model or a failed map/native compatibility check.
 4. After successful apply, remove the stick and fully reboot.

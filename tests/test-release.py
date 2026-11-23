@@ -154,7 +154,10 @@ class Package(unittest.TestCase):
   with zipfile.ZipFile(native) as z:
    self.assertIn('mod.json',z.namelist());self.assertIn('META-HMGAPI/signature',z.namelist());self.assertNotIn('NEMESIS.data',z.namelist())
    meta=json.loads(z.read('mod.json'));self.assertEqual(meta['system'],[{'model':['NEEV23','NEEV','CVEV']}])
-   for entry in CONFIG['profiles']:self.assertIn('profiles/'+entry['model'].lower()+'.json',z.namelist())
+   expected={'NEEV23':[58000,72600,77400,84000],'NEEV':[58000,72600,77400,84000],'CVEV':[58000,77400,84000]}
+   for entry in CONFIG['profiles']:
+    name='profiles/'+entry['model'].lower()+'.json';self.assertIn(name,z.namelist());profile=json.loads(z.read(name));self.assertEqual(profile['supported_capacities_wh'],expected[entry['model']]);self.assertEqual(sorted(map(int,profile['capacity_profiles'])),expected[entry['model']])
+    for capacity in expected[entry['model']]:self.assertEqual(profile['capacity_profiles'][str(capacity)]['charging_contract']['vehicle_parameters']['vehicle_energy_axis_wh'][-1],capacity)
   for entry in CONFIG['profiles']:self.assertFalse((R/'dist'/(stem+'-'+entry['model'].lower()+'-usa-'+entry['firmware']+'.zip')).exists())
  def test_usb_and_source_allowlist(self):
   stem='egmp-carplay-ev-routing-v'+CONFIG['version']

@@ -20,7 +20,7 @@ IDs are JSON integers shared across profiles, not vehicle identifiers. Preserve 
 | energy_w_per_h | 21 numbers | Physical meaning and interpolation are unresolved. |
 | efficiency_factor | Number, dimensionless | 0.95 in the profiles; precise application is unresolved. |
 
-Energy and charging-power arrays pair by index. Edit them together. The energy axis spans 0–77400 Wh. The separate 21-entry energy_w_per_h vector is not a matching axis and is not established as HVAC/BMS auxiliary power.
+Energy and charging-power arrays pair by index. The reference energy axis spans 0–77400 Wh. The checked-in capacity variants pre-scale `vehicle_energy_axis_wh` and the separate 21-entry `energy_w_per_h` sequence; charging power is unchanged. Runtime selects one prepared variant by the BMS nominal capacity and performs no scaling. The precise meaning of `energy_w_per_h` remains unresolved, so this capacity-relative treatment is experimental.
 
 The bundled Ioniq 5 charging object:
 
@@ -63,9 +63,9 @@ The bundled Ioniq 5 consumption object, before runtime auxiliary replacement:
 
 ## Profiles and editing
 
-- [Ioniq 5 profile](../vehicles/hyundai/ioniq-5/us-77kwh/profile.json).
-- [EV6 profile](../vehicles/kia/ev6/us-77kwh/profile.json): copied numerical values are **unvalidated and likely inaccurate**.
+- [Ioniq 5 profiles](../vehicles/hyundai/ioniq-5/profiles.json).
+- [EV6 profiles](../vehicles/kia/ev6/profiles.json): copied numerical values are **unvalidated and likely inaccurate**.
 
-The runtime requires the array lengths above, two connectors and 77400 Wh capacity. These are implementation constraints, not universal Apple-model rules. The builder signs one mod containing the profiles listed in [release.json](../release.json). Vehicle-specific parts select one active profile at Apply. Profile edits require rebuilding and signing the package.
+The runtime requires the array lengths above, two connectors, a 77,400 Wh reference capacity and an exact BMS-capacity match in the model family's prepared variants. These are implementation constraints, not universal Apple-model rules. The builder signs one mod containing the profiles listed in [release.json](../release.json). Vehicle-specific parts select one model-family profile at Apply; runtime selects its capacity variant. Profile edits require rebuilding and signing the package.
 
 Keep units explicit, preserve array alignment and validate changes against measured charging/trip data. Installation success establishes neither calibration accuracy nor the unresolved interpolation/efficiency/index-selection semantics. See [Vehicle profiles](PROFILE.md) and [Validation](VALIDATION.md).

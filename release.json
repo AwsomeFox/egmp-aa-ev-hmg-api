@@ -13,21 +13,21 @@
       "prefix": "NEEV23.",
       "model": "NEEV23",
       "firmware": "*",
-      "path": "hyundai/ioniq-5/us-77kwh/profile.json",
+      "path": "hyundai/ioniq-5/profiles.json",
       "status": "tested integration; energy model uncalibrated"
     },
     {
       "prefix": "CVEV.",
       "model": "CVEV",
       "firmware": "*",
-      "path": "kia/ev6/us-77kwh/profile.json",
+      "path": "kia/ev6/profiles.json",
       "status": "untested; copied Ioniq 5 values"
     },
     {
       "prefix": "NEEV.",
       "model": "NEEV",
       "firmware": "*",
-      "path": "hyundai/ioniq-5/us-77kwh/profile.json",
+      "path": "hyundai/ioniq-5/profiles.json",
       "status": "experimental 2022 compatibility; on-car validation pending"
     }
   ]

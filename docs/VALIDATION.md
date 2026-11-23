@@ -1,6 +1,6 @@
 # Validation and limits
 
-On the target Ioniq 5, the HMG-API port loads, registers the stock status listener, and produces repeated successful live native sends. SOC/range are read through HSCAN; auxiliary power uses read-only HEV transactions. Energy/full-range are derived from the configured battery capacity. EV6 integration/model accuracy are unverified.
+On the target Ioniq 5, the HMG-API port loads, registers the stock status listener, and produces repeated successful live native sends. That test predates v0.5.1's BMS-capacity resolver. SOC/range are read through HSCAN; capacity and auxiliary power use read-only HEV transactions. Energy/full-range are derived from BMS nominal capacity. EV6 integration/model accuracy and the capacity resolver still require on-car validation.
 
 Offline checks cover Java producer fixtures/lifecycle, native ARM serialization, exact-byte recipe refusal, HMG-API hook plans/signatures, NEMESIS metadata/dependencies, and mocked wrapper install/update/remove/recovery. Build evidence is generated under `out/`; On 2026-11-03, the user confirmed installation, Apply, reboot, working CarPlay and EV data with the final single-ZIP package and its fixed active-profile path. The optional NEMESIS wrapper still needs its own HU test.
 

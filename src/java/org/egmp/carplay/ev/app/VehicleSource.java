@@ -12,11 +12,15 @@ public final class VehicleSource {
         public final byte[] charging,consumption;
         public final String auxiliarySource;
         public final double auxiliaryW;
-        Snapshot(int[] v,byte[] c,byte[] e,String source,double watts){values=v;charging=c;consumption=e;auxiliarySource=source;auxiliaryW=watts;}
+        public final String batterySource;
+        Snapshot(int[] v,byte[] c,byte[] e,String source,double watts,String battery){values=v;charging=c;consumption=e;auxiliarySource=source;auxiliaryW=watts;batterySource=battery;}
     }
     private final Object service;
-    private final int minWh,maxWh;
-    private final String charging,consumption;
+    private final int minWh;
+    private final JSONObject capacityProfiles;
+    private final String consumption;
+    private int maxWh;
+    private String charging,batterySource="unresolved";
     public final String displayName;
     public final int dcW,acW;
     private Object adapter,binder;
@@ -50,17 +54,28 @@ public final class VehicleSource {
             if(w<1 || w>1000000)throw new IllegalArgumentException("connector power");
             if(type.equals("ccs1") && dc==0)dc=w;else if(type.equals("j1772") && ac==0)ac=w;else throw new IllegalArgumentException("connector type");}
         dcW=dc;acW=ac;
-        JSONObject battery=p.getJSONObject("battery");minWh=battery.getInt("minimum_energy_wh");maxWh=battery.getInt("maximum_energy_wh");
-        if(minWh!=0 || maxWh!=77400)throw new IllegalArgumentException("unsupported capacity");
+        JSONObject battery=p.getJSONObject("battery");minWh=battery.getInt("minimum_energy_wh");
+        if(minWh!=0 || p.getInt("reference_capacity_wh")!=77400)throw new IllegalArgumentException("unsupported reference capacity");
+        capacityProfiles=p.getJSONObject("capacity_profiles");if(capacityProfiles.length()==0)throw new IllegalArgumentException("capacity profiles");
         JSONObject ch=p.getJSONObject("charging_contract"),co=p.getJSONObject("consumption_contract");
         if(ch.getInt("model_id")!=12582922 || co.getInt("model_id")!=12582921)throw new IllegalArgumentException("contract roles");
         JSONObject cp=ch.getJSONObject("vehicle_parameters"),vp=co.getJSONObject("vehicle_parameters");
         if(cp.getJSONArray("vehicle_energy_axis_wh").length()!=11 || cp.getJSONArray("vehicle_charge_axis_w").length()!=11 || cp.getJSONArray("energy_w_per_h").length()!=21 || vp.getJSONArray("vehicle_consumption_values_wh_per_m").length()!=10)throw new IllegalArgumentException("contract shape");
-        charging=ch.toString();consumption=co.toString();
-        bounded(charging);bounded(consumption);
+        consumption=co.toString();bounded(consumption);
         double aux=co.getJSONObject("vehicle_parameters").getDouble("vehicle_auxiliary_power_w");
         if(Double.isNaN(aux) || Double.isInfinite(aux) || aux<0 || aux>30000)throw new IllegalArgumentException("auxiliary default");
         auxiliaryAverage=new AuxiliaryAverage((int)Math.round(aux));
+    }
+    static String selectCharging(JSONObject profiles,int capacity) throws Exception {
+        JSONObject selected=profiles.optJSONObject(String.valueOf(capacity));
+        if(selected==null)throw new IOException("unsupported BMS_EVENERGYCAPA capacity_wh="+capacity+" supported="+profiles.names());
+        if(selected.getInt("maximum_energy_wh")!=capacity)throw new IOException("capacity profile mismatch");
+        JSONObject contract=selected.getJSONObject("charging_contract"),values=contract.getJSONObject("vehicle_parameters");
+        if(contract.getInt("model_id")!=12582922 || values.getJSONArray("vehicle_energy_axis_wh").getInt(10)!=capacity)throw new IOException("invalid capacity profile "+capacity);
+        String encoded=contract.toString();bounded(encoded);return encoded;
+    }
+    private void resolveBattery(int capacity) throws Exception {
+        charging=selectCharging(capacityProfiles,capacity);maxWh=capacity;batterySource="bms_evenergycapa_profile_"+capacity;
     }
     public static String readFile(String path) throws Exception {
         InputStream in=new FileInputStream(path);
@@ -109,16 +124,22 @@ public final class VehicleSource {
             if(km<0 || km>=2000)throw new IOException("HSCAN bounds");
             soc=Double.valueOf(displayedSoc(pct));range=Integer.valueOf(km);sampledNs=System.nanoTime();
         } catch(Exception failure){adapter=null;}
+        Exception capacityFailure=null;
         try {
             if(hev(27,null)!=2)throw new IOException("CAN generation");
+            if(maxWh==0){int raw=hev(3,0x35);long wh=(long)raw*2L;if(wh<10000 || wh>200000)throw new IOException("BMS_EVENERGYCAPA invalid raw="+raw+" wh="+wh);resolveBattery((int)wh);}
             auxiliarySample=Integer.valueOf(auxiliary(hev(3,0x4f),hev(3,0x24),hev(3,0x33),hev(3,0x43)));
-        } catch(Exception failure){binder=null;}
+        } catch(Exception failure){binder=null;capacityFailure=failure;}
+        if(maxWh==0)throw new IOException("battery capacity unresolved; no EV status sent; will retry: "+(capacityFailure==null?"BMS_EVENERGYCAPA unavailable":capacityFailure.getMessage()));
         long now=System.nanoTime();if(!fresh(sampledNs,now)){soc=null;range=null;}
         int publishedAuxiliary=auxiliaryAverage.update(auxiliarySample,now);
-        return encode(minWh,maxWh,charging,consumption,soc,range,Integer.valueOf(publishedAuxiliary),auxiliaryAverage.hasAverage());
+        return encode(minWh,maxWh,charging,consumption,soc,range,Integer.valueOf(publishedAuxiliary),auxiliaryAverage.hasAverage(),batterySource);
     }
     static boolean fresh(long sampled,long now){long age=now-sampled;return sampled!=0 && age>=0 && age<=15000000000L;}
     static Snapshot encode(int min,int max,String ch,String co,Double percent,Integer range,Integer aux,boolean liveAux) throws Exception {
+        return encode(min,max,ch,co,percent,range,aux,liveAux,"test");
+    }
+    static Snapshot encode(int min,int max,String ch,String co,Double percent,Integer range,Integer aux,boolean liveAux,String batterySource) throws Exception {
         int[] values={min,max,0,0,0,0,0,0,0};
         if(percent!=null && range!=null){
             double p=percent.doubleValue();int r=range.intValue();
@@ -128,6 +149,6 @@ public final class VehicleSource {
         }
         JSONObject consumption=new JSONObject(co);
         if(aux!=null){if(aux.intValue()<0 || aux.intValue()>30000)throw new IllegalArgumentException("auxiliary watts");consumption.getJSONObject("vehicle_parameters").put("vehicle_auxiliary_power_w",aux.doubleValue());}
-        return new Snapshot(values,bounded(ch),bounded(consumption.toString()),aux==null?"profile_default":liveAux?"one_minute_average":"profile_default",consumption.getJSONObject("vehicle_parameters").getDouble("vehicle_auxiliary_power_w"));
+        return new Snapshot(values,bounded(ch),bounded(consumption.toString()),aux==null?"profile_default":liveAux?"one_minute_average":"profile_default",consumption.getJSONObject("vehicle_parameters").getDouble("vehicle_auxiliary_power_w"),batterySource);
     }
 }

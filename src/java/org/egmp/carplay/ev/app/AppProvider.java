@@ -56,7 +56,7 @@ public final class AppProvider {
                             if(!subscription.current(token) || !mod.enabled())return;
                             long handle=((Number)Points.get(app.classLoader,"iap2.service.native_handle",null)).longValue();
                             int rc=NativeBridge.send(handle,snapshot.values,snapshot.charging,snapshot.consumption);
-                            mod.log("CarPlayEV native_send="+rc+" soc_e3="+snapshot.values[3]+" range_km="+snapshot.values[4]+" current_wh="+snapshot.values[2]+" min_wh="+snapshot.values[0]+" max_wh="+snapshot.values[1]+" full_range_km="+(snapshot.values[8]==1?String.valueOf(snapshot.values[6]):"omitted")+" auxiliary_w="+snapshot.auxiliaryW+" auxiliary_source="+snapshot.auxiliarySource+" warning="+snapshot.values[5]+" live="+snapshot.values[7]+" charging_model=12582922 consumption_model=12582921");
+                            mod.log("CarPlayEV native_send="+rc+" soc_e3="+snapshot.values[3]+" range_km="+snapshot.values[4]+" current_wh="+snapshot.values[2]+" min_wh="+snapshot.values[0]+" max_wh="+snapshot.values[1]+" battery_source="+snapshot.batterySource+" full_range_km="+(snapshot.values[8]==1?String.valueOf(snapshot.values[6]):"omitted")+" auxiliary_w="+snapshot.auxiliaryW+" auxiliary_source="+snapshot.auxiliarySource+" warning="+snapshot.values[5]+" live="+snapshot.values[7]+" charging_model=12582922 consumption_model=12582921");
                         }
                     } catch(Throwable error){mod.error("CarPlayEV send (will retry while subscribed)",error);}
                     Thread.sleep(10000);
