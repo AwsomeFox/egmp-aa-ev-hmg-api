@@ -43,7 +43,9 @@ select_profile() {
     local _prefix _firmware _zip _md5 _extra
     PRODUCT=$(getprop ro.build.product)
     while read -r _prefix _firmware _zip _md5 _extra; do
-        case "$PRODUCT" in "$_prefix"*"$_firmware")
+        # v0.5.1 selects only by the allowlisted model prefix. HMG-API map
+        # resolution and the exact native hashes remain the safety gates.
+        case "$PRODUCT" in "$_prefix"*)
             PAYLOAD=payload/$_zip; EXPECTED=$_md5
             [ "$(hash "$PAYLOAD")" = "$EXPECTED" ] || return 1
             echo "product=$PRODUCT payload=$_zip" >> "$LOGS/install.log"
@@ -64,15 +66,18 @@ check_runtime() {
     run "$HMG" engine verify-map || return 1
 }
 check_native() {
-    local _name _want _actual _bad=0
+    local _name _want _actual _message _bad=0
     while read -r _name _want; do
         _actual=$(hash "/system/lib/$_name") || _actual=unreadable
         echo "file=$_name expected=$_want actual=$_actual" >> "$LOGS/install.log"
         if [ "$_actual" != "$_want" ]; then
-            echo "UNKNOWN_HASH $_name $_actual"; _bad=1
+            _message="HASH_MISMATCH file=$_name expected=$_want actual=$_actual"
+            echo "$_message"
+            echo "$_message" >> "$LOGS/install.log"
+            _bad=1
         fi
     done < payload/native-md5.txt
-    [ "$_bad" = 0 ] || { fail 'Unsupported native binaries; no EV files changed'; return 1; }
+    [ "$_bad" = 0 ] || { fail 'Native library hash mismatch; EV Routing was not installed and no EV files were changed'; return 1; }
 }
 check_plan() {
     local _kind _path _rest

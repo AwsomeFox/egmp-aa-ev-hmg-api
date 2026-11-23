@@ -1,6 +1,8 @@
-# Unreleased
+# 0.5.1 — experimental
 
-- Remove the stale `libiap2client.so` hash requirement. The mod does not load, patch or call that library; only the firmware-sensitive `libiap2session.so` EV-status bridge remains gated.
+- Accept the existing Ioniq 5 (`NEEV23`, `NEEV`) and EV6 (`CVEV`) profiles without restricting the firmware region or version. A resolving HMG-API map and the exact `libiap2session.so` hash remain mandatory.
+- Make native-hash refusal logs identify the mismatched file and show its expected and actual hashes explicitly.
+- Remove the stale `libiap2client.so` hash requirement. The mod does not load, patch or call that library.
 
 # 0.5.0 — experimental
 

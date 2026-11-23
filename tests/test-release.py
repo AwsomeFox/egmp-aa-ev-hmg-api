@@ -102,9 +102,10 @@ class Lifecycle(unittest.TestCase):
  def test_disabled_wireless_refused(self):self.change(wireless='disabled');self.invoke('pre.sh',False)
  def test_bad_map_refused(self):self.change(bad_map=True);self.invoke('pre.sh',False)
  def test_unknown_hash_refused(self):
-  self.change(hashes={'libiap2session.so':'0'*32});self.assertIn('UNKNOWN_HASH',self.invoke('pre.sh',False));self.assertFalse(self.mod.exists())
+  self.change(hashes={'libiap2session.so':'0'*32});output=self.invoke('pre.sh',False);self.assertIn('HASH_MISMATCH file=libiap2session.so expected='+CONFIG['native_md5']['libiap2session.so']+' actual='+'0'*32,output);self.assertIn('Native library hash mismatch',output);self.assertFalse(self.mod.exists())
  def test_unknown_model_refused(self):self.change(product='OTHER.USA.260507');self.invoke('pre.sh',False)
- def test_unknown_firmware_refused(self):self.change(product='NEEV23.USA.0000.260903');self.invoke('pre.sh',False)
+ def test_alternate_region_and_firmware_accepted(self):
+  self.change(product='NEEV23.CAN.0000.260903');self.install();self.assertEqual(json.loads((self.root/'system/etc/carplay.ev-routing/profile.json').read_text())['vehicle']['model'],'Ioniq 5')
  def test_ev6_profile_selected(self):
   self.change(product='CVEV.USA.0000.260507');self.install();self.assertEqual(json.loads((self.root/'system/etc/carplay.ev-routing/profile.json').read_text())['vehicle']['model'],'EV6')
  def test_payload_tamper_refused(self):
@@ -152,7 +153,7 @@ class Package(unittest.TestCase):
   self.assertEqual(native.read_bytes(),(STAGE/'payload/mod.zip').read_bytes())
   with zipfile.ZipFile(native) as z:
    self.assertIn('mod.json',z.namelist());self.assertIn('META-HMGAPI/signature',z.namelist());self.assertNotIn('NEMESIS.data',z.namelist())
-   meta=json.loads(z.read('mod.json'));self.assertEqual([s['model'][0] for s in meta['system']],[e['model'] for e in CONFIG['profiles']])
+   meta=json.loads(z.read('mod.json'));self.assertEqual(meta['system'],[{'model':['NEEV23','NEEV','CVEV']}])
    for entry in CONFIG['profiles']:self.assertIn('profiles/'+entry['model'].lower()+'.json',z.namelist())
   for entry in CONFIG['profiles']:self.assertFalse((R/'dist'/(stem+'-'+entry['model'].lower()+'-usa-'+entry['firmware']+'.zip')).exists())
  def test_usb_and_source_allowlist(self):

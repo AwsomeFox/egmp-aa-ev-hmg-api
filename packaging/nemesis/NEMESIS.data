@@ -1,13 +1,13 @@
 [nemesis]
 version=1.1
-package-version=0.5.0
+package-version=0.5.1
 id=carplay.ev-routing
 name=E-GMP CarPlay EV Routing - Experimental
 type=application
 short-desc=Apple Maps EV routing through HMG-API
 detailed-desc=Experimental EV routing. Requires HMG-API beta6 or newer and its wireless mod. Ioniq 5 tested; EV6 values copied and unvalidated. Full reboot required.
 depends=hmgapi@>=0.99.6
-os=NEEV23.USA.*260507,CVEV.USA.*260507,NEEV.USA.*260507
+os=NEEV23.*,CVEV.*,NEEV.*
 models=NEEV23,CVEV,NEEV
 preinstall=scripts/pre.sh
 postinstall=scripts/post.sh

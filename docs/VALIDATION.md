@@ -17,7 +17,7 @@ Checked against the upstream [Making mods guide](https://github.com/VysseCodes/H
 | Declared hooks, native recipe, helper file, service and wireless dependency | Checked against beta6’s reference and shared hook planner. |
 | Packaging and author continuity | The multi-vehicle payload verifies with the established key; its archive format follows upstream `mkmodpkg.sh`. Our builder publishes that native ZIP format directly; equivalent payloads are also placed in optional NEMESIS test wrappers. |
 | HU commands | Upstream `tools/check-scripts.sh` passes the payload and every NEMESIS script. |
-| Actual package engine | The same ZIP installs, updates and removes on both simulated cars in beta6’s host engine; Apply selects the correct profile and removal clears it; wrong author, altered signed content and unsupported firmware are refused. |
+| Actual package engine | The same ZIP installs, updates and removes for NEEV23, NEEV and CVEV in the host engine; Apply selects the correct profile and removal clears it; alternate regions/firmware are accepted, while unknown models, wrong authors and altered signed content are refused. |
 | Recovery and removal | 29 package/lifecycle checks pass; OEM files remain unchanged in the isolated tests. Reboot is required to discard in-process native changes. |
 
 Author-list registration is optional and has not been requested. First installs may show an unfamiliar-author warning. No upstream issue or package submission was made by this review. The user’s final-package HU confirmation does not establish EV6 compatibility, long-drive reliability or resolve the Maps update-cadence issue above.

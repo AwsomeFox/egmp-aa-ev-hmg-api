@@ -1,3 +1,12 @@
+# v0.5.1 — Experimental
+
+- Accept Ioniq 5 (`NEEV23`, `NEEV`) and EV6 (`CVEV`) by model family without restricting region or firmware version.
+- Retain the resolving HMG-API map, required hook points and both exact native-library hashes as mandatory fail-closed compatibility checks.
+- Continue using the existing fixed 77.4 kWh profiles; broader installation compatibility does not establish battery-profile or calibration accuracy on every vehicle.
+- Reject other model families, including Ioniq 6 (`CEEV`).
+
+The code and runtime behavior are otherwise unchanged from v0.5.0.
+
 # v0.5.0 — Experimental
 
 This release moves E-GMP vehicle information into Wireless CarPlay + Android Auto's shared CarPlay identification API. It no longer carries its own `libiap2session.so` patch, so the wireless mod owns the native identification change and this mod contributes the vehicle data through the published API.
