@@ -17,6 +17,7 @@ public final class AppProvider {
     private Thread worker;
     private long workerToken;
     private boolean closed;
+    private String lastFailure;
     private final IIap2Listener listener=new IIap2Listener.Stub(){
         public void connected(int component,String serial){subscription.connected(component);}
         public void disconnected(int component){if(subscription.disconnected(component))release();}
@@ -25,12 +26,12 @@ public final class AppProvider {
             else if(what==16){subscription.stop();release();}
         }
     };
-    private AppProvider(ModContext mod,LoadedApp app,Object service,String profile) throws Exception {
-        this.mod=mod;this.app=app;this.service=service;source=new VehicleSource(service,profile);
+    private AppProvider(ModContext mod,LoadedApp app,Object service,String profile,int batteryCapacityOverrideWh) throws Exception {
+        this.mod=mod;this.app=app;this.service=service;source=new VehicleSource(service,profile,batteryCapacityOverrideWh);
     }
-    public static synchronized void start(ModContext mod,LoadedApp app,Object service,String profile) throws Throwable {
+    public static synchronized void start(ModContext mod,LoadedApp app,Object service,String profile,int batteryCapacityOverrideWh) throws Throwable {
         if(instance!=null)return;
-        AppProvider next=new AppProvider(mod,app,service,profile);
+        AppProvider next=new AppProvider(mod,app,service,profile,batteryCapacityOverrideWh);
         try {
         int opened=NativeBridge.open();if(opened!=0)throw new IllegalStateException("native open="+opened);
         Object raw=Points.call(app.classLoader,"iap2.service.on_bind",service,new Intent());
@@ -39,7 +40,7 @@ public final class AppProvider {
         instance=next;
         if(!next.binder.Iap2SvcInit(next.listener,info))throw new IllegalStateException("listener refused");
         } catch(Throwable failure){instance=null;next.close();throw failure;}
-        mod.log("CarPlayEV semantic listener registered");
+        mod.log("CarPlayEV listener registered");
     }
     public static synchronized void stop(){if(instance!=null){instance.close();instance=null;}}
     private synchronized void begin(){
@@ -51,18 +52,39 @@ public final class AppProvider {
                 while(subscription.current(token) && mod.enabled()){
                     try {
                         VehicleSource.Snapshot snapshot=source.poll();
+                        String selection=source.takeBatterySelectionEvent();
+                        if(selection!=null)mod.log("CarPlayEV "+selection);
                         Object lock=Points.get(app.classLoader,"iap2.service.native_lock",null);
                         synchronized(lock){
                             if(!subscription.current(token) || !mod.enabled())return;
                             long handle=((Number)Points.get(app.classLoader,"iap2.service.native_handle",null)).longValue();
                             int rc=NativeBridge.send(handle,snapshot.values,snapshot.charging,snapshot.consumption);
-                            mod.log("CarPlayEV native_send="+rc+" soc_e3="+snapshot.values[3]+" range_km="+snapshot.values[4]+" current_wh="+snapshot.values[2]+" min_wh="+snapshot.values[0]+" max_wh="+snapshot.values[1]+" full_range_km="+(snapshot.values[8]==1?String.valueOf(snapshot.values[6]):"omitted")+" auxiliary_w="+snapshot.auxiliaryW+" auxiliary_source="+snapshot.auxiliarySource+" warning="+snapshot.values[5]+" live="+snapshot.values[7]+" charging_model=12582922 consumption_model=12582921");
+                            mod.log(statusLine(rc,snapshot));
                         }
-                    } catch(Throwable error){mod.error("CarPlayEV send (will retry while subscribed)",error);}
+                        lastFailure=null;
+                    } catch(Throwable error){
+                        String message=message(error);
+                        if(!message.equals(lastFailure)){
+                            mod.error("CarPlayEV EV status unavailable; will retry: "+message,null);
+                            lastFailure=message;
+                        }
+                    }
                     Thread.sleep(10000);
                 }
             } catch(InterruptedException ended){Thread.currentThread().interrupt();}
         }},"CarPlayEV");worker.setDaemon(true);worker.start();
+    }
+    private static String message(Throwable error){
+        Throwable cause=error;
+        while(cause.getCause()!=null && cause.getCause()!=cause)cause=cause.getCause();
+        return cause.getMessage()==null?cause.getClass().getSimpleName():cause.getMessage();
+    }
+    private static String statusLine(int rc,VehicleSource.Snapshot snapshot){
+        String live=snapshot.values[7]==1
+            ?"soc="+(snapshot.values[3]/1000)+"% range="+snapshot.values[4]+" km energy="+snapshot.values[2]+" Wh"
+            :"soc/range unavailable";
+        String full=snapshot.values[8]==1?" full_range="+snapshot.values[6]+" km":"";
+        return "CarPlayEV status sent: result="+rc+" "+live+full+" auxiliary="+snapshot.auxiliaryW+" W ("+snapshot.auxiliarySource+") low_battery="+(snapshot.values[5]==1);
     }
     private void release(){
         try {

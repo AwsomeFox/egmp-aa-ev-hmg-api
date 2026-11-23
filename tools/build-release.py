@@ -61,7 +61,7 @@ def main():
  compile_java(list((R/'stubs').rglob('*.java')),oem,[a.android_jar],java)
  compile_java(list((R/'src/java').rglob('*.java')),classes,[hmg,wireless_api,oem,a.android_jar,a.json_jar],java)
  compile_java(list((R/'tests').glob('*.java')),tests,[classes,hmg,wireless_api,a.android_jar,a.json_jar],java)
- run(java/'java','-cp',':'.join(map(str,[a.json_jar,classes,hmg,tests])),'org.egmp.carplay.ev.app.ProducerHost',R/'tests/fixtures/status.json',R/'vehicles/hyundai/ioniq-5/us-77kwh/profile.json')
+ run(java/'java','-cp',':'.join(map(str,[a.json_jar,classes,hmg,tests])),'org.egmp.carplay.ev.app.ProducerHost',R/'tests/fixtures/status.json',R/'vehicles'/config['profiles'][0]['path'],R/'vehicles'/config['profiles'][1]['path'])
  for folder,jar_name in [(hmg,'hmg-compile.jar'),(wireless_api,'wireless-api-compile.jar'),(oem,'oem-compile.jar'),(classes,'hooks-classes.jar')]:classjar(folder,out/jar_name)
  dex=out/'dex';dex.mkdir(exist_ok=True)
  run(java/'java','-cp',a.d8_jar,'com.android.tools.r8.D8','--min-api','18','--lib',a.android_jar,'--lib',(java/'javac').resolve().parents[1],'--classpath',out/'hmg-compile.jar','--classpath',out/'wireless-api-compile.jar','--classpath',out/'oem-compile.jar','--output',dex,out/'hooks-classes.jar')
@@ -73,12 +73,12 @@ def main():
  lines=[];evidence=[];mod=out/'mod'
  if mod.exists():shutil.rmtree(mod)
  mod.mkdir();meta=json.loads((R/'mod.json').read_text());meta['version']=version
- (mod/'mod.json').write_text(json.dumps(meta,indent=2)+'\n');shutil.copyfile(R/'patches.json',mod/'patches.json');shutil.copyfile(R/'LICENSE',mod/'LICENSE');shutil.copyfile(R/'NOTICE.md',mod/'NOTICE.md')
+ (mod/'mod.json').write_text(json.dumps(meta,indent=2)+'\n');shutil.copyfile(R/'patches.json',mod/'patches.json');shutil.copyfile(R/'settings.json',mod/'settings.json');shutil.copyfile(R/'LICENSE',mod/'LICENSE');shutil.copyfile(R/'NOTICE.md',mod/'NOTICE.md')
  for path,src in [('files/libcarplayev.so',out/'libcarplayev.so'),('svc/capture.sh',R/'svc/capture.sh')]:
   target=mod/path;target.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(src,target)
  for entry in config['profiles']:
   profile=R/'vehicles'/entry['path'];p=json.loads(profile.read_text());target=mod/('profiles/'+entry['model'].lower()+'.json');target.parent.mkdir(exist_ok=True);shutil.copyfile(profile,target)
-  evidence.append({'model':entry['model'],'profile_id':p['profile_id'],'profile_sha256':sha(profile),'status':entry['status']})
+  evidence.append({'model':entry['model'],'profile_id':p['profile_id'],'capacities_wh':p['supported_capacities_wh'],'profile_sha256':sha(profile),'status':entry['status']})
  with zipfile.ZipFile(mod/meta['hooks']['jar'],'w',zipfile.ZIP_DEFLATED) as z:z.write(dex/'classes.dex','classes.dex')
  run(java/'java','-cp',hmg,'hmgapi.engine.Signing','sign',mod,a.key);run(java/'java','-cp',hmg,'hmgapi.engine.Signing','verify',mod,config['author_uuid'])
  archive(mod,dist/(name+'.zip'));shutil.copyfile(dist/(name+'.zip'),stage/'payload/mod.zip')
@@ -96,7 +96,7 @@ def main():
  # Explicit source roots; no tools, keys, host binaries, previous builds or captures.
  with tempfile.TemporaryDirectory() as t:
   source=Path(t)/name;source.mkdir()
-  for rel in ['README.md','CHANGELOG.md','LICENSE','NOTICE.md','.gitignore','release.json','mod.json','patches.json','src','stubs','svc','vehicles','packaging','tools','tests','docs','images']:
+  for rel in ['README.md','CHANGELOG.md','LICENSE','NOTICE.md','.gitignore','release.json','mod.json','patches.json','settings.json','src','stubs','svc','vehicles','packaging','tools','tests','docs','images']:
    src=R/rel
    if src.is_dir():shutil.copytree(src,source/rel,ignore=shutil.ignore_patterns('.DS_Store','._*','__pycache__','*.pyc'))
    else:shutil.copyfile(src,source/rel)

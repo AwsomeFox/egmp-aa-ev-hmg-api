@@ -6,6 +6,7 @@ import hmgapi.mods.wireless.api.CarPlayIdentification;
 import org.json.*;
 /** EV routing provider for HMG-API beta6 and newer. */
 public final class EvRouting extends ModEntry {
+    private static final String SESSION_MD5="fc7cb675b46a44bd893a1edc054c5e71";
     private String profile;
     private boolean librariesMatch;
     private String sessionMd5;
@@ -13,9 +14,10 @@ public final class EvRouting extends ModEntry {
     private Class<?> part;
     private CarPlayIdentification identityApi;
     private CarPlayIdentification.VehicleIdentity identityContribution;
+    private int batteryCapacityOverrideWh;
     public void zygoteInit(ModContext mod) throws Throwable {
         sessionMd5=ModContext.md5("/system/lib/libiap2session.so");
-        librariesMatch="fc7cb675b46a44bd893a1edc054c5e71".equals(sessionMd5);
+        librariesMatch=SESSION_MD5.equals(sessionMd5);
         // Read before dropping root: app processes cannot traverse the mod folder.
         File f=new File("/system/etc/carplay.ev-routing/profile.json");
         java.io.InputStream in=new java.io.FileInputStream(f);
@@ -24,7 +26,14 @@ public final class EvRouting extends ModEntry {
         } finally {in.close();}
         identityApi=identityApi(mod);
         identityContribution=vehicleIdentity(new JSONObject(profile));
+        batteryCapacityOverrideWh=batteryCapacityOverride(mod.settingString("battery_capacity_wh_override","auto"));
+        mod.log("CarPlayEV battery_capacity_setting="+(batteryCapacityOverrideWh==0?"automatic_bms":batteryCapacityOverrideWh+"_wh_override"));
         if(identityApi!=null)identityApi.registerVehicle(mod.id,identityContribution);
+    }
+    private static int batteryCapacityOverride(String value) {
+        if(value==null || "auto".equals(value))return 0;
+        try {int wh=Integer.parseInt(value);if(wh>0)return wh;}catch(NumberFormatException ignored){}
+        throw new IllegalArgumentException("invalid battery_capacity_wh_override="+value);
     }
     private static CarPlayIdentification identityApi(ModContext mod) {
         Object published=mod.use("wireless-carplay-aa",CarPlayIdentification.SERVICE);
@@ -52,8 +61,10 @@ public final class EvRouting extends ModEntry {
     }
     public void appLoaded(final ModContext mod,final LoadedApp app) throws Throwable {
         if(!"com.tcc.iap2server".equals(app.packageName))return;
-        if(!librariesMatch){mod.error("CarPlayEV: unsupported native hashes; inactive"
-            +" libiap2session.so_md5="+(sessionMd5==null?"unavailable":sessionMd5),null);return;}
+        if(!librariesMatch){mod.error("CarPlayEV: native hash mismatch; EV routing inactive"
+            +" libiap2session.so_expected="+SESSION_MD5
+            +" libiap2session.so_actual="+(sessionMd5==null?"unavailable":sessionMd5)
+            +" libiap2session.so_status="+(SESSION_MD5.equals(sessionMd5)?"match":"MISMATCH"),null);return;}
         String[] points={"iap2.service.on_create","iap2.service.on_destroy","iap2.service.on_bind","iap2.service.native_handle","iap2.service.native_lock"};
         for(String id:points)if(!Points.has(id)){mod.error("CarPlayEV: missing hook map "+id+"; inactive",null);return;}
         runningMod=mod;part=mod.appPart(app,"org.egmp.carplay.ev.app.AppProvider");
@@ -63,7 +74,7 @@ public final class EvRouting extends ModEntry {
                 // All native calls must resolve in the app-part loader.
                 Class<?> bridge=mod.appPart(app,"org.egmp.carplay.ev.app.NativeBridge");
                 bridge.getMethod("load",String.class).invoke(null,"/system/lib/libcarplayev.so");
-                part.getMethod("start",ModContext.class,LoadedApp.class,Object.class,String.class).invoke(null,mod,app,p.thisObject,profile);
+                part.getMethod("start",ModContext.class,LoadedApp.class,Object.class,String.class,int.class).invoke(null,mod,app,p.thisObject,profile,Integer.valueOf(batteryCapacityOverrideWh));
             }
         });
         mod.hook(app.classLoader,"iap2.service.on_destroy",new MethodHook(){

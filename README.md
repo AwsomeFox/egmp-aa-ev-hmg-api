@@ -1,42 +1,77 @@
 # E-GMP CarPlay EV Routing
 
-Experimental Apple Maps EV routing for Gen5W, installed as a **native HMG-API mod**. Current version: **0.5.0** (experimental).
+Adds EV routing to Apple Maps through CarPlay on supported Hyundai Ioniq 5 and Kia EV6 Gen5W head units. Apple Maps can show estimated battery levels and include charging stops when planning a route.
 
-**v0.5.0 has now been installed and tested successfully on-car.** The shared CarPlay identification path, vehicle detection and EV routing are working with the required HMG-API and Wireless CarPlay releases below.
+**Current release: v0.5.1 (experimental)**
+
+This is an experimental, unofficial modification. It changes software on the infotainment system and is not affiliated with Hyundai, Kia or Apple.
+
+<img src="images/apple-maps-ev-route-preview.png" alt="Apple Maps EV route preview showing a Hyundai Ioniq 5, charging stops and estimated battery levels" width="280">
+
+## Supported vehicles
+
+| Vehicle | Head-unit model | Battery profiles included |
+|---|---|---|
+| Hyundai Ioniq 5 | `NEEV` or `NEEV23` | 58, 72.6, 77.4 and 84 kWh |
+| Kia EV6 | `CVEV` | 58, 77.4 and 84 kWh |
+
+Installation is selected by vehicle model, without a region or firmware allowlist. At startup, the head unit must still pass HMG-API's car-map checks and the mod's native-library compatibility check; an unknown build may install but remain inactive. Ioniq 6 is not currently supported.
+
+The Ioniq 5 integration has been tested on US firmware 260507. Other configurations remain experimental. EV6 support uses charging and consumption data derived from the Ioniq 5 and needs further validation.
+
+See [Compatibility](docs/COMPATIBILITY.md) for the complete technical requirements and current validation status.
+
+## Before installing
+
+You need:
+
+- [NEMESIS](https://github.com/xwtk/hmg_nemesis)
+- [HMG-API 1.1.0-rc.3 or newer](https://github.com/Open-HMG/HMG-API/releases)
+- HMG-API's [Wireless CarPlay + Android Auto](https://github.com/Open-HMG/hmgapi-wireless-cp-aa/releases) mod 2.2.0-rc.4 or newer, installed and working
+- A supported Ioniq 5 or EV6 with a compatible HMG-API car map
+
+Confirm that ordinary CarPlay works before installing EV Routing.
 
 ## Install
 
-1. Install [NEMESIS](https://github.com/xwtk/hmg_nemesis) and [HMG-API 1.1.0-rc.3 or newer](https://github.com/Open-HMG/HMG-API/releases). NEMESIS can install HMG-API itself.
-2. Download HMG-API’s **[Wireless CarPlay + Android Auto](https://github.com/Open-HMG/hmgapi-wireless-cp-aa)** mod **2.2.0-rc.4 or newer** from its **[releases page](https://github.com/Open-HMG/hmgapi-wireless-cp-aa/releases)**, install/enable it, apply, verify the car map and reboot. It is a separate download; confirm CarPlay works.
-3. Download **[egmp-carplay-ev-routing-v0.5.0.zip](https://github.com/isaacwisdom/egmp-carplay-ev-routing/releases/download/v0.5.0/egmp-carplay-ev-routing-v0.5.0.zip)** and copy it unchanged into `HMGAPI/updates/` on a USB stick. In HMG-API, use **Check USB updates**, install it, enable it and **Apply changes**. Remove the USB and fully reboot.
-4. **Manually delete the existing iPhone–HU pairing and pair again.** Remove the iPhone from the HU’s paired-device list, forget the HU in the iPhone’s Bluetooth and CarPlay settings, then pair again and allow CarPlay. This step is required after installation; reconnecting the existing pairing is not enough.
+1. Download `egmp-carplay-ev-routing-v0.5.1.zip` from the v0.5.1 release.
+2. Copy the ZIP unchanged into `HMGAPI/updates/` on a USB stick. Do not unzip it.
+3. In HMG-API, select **Check USB updates**, install and enable E-GMP CarPlay EV Routing, then select **Apply changes**.
+4. Remove the USB stick and fully reboot the head unit.
+5. Delete the existing car pairing from both the head unit and the iPhone, then pair again and allow CarPlay.
+6. On the iPhone, open Apple Maps, tap your profile picture, select **Vehicles**, and add or select the detected vehicle.
 
-5. On your iPhone, open Apple Maps, tap your profile picture, then **Vehicles**. Follow the prompts to add your detected vehicle, or select it if it is already listed. See the [illustrated setup steps](docs/INSTALLATION.md#add-your-vehicle-in-apple-maps).
+The iPhone re-pairing step is required; reconnecting the old pairing is not enough.
 
-There is **one mod download** for both supported vehicles. HMG-API selects the correct bundled profile when applying the mod and writes one active profile file; the routing code always reads that file. No manual profile choice is needed. [Detailed directions](docs/INSTALLATION.md). The [NEMESIS store rollout remains on hold](docs/NEMESIS-RELEASE.md); use the native HMG-API installation route.
+See the [illustrated installation guide](docs/INSTALLATION.md) for detailed steps, updating, removal and troubleshooting.
 
-## Apple Maps EV routing
+## Using EV routing
 
-After adding your vehicle, select it when planning driving directions. Maps can include charging stops and estimated battery levels along the route.
+After adding the vehicle in Apple Maps, select it when planning driving directions. Maps can then estimate battery levels and add charging stops where needed.
 
-<img src="images/apple-maps-ev-route-preview.png" alt="Apple Maps EV route preview showing Hyundai Ioniq 5, charging stops and estimated battery levels" width="280">
+The mod automatically selects the vehicle and battery profile. If the BMS-reported capacity selects the wrong profile, open this mod's settings in HMG-API and choose a manual battery capacity. Leave it on **Automatic (BMS)** unless needed. The 72.6 kWh override is for Ioniq 5 only. After changing the setting, apply changes and fully reboot.
 
-## Supported configurations
+## Important limitations
 
-| Vehicle | Firmware | Status |
-|---|---|---|
-| Ioniq 5 US, 77.4 kWh | NEEV23.USA / 260507 | Integration tested on one HU; energy model accurate within 1-2%. |
-| 2022 Ioniq 5 US, 77.4 kWh | NEEV.USA / 260507 | Integration tested on one HU; energy model accuracy pending. |
-| Kia EV6 US | CVEV.USA / 260507 | Integration tested on one HU. **Consumption and Charging contract values copied from Ioniq 5, but appear to be accurate within 1-2%** |
+- This release is experimental and has not been validated on every region, firmware, battery or trim.
+- Arrival estimates and charging stops depend on experimental energy models and may be inaccurate.
+- The 77.4 kWh profile is the reference model. The 58, 72.6 and 84 kWh profiles are scaled from it and have not been independently calibrated, so their estimates are more likely to be inaccurate.
+- EV6 calibration needs additional real-world validation.
+- Installation compatibility does not guarantee accurate routing for a particular vehicle.
 
-An exact `libiap2session.so` hash and a resolving HMG-API map are required. `libiap2client.so` is not used or checked. Other firmware/battery configurations are unsupported, including 260903 until our native integration is validated there.
+If installation or startup is refused, do not bypass the compatibility checks. Export the logs and see [Logging and diagnostics](docs/LOGGING.md).
 
-Live SOC and range are sent every ten seconds while subscribed. Auxiliary power is sampled at the same cadence, averaged over one-minute windows, rounded to the nearest 25 W and changed in the sent consumption contract only once per minute. Energy and full-charge range are estimates. Charging state, active connector and temperature are omitted. Renaming and other contract updates are not implemented.
+## Documentation
 
-Logs rotate between two 512 KiB files and can be exported by NEMESIS. The optional NEMESIS wrapper also writes USB install diagnostics; native HMG-API imports do not run that hook.
+- [Installation and removal](docs/INSTALLATION.md)
+- [Compatibility](docs/COMPATIBILITY.md)
+- [Vehicle and battery profiles](docs/PROFILE.md)
+- [Logging and diagnostics](docs/LOGGING.md)
+- [Validation and known limits](docs/VALIDATION.md)
+- [Building from source](docs/BUILDING.md)
 
-[Compatibility](docs/COMPATIBILITY.md) · [Contracts](docs/CONTRACTS.md) · [Logs](docs/LOGGING.md) · [Build](docs/BUILDING.md) · [Validation](docs/VALIDATION.md)
+## Credits and license
 
-## Credits
+Special credit to [augard/evmaps](https://github.com/augard/evmaps) for charging and consumption reference material. Built on [HMG-API](https://github.com/Open-HMG/HMG-API) and NEMESIS, with vehicle-data research from [egmp-aa-ev-feat](https://github.com/willemcvu/egmp-aa-ev-feat).
 
-Special credit to [augard/evmaps](https://github.com/augard/evmaps) for the charging/consumption dictionaries and reference material. Built on [HMG-API](https://github.com/Open-HMG/HMG-API) and NEMESIS, with vehicle-data research from [egmp-aa-ev-feat](https://github.com/willemcvu/egmp-aa-ev-feat). Original code: GPL-3.0-or-later; see [NOTICE](NOTICE.md). No OEM binaries are distributed.
+Licensed under GPL-3.0-or-later; see [LICENSE](LICENSE) and [NOTICE](NOTICE.md). No Hyundai, Kia, Apple or Google binaries are distributed.
