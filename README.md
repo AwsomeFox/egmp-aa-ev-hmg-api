@@ -15,7 +15,7 @@ This is an experimental, unofficial modification. It changes software on the inf
 | Hyundai Ioniq 5 | `NEEV` or `NEEV23` | 58, 72.6, 77.4 and 84 kWh |
 | Kia EV6 | `CVEV` | 58, 77.4 and 84 kWh |
 
-The mod is not restricted to a particular region or firmware version, but the head unit must pass HMG-API's compatibility checks. Ioniq 6 is not currently supported.
+Installation is selected by vehicle model, without a region or firmware allowlist. At startup, the head unit must still pass HMG-API's car-map checks and the mod's native-library compatibility check; an unknown build may install but remain inactive. Ioniq 6 is not currently supported.
 
 The Ioniq 5 integration has been tested on US firmware 260507. Other configurations remain experimental. EV6 support uses charging and consumption data derived from the Ioniq 5 and needs further validation.
 
@@ -49,12 +49,13 @@ See the [illustrated installation guide](docs/INSTALLATION.md) for detailed step
 
 After adding the vehicle in Apple Maps, select it when planning driving directions. Maps can then estimate battery levels and add charging stops where needed.
 
-The mod automatically selects the vehicle and battery profile. If the BMS-reported capacity selects the wrong profile, HMG-API's mod settings offer a manual battery-capacity override. Leave it on **Automatic (BMS)** unless needed; after changing it, apply changes and fully reboot.
+The mod automatically selects the vehicle and battery profile. If the BMS-reported capacity selects the wrong profile, open this mod's settings in HMG-API and choose a manual battery capacity. Leave it on **Automatic (BMS)** unless needed. The 72.6 kWh override is for Ioniq 5 only. After changing the setting, apply changes and fully reboot.
 
 ## Important limitations
 
 - This release is experimental and has not been validated on every region, firmware, battery or trim.
 - Arrival estimates and charging stops depend on experimental energy models and may be inaccurate.
+- The 77.4 kWh profile is the reference model. The 58, 72.6 and 84 kWh profiles are scaled from it and have not been independently calibrated, so their estimates are more likely to be inaccurate.
 - EV6 calibration needs additional real-world validation.
 - Installation compatibility does not guarantee accurate routing for a particular vehicle.
 
