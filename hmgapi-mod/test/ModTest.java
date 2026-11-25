@@ -248,6 +248,13 @@ public final class ModTest {
         check("flag falls back to its 260507 number", HmgCar.flag("ENERGYMAP_1000MS", 0x31) == 0x31);
         check("relay down: ping false", !Relay.ping());
         check("no car: the energy model stays off", EvCar.notAnEvWeFit() != null);
+        // where the EV log's rows go, by the settings
+        check("EV log on: files on the head unit", HmgApiEntry.evLogOutput(true, false) == EvDriveLog.OUT_FILE);
+        check("EV log on, USB only: the feed for the drive", HmgApiEntry.evLogOutput(true, true) == EvDriveLog.OUT_USB);
+        check("EV log off: no log, whatever USB only says", HmgApiEntry.evLogOutput(false, true) == EvDriveLog.OUT_NONE
+                && HmgApiEntry.evLogOutput(false, false) == EvDriveLog.OUT_NONE);
+        check("no settings yet: files, and the rows run", HmgApiEntry.evLogOutput() == EvDriveLog.OUT_FILE
+                && !HmgApiEntry.evLogUsbOnly() && HmgApiEntry.evRowsOn());
     }
 
     static void testEvCheck() {

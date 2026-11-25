@@ -31,10 +31,49 @@ public final class EvLogTest {
         aggregation();
         pruning();
         writer();
+        usbFeed();
         System.out.println("passed: " + pass + ", failed: " + fail);
         if (fail > 0) {
             System.exit(1);
         }
+    }
+
+    /** "USB drive only": the lines the offload service reads (hmgapi-mod/scripts/offload.sh, feed). */
+    private static void usbFeed() {
+        String header = EvDriveLog.header("NEEV.USA.0000.V015.012.260507", "wp_daudioplus_neev_us", null, "bms", "2026-11-03");
+        java.util.List<String> b = EvUsbFeed.headerBlock(7000, "egmp-NEEV-20261103-", header);
+        String[] lines = header.split("\n");
+        check("feed: block starts with the period and the prefix", b.get(0).equals("B 7000 egmp-NEEV-20261103-"));
+        check("feed: block ends with E", b.get(b.size() - 1).equals("E"));
+        check("feed: one H per header line", b.size() == lines.length + 2);
+        boolean same = true;
+        StringBuilder back = new StringBuilder();
+        for (int i = 0; i < lines.length; i++) {
+            same &= b.get(i + 1).equals("H " + lines[i]);
+            back.append(b.get(i + 1).substring(2)).append('\n');
+        }
+        check("feed: header lines in order, unchanged", same && back.toString().equals(header));
+        check("feed: magic line first", b.get(1).equals("H " + EvDriveLog.MAGIC));
+        check("feed: column row last", b.get(b.size() - 2).startsWith("H t_s,soc_half_pct,"));
+        boolean oneLine = true;
+        for (String l : b) {
+            oneLine &= l.indexOf('\n') < 0 && l.indexOf('\\') < 0;
+        }
+        check("feed: no line break or backslash in a line", oneLine);
+        Object[] v = new Object[EvDriveLog.COLUMNS.length];
+        v[0] = Long.valueOf(5);
+        v[1] = Integer.valueOf(92);
+        String row = EvLogger.csvRow(v);
+        String r = EvUsbFeed.rowLine(7000, row);
+        check("feed: row line", r.startsWith("R 7000 5,92,") && r.indexOf('\n') < 0);
+        check("feed: row unchanged but for the line end", (r.substring("R 7000 ".length()) + "\n").equals(row));
+        check("feed: tag isn't one HMG-API keeps for the mod", !"EvDriveLog".equals(EvUsbFeed.TAG));
+        // the output mode: files unless told otherwise
+        check("output: files by default", EvDriveLog.output() == EvDriveLog.OUT_FILE);
+        EvDriveLog.setOutput(EvDriveLog.OUT_USB);
+        check("output: USB", EvDriveLog.output() == EvDriveLog.OUT_USB);
+        EvDriveLog.setOutput(99);
+        check("output: an unknown value is files", EvDriveLog.output() == EvDriveLog.OUT_FILE);
     }
 
     private static void aggregation() {
