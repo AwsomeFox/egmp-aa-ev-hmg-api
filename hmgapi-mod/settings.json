@@ -81,7 +81,7 @@
       "default": true,
       "title": "Learn this car: highway consumption and DC charging",
       "apply": "restart",
-      "description": "Compares the energy model with this car's own steady highway drives (10 km stretches at 60 km/h or more, from the EV log) and scales the model's road load to match, between 0.7x and 1.3x. Also learns how fast the car really DC fast-charges in each 10% SOC band, from stops at chargers Maps was guiding to where the car, not the charger, set the pace, so Maps' charge times follow the car's own stops. Takes effect at the next Android Auto session. Turning it off forgets what it learned. Needs EV logs on."
+      "description": "Compares the energy model with this car's own steady highway drives (10 km stretches at 60 km/h or more) and scales the model's road load to match, between 0.7x and 1.3x. Also learns how fast the car really DC fast-charges in each 10% SOC band, from stops at chargers Maps was guiding to where the car, not the charger, set the pace, so Maps' charge times follow the car's own stops. Takes effect at the next Android Auto session. Turning it off forgets what it learned. Works with EV logs off too: it keeps only a few numbers."
     },
     {
       "key": "ev_log",
@@ -89,7 +89,15 @@
       "default": true,
       "title": "EV logs",
       "apply": "restart",
-      "description": "Logs battery, charging, climate and Maps' route plan whenever the head unit is on (no location or time of day). Copied to any USB drive that has an egmp-aa-ev-logs folder."
+      "description": "Logs battery, charging, climate and Maps' route plan whenever the head unit is on (no location or time of day), about 150 KB an hour, 100 MB at most. Kept on the head unit and copied to any USB drive that has an egmp-aa-ev-logs folder. Off: nothing is logged; the car is still learned if \"Learn this car\" is on."
+    },
+    {
+      "key": "ev_log_usb_only",
+      "type": "toggle",
+      "default": false,
+      "title": "EV logs: to a USB drive only",
+      "apply": "restart",
+      "description": "Writes the EV log straight to a USB drive that has an egmp-aa-ev-logs folder, and nothing to the head unit's own storage. With no such drive plugged in, nothing is logged. A drive plugged in mid-drive starts logging within a minute. Turn the car off before taking the drive out, or the last minute may be missing. Logs already on the head unit stay there and are still copied to the drive. Needs EV logs on."
     }
   ]
 }

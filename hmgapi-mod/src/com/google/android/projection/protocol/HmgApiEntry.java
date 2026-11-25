@@ -35,7 +35,7 @@ import hmgapi.hook.Points;
  *   (new) battery level, range, odometer          gpm.sensor_source.init: sensors 6 and 5
  *                                                 offered, LiveData sends them
  *
- * Settings (settings.json): energy_model, preconditioning, model_learning, ev_log, live_data, and the
+ * Settings (settings.json): energy_model, preconditioning, model_learning, ev_log, ev_log_usb_only, live_data, and the
  * preconditioning thresholds precond_min_kw, precond_window_min,
  * precond_arrival_m, precond_max_starts (PrecondCore.Config). The thresholds
  * apply at once (HMG-API hands every running app a saved change); turning the
@@ -56,6 +56,39 @@ public final class HmgApiEntry extends ModEntry {
 
     static boolean evLogOn() {
         return on("ev_log");
+    }
+
+    /** EV logs on, and only to a USB drive: nothing is written to the head unit (ev_log_usb_only, off by default) */
+    static boolean evLogUsbOnly() {
+        ModContext m = sMod;
+        return m != null && m.enabled() && m.settingBoolean("ev_log", true) && m.settingBoolean("ev_log_usb_only", false);
+    }
+
+    /** the logger runs for the log, and for RoadLearn and ChargeLearn, which learn from its rows */
+    static boolean evRowsOn() {
+        return evLogOn() || on("model_learning");
+    }
+
+    /** Start the row logger with where its rows go by the settings; nothing when neither the log nor learning is on. */
+    static void startEvRows() {
+        try {
+            if (!evRowsOn()) {
+                return;
+            }
+            EvDriveLog.setOutput(evLogOutput());
+            EvDriveLog.start();
+        } catch (Throwable t) {
+            // never disturb GPM
+        }
+    }
+
+    static int evLogOutput() {
+        return evLogOutput(evLogOn(), evLogUsbOnly());
+    }
+
+    /** log off: the rows only feed the learning; USB only: to the drive through the offload service; else files */
+    static int evLogOutput(boolean log, boolean usbOnly) {
+        return !log ? EvDriveLog.OUT_NONE : usbOnly ? EvDriveLog.OUT_USB : EvDriveLog.OUT_FILE;
     }
 
     /** this Android Auto session's EvCar.notAnEvWeFit() == null (set when GPM's sensors start) */
@@ -95,6 +128,24 @@ public final class HmgApiEntry extends ModEntry {
         }
         int dot = product.indexOf('.');
         return EGMP.contains(dot < 0 ? product : product.substring(0, dot));
+    }
+
+    /**
+     * Model codes whose road load was fitted from their own logs (EvModelTemplate.CAR_PREFIX
+     * also holds estimates, such as the Ioniq 6's): only these learn it slowly (RoadLearn.PRIOR).
+     */
+    static final java.util.List<String> ROAD_FITTED = java.util.Arrays.asList("NEEV", "CVEV");
+
+    static boolean roadFitted(String product) {
+        if (product == null || product.isEmpty()) {
+            return true;   // unknown: as before
+        }
+        for (String p : ROAD_FITTED) {
+            if (product.startsWith(p)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     static boolean modelOn() {
@@ -193,7 +244,8 @@ public final class HmgApiEntry extends ModEntry {
         ChargeLearn.setEnabled(on("model_learning"));
         String product = EvDriveLog.prop("ro.build.product");
         if (egmp(product)) {
-            RoadLearn.setPrior(RoadLearn.PRIOR);
+            // the Ioniq 6's road load is an estimate until its logs fit it: learn it faster
+            RoadLearn.setPrior(roadFitted(product) ? RoadLearn.PRIOR : RoadLearn.PRIOR_OTHER);
             ChargeLearn.setPrior(ChargeLearn.PRIOR);
         } else {
             // another EV (mod.json "system"): E-GMP values to start from, learned faster
@@ -204,9 +256,7 @@ public final class HmgApiEntry extends ModEntry {
                     + (on("model_learning") ? "" : ", learning off") + "; capacity from charges above 60%; DC charge"
                     + " times from " + ChargeLearn.sessions() + " stops so far, E-GMP's until then: too fast for a 400 V car)");
         }
-        if (evLogOn()) {
-            EvDriveLog.start();
-        }
+        startEvRows();
         final ClassLoader cl = app.classLoader;
 
         mod.hook(cl, "gpm.sensor_source.init", new MethodHook() {
@@ -304,7 +354,7 @@ public final class HmgApiEntry extends ModEntry {
         mod.log("EV routing hooks in " + app.processName + " (energy model "
                 + (mod.settingBoolean("energy_model", true) ? "on" : "off") + ", preconditioning "
                 + (precondOn() ? "on" : "off") + ", EV log "
-                + (mod.settingBoolean("ev_log", true) ? "on" : "off") + ", learning "
+                + (!mod.settingBoolean("ev_log", true) ? "off" : evLogUsbOnly() ? "on (USB drive only)" : "on") + ", learning "
                 + (mod.settingBoolean("model_learning", true) ? "on" : "off") + ", live data "
                 + (mod.settingBoolean("live_data", true) ? "on" : "off") + ")");
     }

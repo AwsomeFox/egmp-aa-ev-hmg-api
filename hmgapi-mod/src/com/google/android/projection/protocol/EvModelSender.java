@@ -96,9 +96,7 @@ public final class EvModelSender {
     }
 
     public static void start(Sink source) {
-        if (HmgApiEntry.evLogOn()) {
-            EvDriveLog.start();  // normally already running since GPM started; never throws
-        }
+        HmgApiEntry.startEvRows();  // normally already running since GPM started; never throws
         synchronized (LOCK) {
             sSource = source;
             if (sTemplate == null) {
