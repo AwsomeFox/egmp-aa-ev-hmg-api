@@ -41,56 +41,91 @@ toast() {
     am broadcast -a com.hkmc.intent.action.TOAST -e com.hkmc.intent.extra.TOAST_MESSAGE "$1" --ez com.hkmc.intent.extra.TOAST_POPUPSHOWING true >/dev/null 2>&1 || true
 }
 
-# file size via ls -l (no stat/wc on the unit); empty if missing or if the
-# listing isn't the expected toolbox layout (perms owner group size ...)
-size_of() {
-    local _l
-    _l=$(ls -l "$1" 2>/dev/null) || return 0
-    set -- $_l
-    case "$4" in
-        ''|*[!0-9]*) ;;
-        *) echo "$4" ;;
-    esac
+# Look up known CSV names together. Android toolbox prints regular files as
+# mode owner group size YYYY-MM-DD HH:MM basename.
+file_sizes() {
+    local _dir=$1 _mode _owner _group _size _date _time _name
+    shift
+    (cd "$_dir" && ls -ld "$@") 2>/dev/null |
+        while read -r _mode _owner _group _size _date _time _name; do
+            case "$_mode:$_date:$_time" in
+                -?????????:????-??-??:??:??) ;;
+                *) continue ;;
+            esac
+            case "$_size" in ''|*[!0-9]*) continue ;; esac
+            echo -n "${_name##*/}=$_size "
+        done
 }
 
-# 0 when the drive's copy is already current
+# 0 when the drive's copy is already current; compare bytes if a size is missing.
 up_to_date() {
-    local _ss _ds
-    _ss=$(size_of "$1")
-    _ds=$(size_of "$2")
-    if [ -n "$_ss" ] && [ -n "$_ds" ]; then
-        [ "$_ss" = "$_ds" ]
-        return
-    fi
-    [ -f "$2" ] && cmp "$1" "$2" >/dev/null 2>&1
+    local _name=${1##*/} _src_sizes=$3 _dst_sizes=$4 _size
+    [ -f "$2" ] || return 1
+    case "$_src_sizes" in
+        *" $_name="*)
+            _size=${_src_sizes#*" $_name="}
+            _size=${_size%% *}
+            case "$_dst_sizes" in
+                *" $_name=$_size "*) return 0 ;;
+                *" $_name="*) return 1 ;;
+            esac
+            ;;
+    esac
+    cmp "$1" "$2" >/dev/null 2>&1
 }
 
-# copies new/grown logs; sets COPIED and FAILED
-offload_to() {
-    local _dst="$1/$FOLDER" _f _n _tmp _done=0 _fail=0
-    for _f in "$SRC"/*.csv; do
-        # readable only if the logger made it so (files from before that
-        # change stay private to GPM; skip them quietly)
-        [ -f "$_f" ] && [ -r "$_f" ] || continue
-        _n=${_f##*/}
-        up_to_date "$_f" "$_dst/$_n" && continue
+copy_batch() {
+    local _dst=$1 _n _f _tmp _src_sizes= _dst_sizes=
+    shift
+    # Unusual names are passed alone and use the direct comparison.
+    case "$1" in
+        *[!A-Za-z0-9_./-]*) ;;
+        *)
+            _dst_sizes=" $(file_sizes "$_dst" "$@")"
+            _src_sizes=" $(file_sizes "$SRC" "$@")"
+            ;;
+    esac
+    for _n do
+        _n=${_n#./}
+        _f="$SRC/$_n"
+        up_to_date "$_f" "$_dst/$_n" "$_src_sizes" "$_dst_sizes" && continue
         _tmp="$_dst/.$_n.tmp"
         rm -f "$_tmp" 2>/dev/null
         if cp "$_f" "$_tmp" 2>/dev/null && cmp "$_f" "$_tmp" >/dev/null 2>&1 \
                 && mv "$_tmp" "$_dst/$_n" 2>/dev/null; then
-            _done=$((_done + 1))
+            COPIED=$((COPIED + 1))
         else
             rm -f "$_tmp" 2>/dev/null
             log "copy failed: $_n -> $_dst"
-            _fail=$((_fail + 1))
+            FAILED=$((FAILED + 1))
         fi
     done
-    if [ "$_done" -gt 0 ]; then
+}
+
+# Copy new/grown logs in bounded batches to keep command lines short.
+offload_to() {
+    local _dst="$1/$FOLDER" _f _n
+    COPIED=0
+    FAILED=0
+    set --
+    for _f in "$SRC"/*.csv; do
+        # Files the logger hasn't made readable stay private to GPM.
+        [ -f "$_f" ] && [ -r "$_f" ] || continue
+        _n=./${_f##*/}
+        case "$_n" in
+            *[!A-Za-z0-9_./-]*) copy_batch "$_dst" "$_n"; continue ;;
+        esac
+        set -- "$@" "$_n"
+        if [ "$#" -eq 128 ]; then
+            copy_batch "$_dst" "$@"
+            set --
+        fi
+    done
+    [ "$#" -eq 0 ] || copy_batch "$_dst" "$@"
+    if [ "$COPIED" -gt 0 ]; then
         sync
-        log "copied $_done log(s) to $_dst"
+        log "copied $COPIED log(s) to $_dst"
     fi
-    COPIED=$_done
-    FAILED=$_fail
 }
 
 # drive removed: announce again on the next insertion (no sed on the unit)
