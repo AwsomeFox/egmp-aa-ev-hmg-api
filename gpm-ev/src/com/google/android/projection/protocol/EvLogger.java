@@ -43,7 +43,9 @@ final class EvLogger {
     private final int maxBufferChars;
     private final Sink sink;
     private final StringBuilder buf = new StringBuilder(4096);
+    private boolean dirPermissionsSet;
     private File cur;          // file of this session, null until first flush
+    private boolean curReadable;
     private long curBytes;
     private int droppedRows;
 
@@ -101,19 +103,25 @@ final class EvLogger {
             if (dir == null) {
                 return false;
             }
-            if (!dir.isDirectory() && !dir.mkdirs()) {
-                sink.log("cannot create " + dir);
-                return false;
+            if (!dir.isDirectory()) {
+                dirPermissionsSet = false;
+                if (!dir.mkdirs()) {
+                    sink.log("cannot create " + dir);
+                    return false;
+                }
             }
             // The offload service runs as NEMESIS root, which has no
             // CAP_DAC_OVERRIDE: it can only read these as "other". The logs
             // hold no personal data, so make them world-readable.
-            dir.setReadable(true, false);
-            dir.setExecutable(true, false);
+            boolean curMissing = cur != null && !cur.isFile();
+            if (!dirPermissionsSet || curMissing) {
+                boolean readable = dir.setReadable(true, false);
+                boolean searchable = dir.setExecutable(true, false);
+                dirPermissionsSet = readable && searchable;
+            }
 
             byte[] rows = buf.toString().getBytes("US-ASCII");
-            boolean open = cur == null || !cur.isFile()
-                    || curBytes + rows.length > maxFileBytes;
+            boolean open = cur == null || curMissing || curBytes + rows.length > maxFileBytes;
             File target = cur;
             byte[] hdr = new byte[0];
             if (open) {
@@ -134,7 +142,9 @@ final class EvLogger {
             } finally {
                 out.close();
             }
-            target.setReadable(true, false);
+            if (open || !curReadable) {
+                curReadable = target.setReadable(true, false);
+            }
             if (open) {
                 sink.log("logging to " + target.getName());
             }
