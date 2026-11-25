@@ -31,6 +31,7 @@ public final class EvLogTest {
         aggregation();
         pruning();
         writer();
+        directoryPermissions();
         usbFeed();
         System.out.println("passed: " + pass + ", failed: " + fail);
         if (fail > 0) {
@@ -226,6 +227,56 @@ public final class EvLogTest {
                 f.delete();
             }
             dir.delete();
+        }
+    }
+
+    private static void directoryPermissions() throws Exception {
+        PermissionTrackingDirectory dir = new PermissionTrackingDirectory(
+                Files.createTempDirectory("evlogperms").toFile());
+        EvLogger w = new EvLogger(dir, 100, 250, 64, msg -> {});
+        String prefix = "egmp-T-20261029-";
+        String header = "t_s,x\n";
+        try {
+            w.append("0,1\n");
+            check("a failed permission change still allows the flush", w.flush(prefix, header)
+                    && dir.readCalls == 1 && dir.executeCalls == 1);
+            w.append("5,2\n");
+            check("directory permissions are retried", w.flush(prefix, header)
+                    && dir.readCalls == 2 && dir.executeCalls == 2);
+            w.append("10,3\n");
+            check("ordinary appends skip directory permission changes", w.flush(prefix, header)
+                    && dir.readCalls == 2 && dir.executeCalls == 2);
+
+            Files.delete(w.currentFile().toPath());
+            Files.delete(dir.toPath());
+            w.append("15,4\n");
+            check("a recreated directory gets permissions again", w.flush(prefix, header)
+                    && dir.readCalls == 3 && dir.executeCalls == 3);
+        } finally {
+            if (w.currentFile() != null) {
+                Files.deleteIfExists(w.currentFile().toPath());
+            }
+            Files.deleteIfExists(dir.toPath());
+        }
+    }
+
+    private static final class PermissionTrackingDirectory extends File {
+        int readCalls;
+        int executeCalls;
+
+        PermissionTrackingDirectory(File dir) {
+            super(dir.getPath());
+        }
+
+        @Override
+        public boolean setReadable(boolean readable, boolean ownerOnly) {
+            return ++readCalls > 1 && readable && !ownerOnly;
+        }
+
+        @Override
+        public boolean setExecutable(boolean executable, boolean ownerOnly) {
+            executeCalls++;
+            return executable && !ownerOnly;
         }
     }
 }
