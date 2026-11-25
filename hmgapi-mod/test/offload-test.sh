@@ -32,6 +32,39 @@ PATH="$T/bin:$PATH" EVLOG_SRC="$T/src" EVLOG_POLL_S=0 EVLOG_PASSES=1 sh hmgapi-m
 check "grown log copied again" 'cmp -s "$T/src/egmp-NEEV23-20261103-002.csv" "$T/usb0/egmp-aa-ev-logs/egmp-NEEV23-20261103-002.csv"'
 check "logged the copies" 'grep -q "copied 2 log(s)" "$T/out"'
 
+# Android toolbox's listing layout, with one trace line per invocation.
+cat > "$T/bin/ls" <<SH
+#!/bin/sh
+echo list >> "$T/listings"
+shift
+for file do
+    [ -f "\$file" ] || continue
+    printf '%s owner group %s 2026-11-03 12:00 %s\n' -rw-r--r-- "\$(wc -c < "\$file")" "\${file##*/}"
+done
+SH
+chmod 755 "$T/bin/ls"
+poll_three_times() {
+    PATH="$T/bin:$PATH" EVLOG_SRC="$T/src" EVLOG_POLL_S=0 EVLOG_PASSES=3 sh hmgapi-mod/scripts/offload.sh >> "$T/out" 2>&1
+}
+poll_three_times
+check "unchanged logs use two listings per poll" '[ "$(wc -l < "$T/listings")" -eq 6 ]'
+
+cat > "$T/bin/sleep" <<SH
+#!/bin/sh
+if [ -f "$T/nodrive" ]; then
+    rm "$T/nodrive"
+else
+    touch "$T/nodrive"
+    echo "5,91" >> "$T/src/egmp-NEEV23-20261103-001.csv"
+fi
+SH
+chmod 755 "$T/bin/sleep"
+: > "$T/listings"
+poll_three_times
+check "no listing while the drive is absent" '[ "$(wc -l < "$T/listings")" -eq 4 ]'
+check "an older log that grew while disconnected is copied on reconnect" 'cmp -s "$T/src/egmp-NEEV23-20261103-001.csv" "$T/usb0/egmp-aa-ev-logs/egmp-NEEV23-20261103-001.csv"'
+rm "$T/bin/ls" "$T/bin/sleep"
+
 # ---- USB drive only ----
 D="$T/usb0/egmp-aa-ev-logs"
 cat > "$T/bin/logcat" <<SH
