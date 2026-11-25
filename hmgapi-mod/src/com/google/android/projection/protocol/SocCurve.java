@@ -48,15 +48,44 @@ final class SocCurve {
         return out;
     }
 
-    /** the whole 0x8003 message: SensorBatch {26: {1: cdpz}} */
+    /** the whole 0x8003 message: SensorBatch {26: {1: cdpz}}, the curve only */
     static byte[] message(float rawNow, float shownNow) {
-        float[] y = shown(rawNow, shownNow);
+        return message(rawNow, shownNow, true, 0, 0);
+    }
+
+    /** Settings limits: minimum arrival % at charging stops, target arrival % at the destination. 0: Maps' own. */
+    static final int CHARGER_PCT_MAX = 50, DEST_PCT_MAX = 100;
+
+    static int clampPct(int pct, int max) {
+        return pct <= 0 ? 0 : Math.min(pct, max);
+    }
+
+    /**
+     * The whole 0x8003 message: SensorBatch {26: {1: cdpz}}, cdpz = {1: cdqu}. cdqu's
+     * other two fields are the EV trip settings (Maps 26.44: awfg.b()/c(), named in its
+     * vehicle profile's toString): 1 = minimumArrivalBatteryPercentageForChargingStops,
+     * 2 = targetArrivalBatteryPercentageForDestination. Maps uses each when it is > 0,
+     * ahead of the user's own setting; left out (0), Maps keeps the user's. With curve
+     * false the points are left out (Maps then clears any curve it had and uses its own %).
+     */
+    static byte[] message(float rawNow, float shownNow, boolean curve, int chargerPct, int destPct) {
         Buf cdqu = new Buf();
-        for (int i = 0; i < RAW_POINTS.length; i++) {
-            Buf pt = new Buf();
-            pt.tag(3, 5).fixed32(Float.floatToIntBits(RAW_POINTS[i]));
-            pt.tag(4, 5).fixed32(Float.floatToIntBits(y[i]));
-            cdqu.tag(4, 2).bytes(pt.toBytes());
+        chargerPct = clampPct(chargerPct, CHARGER_PCT_MAX);
+        destPct = clampPct(destPct, DEST_PCT_MAX);
+        if (chargerPct > 0) {
+            cdqu.tag(1, 0).varint(chargerPct);
+        }
+        if (destPct > 0) {
+            cdqu.tag(2, 0).varint(destPct);
+        }
+        if (curve) {
+            float[] y = shown(rawNow, shownNow);
+            for (int i = 0; i < RAW_POINTS.length; i++) {
+                Buf pt = new Buf();
+                pt.tag(3, 5).fixed32(Float.floatToIntBits(RAW_POINTS[i]));
+                pt.tag(4, 5).fixed32(Float.floatToIntBits(y[i]));
+                cdqu.tag(4, 2).bytes(pt.toBytes());
+            }
         }
         byte[] cdpz = new Buf().tag(1, 2).bytes(cdqu.toBytes()).toBytes();
         byte[] field = new Buf().tag(1, 2).bytes(cdpz).toBytes();

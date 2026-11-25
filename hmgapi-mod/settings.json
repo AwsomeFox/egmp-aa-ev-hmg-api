@@ -18,6 +18,20 @@
       "description": "Sends Maps how the car's battery % relates to the battery's energy (Android Auto sensor 26), so the percentages Maps shows (now, on arrival, at charging stops) match the dash. On E-GMP the energy runs out at about 2% on the dash, so without it Maps reads up to 2 points low near empty. Needs the energy model on and a library build whose recipe takes sensor 26 (Ioniq 5 and EV6 US 260507, EV6 Canada 260206)."
     },
     {
+      "key": "arrival_charger_pct",
+      "type": "number",
+      "default": 0,
+      "title": "Arrive at charging stops with at least (%)",
+      "description": "Google Maps plans its charging stops so the car arrives at each with at least this battery % (1-50). 0 (the default) leaves Maps' own setting. Sent with the battery % data (Android Auto sensor 26), so it needs the energy model on and the same library builds as \"Maps' battery % matches the car's\". Changes apply at once if that sensor was already on this session, otherwise from the next Android Auto connection."
+    },
+    {
+      "key": "arrival_dest_pct",
+      "type": "number",
+      "default": 0,
+      "title": "Arrive at the destination with (%)",
+      "description": "Google Maps plans the trip so the car reaches the destination with this battery % (1-100). 0 (the default) leaves Maps' own setting. Same needs as the setting above."
+    },
+    {
       "key": "preconditioning",
       "type": "toggle",
       "default": true,

@@ -41,6 +41,10 @@ public final class SocCurveTest {
             } else if (wire == 5) {
                 v = java.util.Arrays.copyOfRange(b, i, i + 4);
                 i += 4;
+            } else if (wire == 0) {
+                int from0 = i;
+                while ((b[i++] & 0x80) != 0) { }
+                v = java.util.Arrays.copyOfRange(b, from0, i);
             } else {
                 throw new IllegalStateException("wire " + wire);
             }
@@ -78,6 +82,31 @@ public final class SocCurveTest {
         return out;
     }
 
+    static int varint(byte[] v) {
+        int r = 0, sh = 0;
+        for (byte c : v) {
+            r |= (c & 0x7f) << sh;
+            sh += 7;
+        }
+        return r;
+    }
+
+    /** cdqu's fields: {1 charger %, 2 destination %, count of 4 points}; -1 where absent */
+    static int[] cdqu(byte[] msg) {
+        List<Object[]> batch = fields(msg, 2, msg.length);
+        List<Object[]> wrap = fields((byte[]) batch.get(0)[2]);
+        List<Object[]> cdpz = fields((byte[]) wrap.get(0)[2]);
+        int[] out = {-1, -1, 0};
+        for (Object[] f : fields((byte[]) cdpz.get(0)[2])) {
+            int n = (Integer) f[0];
+            if (n == 1 && (Integer) f[1] == 0) out[0] = varint((byte[]) f[2]);
+            else if (n == 2 && (Integer) f[1] == 0) out[1] = varint((byte[]) f[2]);
+            else if (n == 4) out[2]++;
+            else check("cdqu: unexpected field " + n, false);
+        }
+        return out;
+    }
+
     /** Maps' rules: 0 < x < 100, 0 <= y <= 100, x rising, y not falling */
     static boolean mapsKeepsAll(float[] p) {
         for (int k = 0; k < p.length / 2; k++) {
@@ -100,6 +129,20 @@ public final class SocCurveTest {
         check("raw under 5%: the plain 2.3%-zero line", Math.abs(low[2 * 6 + 1] - (z + (100f - z) / 100f * 50f)) < 0.01f && mapsKeepsAll(low));
         float[] hi = points(SocCurve.message(90f, 99.5f));
         check("a steep curve is clamped at 100 and still kept", mapsKeepsAll(hi) && hi[hi.length - 1] == 100f);
+
+        // the EV trip settings (cdqu 1 and 2)
+        check("curve only: the same bytes as before", java.util.Arrays.equals(SocCurve.message(60.3f, 61f),
+                SocCurve.message(60.3f, 61f, true, 0, 0)));
+        int[] t = cdqu(SocCurve.message(60.3f, 61f, true, 15, 30));
+        check("curve + targets: charger 15%, destination 30%, 13 points", t[0] == 15 && t[1] == 30 && t[2] == 13);
+        t = cdqu(SocCurve.message(0f, 0f, false, 10, 0));
+        check("targets only: charger 10%, no destination, no points", t[0] == 10 && t[1] == -1 && t[2] == 0);
+        t = cdqu(SocCurve.message(0f, 0f, false, 0, 80));
+        check("destination only", t[0] == -1 && t[1] == 80 && t[2] == 0);
+        t = cdqu(SocCurve.message(50f, 51f, true, 99, 150));
+        check("clamped: charger to 50%, destination to 100%", t[0] == 50 && t[1] == 100);
+        t = cdqu(SocCurve.message(50f, 51f, true, -5, 0));
+        check("negative = not sent", t[0] == -1 && t[1] == -1);
         System.exit(fail);
     }
 }

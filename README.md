@@ -21,6 +21,7 @@ This fork runs it as a mod for [HMG-API](https://github.com/VysseCodes/HMG-API),
 - **EV routing:** the head unit sends Maps a vehicle energy model with the battery's live energy, so Maps plans stops and shows arrival %.
 - **Real capacity:** usable capacity is learned from the BMS, not assumed from the new-car 77.4 kWh.
 - **Maps' battery % matches the dash:** the head unit also tells Maps how the car's battery % relates to the battery's energy (Android Auto sensor 26). On E-GMP the energy runs out at about 2 % on the dash, so without it the percentages Maps shows (now, on arrival, at charging stops) read up to 2 points low near empty. US 260507 library build (Ioniq 5 and EV6) for now.
+- **Arrival targets (optional):** settings for the battery % Maps plans to arrive with at charging stops and at the destination, sent in the same sensor 26. Off (0) by default, so Maps keeps your own settings.
 - **Cold weather:** live outside temperature raises heating and rolling losses in the model.
 - **Charge times:** calibrated on real DC sessions and the car's own estimate, including the slow last 10–20 %.
 - **Only on an EV it fits:** before anything goes to Maps, the mod checks the car reports a battery state of charge and a pack of 50–90 kWh (its nominal size, or the size its energy and charge imply). Otherwise the energy model and live battery data stay off, and HMG-API's log says why, so a car the model doesn't fit (an EV9's 99.8 kWh pack, a car without a traction battery) never gets a wrong range.
@@ -76,6 +77,7 @@ Logs from different cars, climates and battery ages are what improve the energy 
 | [LOGGING](docs/LOGGING.md) | EV log format and `tools/evlog.py` |
 | [DATA-SOURCES](docs/DATA-SOURCES.md) | vehicle data the head unit exposes |
 | [RESEARCH](docs/RESEARCH.md) | head unit internals and the patch design |
+| [AA-INTEGRATION](docs/AA-INTEGRATION.md) | newer Android Auto / CarPlay features for EV routing and turn-by-turn, ranked (2026-11) |
 | [HANDOFF](docs/HANDOFF.md) | developer guide for the NEMESIS package: build, install, troubleshooting |
 | [ROADMAP](docs/ROADMAP.md) | what's next |
 | [HMG-API-COMPARISON](docs/HMG-API-COMPARISON.md) | the HMG-API mod against HMG-API's built-ins: data, features, gaps |
