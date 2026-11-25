@@ -188,6 +188,32 @@ CHARGE_CURVE = [
 
 # 1.10 max charging rate (v1.2 VehicleInfo.maximum_charging_rate_watts): the curve's peak.
 MAX_CHARGING_RATE_W = max(p for _, p in CHARGE_CURVE)
+# 1.9 peak motor power (v1.2 VehicleInfo.peak_motor_power_watts), by trim: E-GMP long range RWD
+# 168 kW, AWD 239 kW, standard range 125 kW (2023 US Ioniq 5 / EV6 / Ioniq 6). The template
+# carries RWD; EvModelSender patches AWD (front motor energy seen) or SR (small learned pack).
+MOTOR_RWD_W, MOTOR_AWD_W, MOTOR_SR_W = 168000, 239000, 125000
+
+# ---- the winter add-on (setting winter_model, off by default): appended to the model at runtime,
+# so it can be switched. Protobuf merges the repeated fields of a second block 8 into the
+# first, and blocks 6 and 10 are new. All of it is untested on Maps.
+#  6   auxiliary_drain_at_time [0]: the live climate + battery heater power (W), patched; Maps
+#      holds it for > 15 min, then falls back to block 7 by outside temp
+#  8.2 charging_curves_at_temperature: the 8.1 rows capped by pack temperature, from the owner's
+#      cold-pack log (<10 C ~90 kW, <15 C ~120 kW, <20 C ~160 kW; ENERGY-MODEL.md "field
+#      findings"), and the warm curve from 22 C; Maps picks by 1.8 (live pack temp)
+#  10  battery_preconditioning: ASSUMED E-GMP values (no measurements): target pack temp by
+#      charger power, ~5 kW heater, ~120 Wh per degree for the pack, no preconditioning
+#      under ~10 % battery, at most ~8 C rise while charging
+WINTER_TEMPS = [(5.0, 90000), (12.0, 120000), (18.0, 160000), (22.0, None)]
+WINTER_CHARGERS_W = [350000, 330000, 325000, 320000, 260000, 250000, 240000, 200000, 150000,
+                     100000, 50000]
+WINTER_STEPS = list(range(200, 19, -20)) + [10, 4, 1]   # every 10 %, then 5, 2, 0.5 %
+AUX_DRAIN_PLACEHOLDER_W = 50000
+PRECOND_TARGETS = [(50000, 15.0), (150000, 22.0), (350000, 25.0)]
+PRECOND_POWER_W = 5000
+PRECOND_WH_PER_C = 120
+PRECOND_MIN_WH = 7700          # ~10 % of the reference pack
+PRECOND_MAX_RISE = [(50000, 5.0), (150000, 8.0), (350000, 8.0)]
 
 # Battery internal loss: I^2R, R = 0.1 ohm, ~650 V nominal.
 BL_OHM = 0.1
@@ -299,13 +325,16 @@ def interp_curve(energy_wh: float) -> float:
     raise AssertionError
 
 
-def charger_power(charger_w: int, energy_wh: float) -> float:
-    """Charger-side power at this energy on this charger."""
+def charger_power(charger_w: int, energy_wh: float, cap_w=None) -> float:
+    """Charger-side power at this energy on this charger (capped at cap_w: a cold pack)."""
     if charger_w in SUPERCHARGERS_W:
         if energy_wh < SUPERCHARGER_FLAT_TO_WH:
-            return float(SUPERCHARGER_FLAT_W)
-        return min(SUPERCHARGER_FLAT_W, interp_curve(energy_wh))
-    return min(charger_w, interp_curve(energy_wh))
+            p = float(SUPERCHARGER_FLAT_W)
+        else:
+            p = min(SUPERCHARGER_FLAT_W, interp_curve(energy_wh))
+    else:
+        p = min(charger_w, interp_curve(energy_wh))
+    return p if cap_w is None else min(p, cap_w)
 
 
 def charge_eta(charger_w: int) -> float:
@@ -313,7 +342,7 @@ def charge_eta(charger_w: int) -> float:
     return AC_ETA if charger_w <= AC_MAX_W else CHARGE_ETA
 
 
-def cumulative_table(charger_w: int) -> list[tuple[int, float]]:
+def cumulative_table(charger_w: int, cap_w=None) -> list[tuple[int, float]]:
     """Seconds to charge from empty to each GRID_WH step on this charger
     (ascending absolute energy, (0, 0) first). Used to build the 8.1 rows and
     by the analysis/plot tools."""
@@ -324,21 +353,21 @@ def cumulative_table(charger_w: int) -> list[tuple[int, float]]:
         e0 = (i - 1) * GRID_WH
         for j in range(GRID_SLICES):
             # slice midpoint power, charger-side; scale to battery-side energy
-            p = charger_power(charger_w, e0 + (j + 0.5) * de)
+            p = charger_power(charger_w, e0 + (j + 0.5) * de, cap_w)
             seconds += 3600.0 * de / (p * charge_eta(charger_w))
         out.append((i * GRID_WH, seconds))
     return out
 
 
-def charge_table(charger_w: int) -> list[tuple[int, int]]:
+def charge_table(charger_w: int, cap_w=None, steps=None) -> list[tuple[int, int]]:
     """The 8.1 row: (headroom Wh still needed to reach full, seconds to full
     from there), descending headroom like Ford's DC rows, no (0, 0) point
     (zero varints are not encoded, so they could not be runtime-scaled)."""
-    cum = cumulative_table(charger_w)
+    cum = cumulative_table(charger_w, cap_w)
     full = cum[-1][1]
     n = len(cum) - 1
     return [(CAPACITY_WH - cum[n - j][0], round(full - cum[n - j][1]))
-            for j in HEADROOM_STEPS]
+            for j in (HEADROOM_STEPS if steps is None else steps)]
 
 
 def gen_text() -> str:
@@ -352,6 +381,7 @@ def gen_text() -> str:
     a(f"  air_density: {AIR_DENSITY}")
     a(f"  outside_temp_c: {OUTSIDE_TEMP_C}")
     a(f"  battery_temp_c: {BATT_TEMP_PLACEHOLDER_C}")
+    a(f"  peak_motor_power_w: {MOTOR_RWD_W}")
     a(f"  max_charging_rate_w: {MAX_CHARGING_RATE_W}")
     a("}")
     a("road_load {")
@@ -390,6 +420,86 @@ def gen_text() -> str:
     return "\n".join(L) + "\n"
 
 
+def gen_winter_text() -> str:
+    """The winter add-on: blocks 6, 8.2 and 10 (see WINTER_*)."""
+    L = []
+    a = L.append
+    a(f"aux_drain_at_time {{ relative_time_s: 0 drain_w {{ value: {AUX_DRAIN_PLACEHOLDER_W} }} }}")
+    a("charge_time {")
+    for t, cap in WINTER_TEMPS:
+        a("  by_temp {")
+        a(f"    temp_c: {t}")
+        for c in WINTER_CHARGERS_W:
+            a("    curves {")
+            a(f"      charger_power_w: {c}")
+            for h, sec in charge_table(c, cap, WINTER_STEPS):
+                a(f"      points {{ energy_wh: {h} seconds: {sec} }}")
+            a("    }")
+        a("  }")
+    a("}")
+    a("battery_preconditioning {")
+    for w, t in PRECOND_TARGETS:
+        a(f"  target_temp_at_input_power {{ input_power_w: {w} temp_c: {t} }}")
+    a(f"  conditioning_power_w: {PRECOND_POWER_W}")
+    for w, t in PRECOND_TARGETS:
+        a(f"  energy_for_preconditioning {{ target_temp_c: {t} energy_wh: {round(PRECOND_WH_PER_C * (t - 5.0))} }}")
+    a(f"  min_battery_level_wh: {PRECOND_MIN_WH}")
+    for w, t in PRECOND_MAX_RISE:
+        a(f"  max_temp_increase_at_station {{ input_power_w: {w} temp_c: {t} }}")
+    a("}")
+    return "\n".join(L) + "\n"
+
+
+_WINTER_MSGS = {(6,), (6, 3), (8,), (8, 2), (8, 2, 2), (8, 2, 2, 2)}
+_WINTER_VARINTS = {
+    (6, 3, 1): "aux",       # aux_drain_at_time[0].drain_w.value (live)
+    (8, 2, 2, 2, 1): "axis",  # by_temp...points.energy_wh (headroom to full), x k
+    (8, 2, 2, 2, 2): "time",  # by_temp...points.seconds, x k
+}
+
+
+def _widen_winter(buf, start: int, end: int, path: tuple, marks: list) -> bytearray:
+    out = bytearray()
+    for num, f in iter_fields(buf, start, end):
+        p = path + (num,)
+        if f.wire == 2 and p in _WINTER_MSGS:
+            sub_marks: list = []
+            sub = _widen_winter(buf, f.val_off, f.val_off + f.val_len, p, sub_marks)
+            out += write_varint(num << 3 | 2) + write_varint(len(sub))
+            base = len(out)
+            out += sub
+            marks.extend((k, base + o, v) for k, o, v in sub_marks)
+        elif f.wire == 0 and p in _WINTER_VARINTS:
+            v, _ = read_varint(buf, f.val_off)
+            out += write_varint(num << 3)
+            marks.append((_WINTER_VARINTS[p], len(out), v))
+            out += fixed_varint(v, SCALE_WIDTH)
+        else:
+            out += buf[f.tag_off : f.val_off + f.val_len]
+    return out
+
+
+def build_winter() -> tuple[bytes, int, list, list]:
+    """The add-on's bytes (fields of VehicleEnergyModel, to append), its aux-drain offset
+    and its capacity-scaled marks (axis, time), checked against charge_table()."""
+    text = gen_winter_text()
+    r = subprocess.run(
+        ["protoc", "-I", str(PROTO.parent), "--encode=vem.VehicleEnergyModel", PROTO.name],
+        input=text.encode(), capture_output=True)
+    assert r.returncode == 0, r.stderr.decode()
+    canonical = bytes(r.stdout)
+    marks: list = []
+    out = _widen_winter(canonical, 0, len(canonical), (), marks)
+    aux = [o for k, o, v in marks if k == "aux"]
+    assert len(aux) == 1 and [v for k, o, v in marks if k == "aux"] == [AUX_DRAIN_PLACEHOLDER_W]
+    axis = [(o, v) for k, o, v in marks if k == "axis"]
+    times = [(o, v) for k, o, v in marks if k == "time"]
+    want = [pt for _t, cap in WINTER_TEMPS for c in WINTER_CHARGERS_W for pt in charge_table(c, cap, WINTER_STEPS)]
+    assert [v for _, v in axis] == [h for h, _ in want] and [v for _, v in times] == [t for _, t in want]
+    assert protoc_decode(bytes(out)) == protoc_decode(canonical), "widened add-on decodes differently"
+    return bytes(out), aux[0], axis, times
+
+
 def widen_quantity(model: bytearray, bf: dict, batt, num: int, width: int) -> int:
     """Widen battery field num's Quantity.value varint to width bytes in place.
 
@@ -422,7 +532,7 @@ def widen_runtime_fields(model: bytearray) -> tuple[int, int]:
     assert set(top) == {1, 2, 3, 4, 5, 7, 8}, f"unexpected top fields {sorted(top)}"
     batt = top[1]
     bf = parse_fields(model, batt.val_off, batt.val_off + batt.val_len)
-    assert set(bf) == {2, 3, 4, 5, 6, 7, 8, 10}, f"unexpected battery fields {sorted(bf)}"
+    assert set(bf) == {2, 3, 4, 5, 6, 7, 8, 9, 10}, f"unexpected battery fields {sorted(bf)}"
     energy_off = widen_quantity(model, bf, batt, 3, ENERGY_WIDTH)
     bf = parse_fields(model, batt.val_off, batt.val_off + batt.val_len)
     cap_off = widen_quantity(model, bf, batt, 4, CAPACITY_WIDTH)
@@ -577,6 +687,10 @@ def main() -> int:
     assert bf[8].wire == 5 and bf[8].val_len == 4
     assert struct.unpack("<f", model[bf[8].val_off:bf[8].val_off + 4])[0] == BATT_TEMP_PLACEHOLDER_C
     btemp_off_in_model = bf[8].val_off
+    # battery.peak_motor_power_w (field 9): a 3-byte varint for every trim's value
+    assert bf[9].wire == 0 and bf[9].val_len == 3
+    assert all(16384 <= w < 1 << 21 for w in (MOTOR_RWD_W, MOTOR_AWD_W, MOTOR_SR_W))
+    motor_off_in_model = bf[9].val_off
     # road_load.a_n.value (2.1.1, float) - cold road load patch point
     rl = top[2]
     rf = parse_fields(model, rl.val_off, rl.val_off + rl.val_len)
@@ -601,6 +715,12 @@ def main() -> int:
     cap_off += hdr
     temp_off = temp_off_in_model + hdr
     hvac_off = hvac_off_in_model + hdr
+    motor_off = motor_off_in_model + hdr
+    # the model's length varint (after 80 03 BA 01): the winter add-on is appended at runtime
+    assert hdr == 6 and batch[4] & 0x80 and not batch[5] & 0x80, "field 23 length must be a 2-byte varint"
+    winter, winter_aux, w_axis, w_time = build_winter()
+    assert len(model) + len(winter) < 1 << 14, "model + winter add-on must keep a 2-byte length"
+    print(f"winter add-on {len(winter)} bytes (model with it {len(model) + len(winter)})")
     btemp_off = btemp_off_in_model + hdr
     a_off = a_off_in_model + hdr
     c_off = c_off_in_model + hdr
@@ -637,6 +757,15 @@ def main() -> int:
         + f"    static final int AC_MAX_W = {AC_MAX_W};\n"
         + f"    static final float CHARGE_SCALE_MIN = {CHARGE_SCALE_MIN!r}f;\n"
         + f"    static final float CHARGE_SCALE_MAX = {CHARGE_SCALE_MAX!r}f;\n"
+        + "    // the winter add-on (blocks 6, 8.2, 10; setting winter_model): appended to the model\n"
+        + f"    static final int WINTER_AUX_OFFSET = {winter_aux};  // aux_drain_at_time[0].drain_w (SCALE_WIDTH)\n"
+        + java_ints("WINTER_AXIS_OFFSETS", [o for o, _ in w_axis], "8.2 energy_wh varints in the add-on, x k")
+        + java_ints("WINTER_AXIS_WH", [v for _, v in w_axis], "their reference values")
+        + java_ints("WINTER_TIME_OFFSETS", [o for o, _ in w_time], "8.2 seconds varints in the add-on, x k")
+        + java_ints("WINTER_TIME_S", [v for _, v in w_time], "their reference values")
+        + "    static final String WINTER_B64 =\n"
+        + "\n".join(('        "' if i == 0 else '        + "') + base64.b64encode(winter).decode()[j:j + 100] + '"'
+                    for i, j in enumerate(range(0, len(base64.b64encode(winter)), 100))) + ";\n"
     )
     model_rev = hashlib.sha1(batch).hexdigest()[:8]
     cold_t = ", ".join(f"{t}f" for t, _ in COLD_DELTA_A)
@@ -668,6 +797,10 @@ def main() -> int:
         "    static final int HVAC_OFFSET = %d;  // hvac_status, one varint byte: 0 unknown, 1 off, 2 on\n"
         "    static final int BATT_TEMP_OFFSET = %d;  // battery_temp_c float bits\n"
         "    static final float BATT_TEMP_PLACEHOLDER_C = %rf;\n"
+        "    static final int MOTOR_OFFSET = %d;  // peak_motor_power_w, 3-byte varint\n"
+        "    static final int MOTOR_RWD_W = %d, MOTOR_AWD_W = %d, MOTOR_SR_W = %d;\n"
+        "    // the model's length varint (2 bytes): the winter add-on is appended at runtime\n"
+        "    static final int LENGTH_OFFSET = 4;\n"
         "    static final String MODEL_REV = \"%s\";  // sha1 of the batch, short\n"
         "    static final int ROAD_A_OFFSET = %d;  // road_load.a_n float bits\n"
         "    static final float ROAD_A_N = %rf;\n"
@@ -697,7 +830,8 @@ def main() -> int:
         "    private EvModelTemplate() {}\n"
         "}\n"
         % (CAPACITY_WH, cap_off, CAPACITY_WIDTH, energy_off, ENERGY_WIDTH,
-           PLACEHOLDER_WH, temp_off, hvac_off, btemp_off, BATT_TEMP_PLACEHOLDER_C, model_rev, a_off, ROAD_LOAD[0], c_off, ROAD_LOAD[2],
+           PLACEHOLDER_WH, temp_off, hvac_off, btemp_off, BATT_TEMP_PLACEHOLDER_C,
+           motor_off, MOTOR_RWD_W, MOTOR_AWD_W, MOTOR_SR_W, model_rev, a_off, ROAD_LOAD[0], c_off, ROAD_LOAD[2],
            car_p, car_a, car_c, DL_SPIN_W, DL_SPIN_W_PER_MPS, DL_FRACTION,
            ENERGY_ZERO_PCT, cold_t, cold_a,
            SCALE_WIDTH, scale_java, lines[0], concat)

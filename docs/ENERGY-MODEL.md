@@ -39,7 +39,7 @@ Google's own definition, labelled "Vehicle energy model (v1.2)", package `maps.a
 | `1.5` enum | `hvac_status` | 0 unknown, 1 off, 2 on. **Live now**: on when climate power (HEV 0x4f) is ≥ 150 W, with 60 s hysteresis |
 | `1.6` float | `reference_air_density` | |
 | `1.8` float | `battery_temp_celsius` | "only required if battery preconditioning parameters are provided". **Live now**: the cluster packet's min pack temp (`XEV_MIN_BATT_TEMP`); 25 °C until the first packet |
-| `1.9` uint32 | `peak_motor_power_watts` | "only required for lightweight predictions". Trim-dependent; not sent |
+| `1.9` uint32 | `peak_motor_power_watts` | "only required for lightweight predictions". **Sent by trim**: 168 kW (long-range RWD) until the front motor reports drive energy (HEV 0x47, AWD: 239 kW); 125 kW for a learned pack under 56 kWh (standard range) |
 | `1.10` uint32 | `maximum_charging_rate_watts` | lightweight predictions. **Sent now**: 235 kW, the 4.1 peak |
 | `1.11` bool | `heat_pump_equipped` | lightweight predictions. Trim-dependent; not sent |
 | `1.12[]` | - | not in v1.2 (newer than the leak) |
@@ -97,7 +97,7 @@ Write it as protobuf text (`vem.VehicleEnergyModel`), then `protoc --encode=vem.
 | `5.4` | I²R: loss = R·(P/V)². Use the pack's DC resistance and ~650–700 V nominal. R is unmeasured; estimate it from the cell count and cell resistance, or from the voltage sag under load |
 | `7` aux power (Q4) | driving heater/A-C power vs outside temp; cold part calibrated with road load A (see "Cold weather") |
 | `8.1` | integrated from 4.1 (×η=0.95 charger→battery, 0.5% cells in 4 slices) + AC limits (10.9 kW onboard, 1.44 kW L1); 16 charger rows (350/330/325/320/260/250/240/200/175/150/125/100/50/25 kW DC, 10.9/1.44 kW AC). Each row has 29 points of (headroom to full, seconds to full): headroom from 100% down to 10% in 5% steps, then 9…1% in 1% steps, then 0.5%. **250 and 325 kW = Tesla Superchargers** (see "Tesla Superchargers" below): V3 cabinets (listed at 250 kW) and V4 posts on upgraded V3 cabinets (listed at 325 kW) run at ~500 V, so the 800 V pack charges via the boost converter at a flat 97 kW to 90% (no step-down or pause), then the normal taper. Maps keys these tables by charger power only, so the voltage limit has to live in those rows; 260/240 and 330/320 kW rows bracket them so other stations near 250 or 325 kW stay on the 800 V profile. 500 kW V4 cabinets are above the 350 kW row and charge at full speed. Energy axis and seconds defined for the 77.4 kWh reference pack and **rescaled at runtime** (see "Capacity scaling") |
-| leave out | `1.9`, `1.11` (trim-dependent), `1.12`, 6, 9, 10 (Ford works without them) |
+| leave out | `1.11` (trim-dependent), `1.12`, 9 (Ford works without them); 6, 8.2 and 10 only with the `winter_model` test setting (see "Winter add-on") |
 
 ### Unit conversion for EPA-style rolldown (target) coefficients
 - A [N] = A[lbf] × 4.44822
@@ -252,7 +252,7 @@ Maps doesn't take the car's state of charge from sensor 23: it shows **energy ÷
 
 Field 26 is what Open Android Auto calls `RAW_EV_TRIP_SETTINGS {1: bytes}`; the phone asks for it as soon as the head unit offers it. The Android Auto library only parses requests for types it accepts, so the recipe raises `SensorType_IsValid` to 26 (`cmp r0,#25`, `tools/mkrecipe.py --max-type 26`); with only 23 accepted, a request for 26 logs `Failed to parse proto … SensorSource.cpp:209`.
 
-**What the mod sends** (`SocCurve`, every 5 s after the model, as its own `0x8003` message): 13 points (raw 1, 5, 10, 20 … 90, 95, 99 %) on the line through (raw 0, shown 2 %) and the car's current (energy ÷ capacity, display SOC), clamped to 0–100 and never falling. It's offered only where the recipe in memory takes type 26 (`NativeCheck.maxSensorType`): the US 260507 build today. The Ioniq 6 US 260903 recipe still stops at 23 until it's regenerated from that library with `--max-type 26`. Setting `battery_curve`. The same message carries the arrival targets when `arrival_charger_pct` / `arrival_dest_pct` are above 0 (cdqu fields 1 and 2, varints); with `battery_curve` off but a target set, sensor 26 still goes out, without points.
+**What the mod sends** (`SocCurve`, every 5 s after the model, as its own `0x8003` message): 13 points (raw 1, 5, 10, 20 … 90, 95, 99 %) on the line through (raw 0, shown 2 %) and the car's current (energy ÷ capacity, display SOC), clamped to 0–100 and never falling. It's offered only where the recipe in memory takes type 26 (`NativeCheck.maxSensorType`): the US 260507 build today. The Ioniq 6 US 260903 recipe takes 26 too since 2026-11-21: its 16-byte window there has the same md5 as the US build's, so the new verify md5 was computed from those bytes (not yet checked on an Ioniq 6). Setting `battery_curve`. The same message carries the arrival targets when `arrival_charger_pct` / `arrival_dest_pct` are above 0 (cdqu fields 1 and 2, varints); with `battery_curve` off but a target set, sensor 26 still goes out, without points.
 
 **Zero point:** `EvModelTemplate.ENERGY_ZERO_PCT` = 2.3 %, from parked log rows (energy and display SOC together): a 2022 EV6 fits 649 Wh/% × (SOC − 2.32 %) from 7 to 100 %, a 2023 Ioniq 5 730 Wh/% × (SOC − 2.27 %) from 41 to 100 % (`tools/analyze_drive_logs.py capacity`). It was 2 % until 2026-11-17.
 
@@ -366,3 +366,19 @@ Replaying the 2022 EV6's logs (`EV_LOGS=<folder> sh gpm-ev/test/run.sh`, ChargeL
 - open-android-auto (sensor 23/25 and VehicleEnergyForecast protos): https://github.com/Deadknight/open-android-auto
 - ArdaMapsEnergyProvider (the same model used on AAOS): https://github.com/Deadknight/ArdaMapsEnergyProvider
 - aa-proxy-rs issue #19 (early attempts; fuel type and connectors alone didn't trigger EV routing): https://github.com/aa-proxy/aa-proxy-rs/issues/19
+
+## Winter add-on and the block-4 test (test settings, 2026-11-21)
+
+**`winter_model`** (off by default) appends blocks Ford's sample doesn't have. They go after the model in the same sensor-23 message, and protobuf merges the second block 8 into the first. `EvModelSender.withWinter` rewrites the 2-byte length. The model plus the add-on is about 12.5 KB.
+- **6** `auxiliary_drain_at_time[0]`: the live climate power (HEV 0x4f × 20 W) plus the battery heater (HEV 0x43, W), in 100 W steps. A change of 400 W or more has to hold for 60 s before it is sent, because Maps re-routes when `6[0]` moves by 500 W or more.
+- **8.2** `charging_curves_at_temperature`: the DC rows (350–50 kW, the Supercharger rows included), 13 points each, capped at the cold-pack limits from the logbook: 5 °C → 90 kW, 12 °C → 120 kW, 18 °C → 160 kW, and 22 °C → the warm curve. Maps picks a set by `1.8`, the live pack temperature. They are scaled to the learned capacity like 8.1. The learned charge curve isn't applied to them, because they are caps.
+- **10** `battery_preconditioning`: **assumed** E-GMP values, nothing measured:
+  - target pack temperature 15 / 22 / 25 °C at 50 / 150 / 350 kW;
+  - a 5 kW heater;
+  - 120 Wh per °C above 5 °C;
+  - no preconditioning under 7.7 kWh (about 10 %);
+  - at most 5–8 °C of rise while charging.
+
+**`block4_flat_test`** (off) sets every 4.1 power to 150 kW after 8.1 has been integrated from the real curve. If Maps' planned charging minutes move, Maps reads 4.1 as a charge limit. If they don't, it is the regen limit, as v1.2 says.
+
+Host tests: `hmgapi-mod/test/WinterTest.java`. protoc decodes the model plus the add-on with the blocks merged: 16 charger rows and 4 temperature sets. Not yet on a car.

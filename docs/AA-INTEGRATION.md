@@ -267,4 +267,7 @@ Not run yet. All of these fit in one session: a parked check, a drive of about 1
 - **Drive.**
   - Before leaving, read Maps' planned arrival % at the stop and at the destination with 0.8.2 and with this build, from the same start SOC.
   - Afterwards, compare both with the real arrival %, on a route with some climb.
-- **Optional, block 4.** A test build overwrites 4.1's powers with a flat 150 kW after 8.1 is computed. If Maps' planned charging minutes move, 4.1 is used as a charge limit. If not, it's regen, as v1.2 says.
+- **Winter model** (`winter_model` on, cold morning): compare Maps' planned charge minutes and arrival % with the setting off. Watch for re-routes when the heater or the climate changes.
+- **NACS** (`ev_connector_nacs` on): Maps' Compatible plugs screen gains NACS, and Superchargers appear as stops.
+- **Ioniq 6 (260903):** `sensor 26 sent:` appears, and Maps' battery % matches the dash.
+- **Optional, block 4.** The `block4_flat_test` setting overwrites 4.1's powers with a flat 150 kW after 8.1 is computed. If Maps' planned charging minutes move, 4.1 is used as a charge limit. If not, it's regen, as v1.2 says.

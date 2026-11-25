@@ -211,6 +211,16 @@ public final class HmgApiEntry extends ModEntry {
         return mod.settingInt("arrival_charger_pct", 0) > 0 || mod.settingInt("arrival_dest_pct", 0) > 0;
     }
 
+    /** AA's EvConnectorType for Tesla's NACS / SAE J3400 (open-android-auto; Maps' own enum agrees) */
+    static final int NACS = 14;
+
+    static int[] withConnector(int[] in, int c) {
+        for (int x : in) if (x == c) return in;
+        int[] out = java.util.Arrays.copyOf(in, in.length + 1);
+        out[in.length] = c;
+        return out;
+    }
+
     static boolean liveDataOn() {
         return on("live_data");
     }
@@ -282,6 +292,15 @@ public final class HmgApiEntry extends ModEntry {
                         EvModelSender.setBatteryCurve(curve);
                         EvModelSender.setSensor26(curve || trip);
                         tripSettings(mod);
+                        // test settings: the winter add-on, and block 4 flattened (docs/AA-INTEGRATION.md)
+                        EvModelSender.setWinter(mod.settingBoolean("winter_model", false));
+                        EvModelSender.setBlock4Flat(mod.settingBoolean("block4_flat_test", false));
+                        // NACS (14) for adapter owners: mod.json lists CCS1 and J1772; HMG-API set
+                        // those just before this hook. Only where the recipe lets the library take 14
+                        if (mod.settingBoolean("ev_connector_nacs", false) && NativeCheck.nacs()
+                                && p.args.length > 5 && p.args[5] instanceof int[]) {
+                            p.args[5] = withConnector((int[]) p.args[5], NACS);
+                        }
                     }
                     if (sEvFits && liveDataOn() && p.args[2] instanceof int[]) {
                         // types the stock library takes (1..21): no patch needed
