@@ -15,7 +15,45 @@
       "default": true,
       "title": "Maps' battery % matches the car's",
       "apply": "restart",
-      "description": "Sends Maps how the car's battery % relates to the battery's energy (Android Auto sensor 26), so the percentages Maps shows (now, on arrival, at charging stops) match the dash. On E-GMP the energy runs out at about 2% on the dash, so without it Maps reads up to 2 points low near empty. Needs the energy model on and a library build whose recipe takes sensor 26 (Ioniq 5 and EV6 US 260507, EV6 Canada 260206)."
+      "description": "Sends Maps how the car's battery % relates to the battery's energy (Android Auto sensor 26), so the percentages Maps shows (now, on arrival, at charging stops) match the dash. On E-GMP the energy runs out at about 2% on the dash, so without it Maps reads up to 2 points low near empty. Needs the energy model on and a library build whose recipe takes sensor 26 (Ioniq 5 and EV6 US 260507, EV6 Canada 260206; Ioniq 6 US 260903 and Canada 260206, not yet checked on one)."
+    },
+    {
+      "key": "arrival_charger_pct",
+      "type": "number",
+      "default": 0,
+      "title": "Arrive at charging stops with at least (%)",
+      "description": "Google Maps plans its charging stops so the car arrives at each with at least this battery % (1-50). 0 (the default) leaves Maps' own setting. Sent with the battery % data (Android Auto sensor 26), so it needs the energy model on and the same library builds as \"Maps' battery % matches the car's\". Changes apply at once if that sensor was already on this session, otherwise from the next Android Auto connection."
+    },
+    {
+      "key": "arrival_dest_pct",
+      "type": "number",
+      "default": 0,
+      "title": "Arrive at the destination with (%)",
+      "description": "Google Maps plans the trip so the car reaches the destination with this battery % (1-100). 0 (the default) leaves Maps' own setting. Same needs as the setting above."
+    },
+    {
+      "key": "ev_connector_nacs",
+      "type": "toggle",
+      "default": false,
+      "title": "I carry a NACS (Tesla) adapter",
+      "apply": "restart",
+      "description": "Tells Maps the car can also use NACS (Tesla Supercharger) plugs, besides CCS1 and J1772, so its charging stops can include Superchargers that take adapters. Needs a library build whose patch takes it (Ioniq 5 and EV6 US 260507). Not yet checked on a car: see Maps' Compatible plugs screen."
+    },
+    {
+      "key": "winter_model",
+      "type": "toggle",
+      "default": false,
+      "title": "Winter model for Maps (test)",
+      "apply": "restart",
+      "description": "Also sends Maps the live heater and climate power, charge times for a cold pack (by the battery temperature it now gets), and a battery preconditioning model (assumed E-GMP values). For cold-weather arrival charge and charging-stop times. Untested on Maps: compare its plan with this off on the same route. Needs the energy model on."
+    },
+    {
+      "key": "block4_flat_test",
+      "type": "toggle",
+      "default": false,
+      "title": "Test: flat block 4 (charge or regen limit?)",
+      "apply": "restart",
+      "description": "For one car test only: sends a flat 150 kW in the energy model's block 4, which Google's schema calls the regen limit and egmp fills with the charge curve. If Maps' planned charging minutes change, block 4 is a charge limit. Leave off otherwise."
     },
     {
       "key": "preconditioning",

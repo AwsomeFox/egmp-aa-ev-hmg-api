@@ -6,7 +6,7 @@ import java.util.List;
 
 /**
  * NativeCheck against library images (hmgapi-mod/test/recipe-test.sh makes them):
- *   NativeCheckTest <recipes dir> <image> <expected recipe id or "none"> [highest sensor type it takes]
+ *   NativeCheckTest <recipes dir> <image> <expected recipe id or "none"> [highest sensor type it takes [nacs|no-nacs]]
  * The recipes are read as the zygote reads them; the image stands in for the
  * library's memory.
  */
@@ -31,9 +31,14 @@ public final class NativeCheckTest {
         for (NativeCheck.Recipe r : rs) {
             if (r.id.equals(got)) max = NativeCheck.maxSensorType(r);
         }
+        boolean nacs = false;
+        for (NativeCheck.Recipe r : rs) {
+            if (r.id.equals(got)) nacs = NativeCheck.nacs(r);
+        }
         if (a.length > 3) ok &= max == Integer.parseInt(a[3]);
+        if (a.length > 4) ok &= nacs == "nacs".equals(a[4]);
         System.out.println((ok ? "ok    " : "FAIL  ") + new File(a[1]).getName() + ": " + (got == null ? "none (" + why + ")" : got)
-                + " from " + rs.size() + " recipe(s)" + (got == null ? "" : ", sensor types up to " + max));
+                + " from " + rs.size() + " recipe(s)" + (got == null ? "" : ", sensor types up to " + max + (nacs ? ", NACS" : "")));
         if (!ok) System.exit(1);
     }
 }

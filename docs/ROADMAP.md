@@ -45,7 +45,7 @@ Use the EV logs (item 2) to correct the model on the car: compare predicted and 
 
 - **Library recipes for the other builds:** the Canadian Ioniq 5 (`a0bea1c4`, which the Wireless mod already has a recipe for; the Canadian EV6 and Ioniq 6 share the US builds' `48ee793a` and `dbfe7bd2`) and the Ioniq 5 US 260903 (build unknown; a Car Report shows it). Each needs one copy of the stock library (kept private) and `tools/mkrecipe.py`; the library keeps its C++ symbol names, so `mkrecipe.py` could find the three sites itself.
 - **Per-variant starting models:** road load from the EPA test-car list (target coefficients for every Ioniq 5, EV6, Ioniq 6, GV60 variant), picked by the pack's nominal size (HEV `BMS_EVENERGYCAPA`), the product code and the VIN's model characters; charge curves for the 58 and 84 kWh packs.
-- **Sensor 26 (`RAW_EV_TRIP_SETTINGS`):** one opaque blob in the same sensor batch as 23, read by Maps. Needs a fresh Maps decompile to recover its layout, then one byte in each recipe (accept types up to 26) and the same raw send.
+- **Sensor 26 (`RAW_EV_TRIP_SETTINGS`):** done: the battery % curve (2026-11-10) and the arrival % targets (`arrival_charger_pct`, `arrival_dest_pct`, 2026-11-21). The Ioniq 6 recipe takes 26 as well (2026-11-21, needs a check on an Ioniq 6).
 
 ## To verify (existing features)
 

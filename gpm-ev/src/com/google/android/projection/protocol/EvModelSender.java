@@ -204,13 +204,71 @@ public final class EvModelSender {
                 : Integer.MIN_VALUE) * sScale;
         writeFloatLe(msg, EvModelTemplate.ROAD_A_OFFSET, roadA);
         writeFloatLe(msg, EvModelTemplate.ROAD_C_OFFSET, sBaseC * sScale);
+        int hvac = hvacStep(EvCar.hev(HEV_FLAG_CLIMATE_W, SHARED_MAX_AGE_MS), EvCar.now());
+        msg[EvModelTemplate.HVAC_OFFSET] = (byte) hvac;
+        int packC = EvCar.packMinC();
+        if (packC != Integer.MIN_VALUE) {
+            sPackC = packC;
+        }
+        writeFloatLe(msg, EvModelTemplate.BATT_TEMP_OFFSET, sPackC != Integer.MIN_VALUE
+                ? (float) sPackC : EvModelTemplate.BATT_TEMP_PLACEHOLDER_C);
         int rc = sSource.sendRawMessage(msg);
         sRoadA = roadA;
         Log.i(TAG, "energy model sent: " + wh + " Wh of " + cap
                 + " Wh (" + capacitySource() + "), soc=" + halfPct
                 + "/200, enrg=" + sEnergyRaw + ", rc=" + rc
                 + ", out=" + (outOk ? String.valueOf(outC) : "?")
-                + "C, A=" + Math.round(roadA) + "N, " + EvCar.navSummary());
+                + "C, A=" + Math.round(roadA) + "N, hvac=" + hvac + ", pack="
+                + (sPackC != Integer.MIN_VALUE ? sPackC + "C" : "?") + ", " + EvCar.navSummary());
+    }
+
+    // ---- VEM v1.2 1.5 hvac_status and 1.8 battery_temp_c ----------------------
+
+    /** HEV DATC_CLMTPWRCNSMPTN_W: live climate power, ~20 W per unit (EvDriveLog, RoadLearn) */
+    static final int HEV_FLAG_CLIMATE_W = 0x4f;
+    static final float CLIMATE_W_PER_UNIT = 20f;
+    /** climate power at or above this is "on" (fans alone draw less) */
+    static final float HVAC_ON_W = 150f;
+    /** a new on/off state must hold this long before it is sent (Maps may re-route on a change) */
+    static final long HVAC_HOLD_MS = 60000;
+    /** VehicleInfo.HvacStatus */
+    static final int HVAC_UNKNOWN = 0, HVAC_OFF = 1, HVAC_ON = 2;
+
+    private static int sHvacSent = HVAC_UNKNOWN, sHvacSeen = -1;
+    private static long sHvacSeenAt;
+    /** last known pack temperature (cluster XEV_MIN_BATT_TEMP), C; kept when the packet goes stale */
+    private static volatile int sPackC = Integer.MIN_VALUE;
+
+    /**
+     * The hvac_status to send for this climate power reading (raw < 0: unknown), with
+     * HVAC_HOLD_MS of hysteresis. The first known state is sent at once.
+     */
+    static synchronized int hvacStep(int raw, long now) {
+        int s = raw < 0 ? HVAC_UNKNOWN : raw * CLIMATE_W_PER_UNIT >= HVAC_ON_W ? HVAC_ON : HVAC_OFF;
+        if (s == HVAC_UNKNOWN || s == sHvacSent) {
+            sHvacSeen = -1;
+            return sHvacSent;
+        }
+        if (sHvacSent == HVAC_UNKNOWN) {
+            sHvacSent = s;
+            sHvacSeen = -1;
+            return s;
+        }
+        if (s != sHvacSeen) {
+            sHvacSeen = s;
+            sHvacSeenAt = now;
+        } else if (now - sHvacSeenAt >= HVAC_HOLD_MS) {
+            sHvacSent = s;
+            sHvacSeen = -1;
+        }
+        return sHvacSent;
+    }
+
+    /** test hook */
+    static synchronized void resetHvac() {
+        sHvacSent = HVAC_UNKNOWN;
+        sHvacSeen = -1;
+        sPackC = Integer.MIN_VALUE;
     }
 
     private static int sTickFailures;
@@ -557,11 +615,19 @@ public final class EvModelSender {
             writeFloatLe(aWant, 0, EvModelTemplate.ROAD_A_N);
             byte[] cWant = new byte[4];
             writeFloatLe(cWant, 0, EvModelTemplate.ROAD_C_N);
+            byte[] tWant = new byte[4];
+            writeFloatLe(tWant, 0, EvModelTemplate.BATT_TEMP_PLACEHOLDER_C);
             for (int i = 0; i < 4; i++) {
                 if (template[EvModelTemplate.ROAD_A_OFFSET + i] != aWant[i]
-                        || template[EvModelTemplate.ROAD_C_OFFSET + i] != cWant[i]) {
+                        || template[EvModelTemplate.ROAD_C_OFFSET + i] != cWant[i]
+                        || template[EvModelTemplate.BATT_TEMP_OFFSET + i] != tWant[i]) {
                     return false;
                 }
+            }
+            // hvac_status: tag (field 5, varint) then the placeholder byte 0
+            if (template[EvModelTemplate.HVAC_OFFSET - 1] != (byte) (5 << 3)
+                    || template[EvModelTemplate.HVAC_OFFSET] != 0) {
+                return false;
             }
             int width = EvModelTemplate.SCALE_WIDTH;
             int[] offs = EvModelTemplate.AXIS_OFFSETS;

@@ -254,11 +254,34 @@ final class NativeCheck {
 
     static int maxSensorType(Recipe r) {
         for (String b : r.bytes) {
+            // SensorType_IsValid's cmp r0,#imm: #0x14 stock (types 1..21) to #0x19 (1..26)
             if (b.length() == 4 && b.endsWith("28")) {
-                return Integer.parseInt(b.substring(0, 2), 16) + 1;
+                int imm = Integer.parseInt(b.substring(0, 2), 16);
+                if (imm >= 0x14 && imm <= 0x19) return imm + 1;
             }
         }
         return 23;
+    }
+
+    /** NACS (connector type 14) gets through the library: the recipe in memory widens EvConnectorType_IsValid. */
+    static boolean nacs() {
+        if (!patched()) {
+            return false;
+        }
+        for (Recipe r : recipes()) {
+            if (r.id.equals(sOk)) {
+                return nacs(r);
+            }
+        }
+        return false;
+    }
+
+    /** EvConnectorType_IsValid's cmp r0,#9 -> cmp r0,#14 is one of the recipe's patches */
+    static boolean nacs(Recipe r) {
+        for (String b : r.bytes) {
+            if (b.equals("0e28")) return true;
+        }
+        return false;
     }
 
     static boolean patched() {
