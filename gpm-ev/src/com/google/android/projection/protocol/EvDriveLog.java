@@ -34,6 +34,12 @@ import java.util.TimeZone;
  * gap go to the old file first). aa_active says whether an Android Auto
  * session (EvModelSender) was running.
  *
+ * Where the rows go (setOutput, before start): OUT_FILE, the files above (the
+ * default, and the only mode of the NEMESIS package); OUT_USB, lines in the
+ * system log that the mod's offload service writes to a USB drive (EvUsbFeed:
+ * nothing is written to the head unit); OUT_NONE, nowhere: the rows are still
+ * built, because RoadLearn and ChargeLearn learn from them.
+ *
  * Technical data only: no location (GPS gives only the altitude change since
  * the file started), no addresses or names, no wall-clock times (the file's
  * UTC date only), no full VIN.
@@ -107,7 +113,15 @@ public final class EvDriveLog {
         "nav_charger_dep_wh", "nav_charger_chg_s",
     };
 
+    /** rows go to files in GPM's own folder (EvLogger) */
+    public static final int OUT_FILE = 0;
+    /** rows go to the system log, for the offload service to write to a USB drive (EvUsbFeed) */
+    public static final int OUT_USB = 1;
+    /** rows are built for RoadLearn and ChargeLearn only */
+    public static final int OUT_NONE = 2;
+
     private static final Object LOCK = new Object();
+    private static volatile int sOutput = OUT_FILE;
     private static Thread sThread;
     private static EvLogger sLogger;            // LOCK
     private static volatile String sPrefix;     // file name prefix for the next new file
@@ -124,8 +138,18 @@ public final class EvDriveLog {
     private static int sClimUnit = Integer.MIN_VALUE;
     private static int sClimCelsius = -1;
     private static int sFailures;
+    private static boolean sFeedHeaderDue;      // OUT_USB: send the header block before the next row
 
     private EvDriveLog() {}
+
+    /** Where the rows go: OUT_FILE, OUT_USB or OUT_NONE. Call before start(). */
+    public static void setOutput(int output) {
+        sOutput = output == OUT_USB || output == OUT_NONE ? output : OUT_FILE;
+    }
+
+    static int output() {
+        return sOutput;
+    }
 
     // ---- entry points (any thread, never throw) ----------------------------------
 
@@ -148,7 +172,8 @@ public final class EvDriveLog {
                 t.start();
             }
             registerShutdown();
-            Log.i(TAG, "started");
+            Log.i(TAG, "started" + (sOutput == OUT_USB ? " (rows to a USB drive only)"
+                    : sOutput == OUT_NONE ? " (learning only: no log is written)" : ""));
         } catch (Throwable t) {
             try {
                 Log.w(TAG, "not started: " + t);
@@ -237,6 +262,7 @@ public final class EvDriveLog {
         }
         if (now >= sNextFlush) {
             flush();
+            sFeedHeaderDue = true;  // OUT_USB: the header again, for a drive plugged in since
             sNextFlush = now + FLUSH_MS;
         }
     }
@@ -248,6 +274,10 @@ public final class EvDriveLog {
         sOdoStartRaw = -1;
         sAltStart = Double.NaN;
         sAgg.reset();
+        sFeedHeaderDue = true;
+        if (sOutput != OUT_FILE) {
+            return;
+        }
         synchronized (LOCK) {
             if (sLogger == null) {
                 File dir = EvModelSender.appFile(EvLogger.DIR);
@@ -275,8 +305,16 @@ public final class EvDriveLog {
         try {
             Object[] values = buildRow(now);
             learn(now, values);
+            int output = sOutput;
+            if (output == OUT_NONE) {
+                return;
+            }
             String row = EvLogger.csvRow(values);
             updateHeader();
+            if (output == OUT_USB) {
+                feed(row);
+                return;
+            }
             synchronized (LOCK) {
                 if (sLogger != null) {
                     sLogger.append(row);
@@ -285,6 +323,22 @@ public final class EvDriveLog {
         } catch (Throwable t) {
             logFailure(t);
         }
+    }
+
+    /** OUT_USB: the row (and, when due, the period's header block first) to the system log. */
+    private static void feed(String row) {
+        String prefix = sPrefix;
+        String header = sHeader;
+        if (prefix == null || header == null) {
+            return;
+        }
+        if (sFeedHeaderDue) {
+            for (String line : EvUsbFeed.headerBlock(sFileStart, prefix, header)) {
+                Log.i(EvUsbFeed.TAG, line);
+            }
+            sFeedHeaderDue = false;
+        }
+        Log.i(EvUsbFeed.TAG, EvUsbFeed.rowLine(sFileStart, row));
     }
 
     private static final int COL_ENERGY = column("energy_wh");

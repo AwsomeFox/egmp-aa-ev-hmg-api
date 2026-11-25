@@ -75,6 +75,68 @@ public final class SenderRowTest {
             throw new AssertionError("schema does not accept " + EvDriveLog.MAGIC);
         }
         pass++;
+        // "USB drive only": the rows go to the system log (EvUsbFeed), the header block
+        // first and again after a minute; with no output, nothing is logged at all
+        java.io.PrintStream real = System.out;
+        java.io.ByteArrayOutputStream cap = new java.io.ByteArrayOutputStream();
+        long t1 = t0 + 10L * EvDriveLog.GAP_MS;   // a new period
+        System.setOut(new java.io.PrintStream(cap, true));
+        try {
+            EvDriveLog.setOutput(EvDriveLog.OUT_USB);
+            for (int s2 = 0; s2 <= 71; s2++) {
+                EvDriveLog.step(t1 + s2 * 1000L);
+            }
+        } finally {
+            System.setOut(real);
+        }
+        String tag = "I/" + EvUsbFeed.TAG + ": ";
+        java.util.List<String> feed = new java.util.ArrayList<String>();
+        for (String l : cap.toString("UTF-8").split("\n")) {
+            if (l.startsWith(tag)) {
+                feed.add(l.substring(tag.length()));
+            }
+        }
+        int blocks = 0, rows = 0, firstRow = -1, firstE = -1;
+        for (int k = 0; k < feed.size(); k++) {
+            String l = feed.get(k);
+            if (l.startsWith("B " + t1 + " egmp-")) {
+                blocks++;
+            } else if (l.equals("E") && firstE < 0) {
+                firstE = k;
+            } else if (l.startsWith("R " + t1 + " ")) {
+                rows++;
+                if (firstRow < 0) {
+                    firstRow = k;
+                }
+                if (l.substring(("R " + t1 + " ").length()).split(",", -1).length != EvDriveLog.COLUMNS.length) {
+                    throw new AssertionError("feed row columns: " + l);
+                }
+            }
+        }
+        if (blocks != 2 || rows != 14 || firstE < 0 || firstRow != firstE + 1
+                || !feed.get(1).equals("H " + EvDriveLog.MAGIC)
+                || !feed.get(firstE - 1).equals("H " + String.join(",", EvDriveLog.COLUMNS))
+                || !feed.get(firstRow).startsWith("R " + t1 + " 5,")) {
+            throw new AssertionError("usb feed: blocks " + blocks + " rows " + rows + " first row at " + firstRow
+                    + " first E at " + firstE + "\n" + feed);
+        }
+        pass++;
+        cap.reset();
+        long t2 = t1 + 20L * EvDriveLog.GAP_MS;
+        System.setOut(new java.io.PrintStream(cap, true));
+        try {
+            EvDriveLog.setOutput(EvDriveLog.OUT_NONE);
+            for (int s2 = 0; s2 <= 71; s2++) {
+                EvDriveLog.step(t2 + s2 * 1000L);
+            }
+        } finally {
+            System.setOut(real);
+            EvDriveLog.setOutput(EvDriveLog.OUT_FILE);
+        }
+        if (cap.toString("UTF-8").contains(EvUsbFeed.TAG) || cap.toString("UTF-8").contains("logging to")) {
+            throw new AssertionError("no output, but logged: " + cap.toString("UTF-8"));
+        }
+        pass++;
         System.out.println("EvDriveLog row: " + EvDriveLog.COLUMNS.length
                 + " columns, no exception");
         System.out.println("passed: " + pass + ", failed: 0");

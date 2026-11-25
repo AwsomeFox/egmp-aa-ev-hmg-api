@@ -25,7 +25,7 @@ mkdir -p "$SOUT"
 javac -nowarn -d "$SOUT" -cp "$ANDROID_HOME/platforms/android-19/android.jar" \
     test/shim/android/util/Log.java test/shim/android/os/SystemClock.java \
     src/$PKG/EvModelSender.java src/$PKG/EvModelTemplate.java src/$PKG/EvLogger.java \
-    src/$PKG/EvCar.java src/$PKG/EvDriveLog.java src/$PKG/EvRowAgg.java src/$PKG/RoadLearn.java \
+    src/$PKG/EvCar.java src/$PKG/EvDriveLog.java src/$PKG/EvUsbFeed.java src/$PKG/EvRowAgg.java src/$PKG/RoadLearn.java \
     src/$PKG/ChargeLearn.java src/$PKG/ChargeCurve.java \
     src/$PKG/NavProto.java src/$PKG/PrecondCore.java src/$PKG/Precond.java \
     stubs/$PKG/SensorSource.java stubs/com/hkmc/cluster/NavigationCluster.java \

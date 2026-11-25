@@ -14,7 +14,7 @@
 #
 # hooks.jar: the mod's code in GPM. The classes the NEMESIS build shares
 # (gpm-ev/src: NavProto, PrecondCore, EvRowAgg, EvLogger, EvModelTemplate, RoadLearn, ChargeLearn, ChargeCurve,
-# EvDriveLog) come from there unchanged, except EvDriveLog's package line in
+# EvDriveLog, EvUsbFeed) come from there unchanged, except EvDriveLog's package line in
 # the log header; EvCar, EvModelSender and Precond are this mod's own
 # (hmgapi-mod/src), with HmgApiEntry, HmgCar, NativeCheck and Relay. Both builds
 # carry the same hooks.jar; the standalone one keeps preconditioning off.
@@ -41,7 +41,7 @@ rm -rf "$B" "$MOD" "$SOLO"
 mkdir -p "$B/src/$PKG" "$B/hooks" "$B/relay" "$MOD" "$SOLO"
 
 echo "== hooks.jar"
-for c in NavProto PrecondCore EvRowAgg EvLogger EvModelTemplate EvDriveLog RoadLearn ChargeLearn ChargeCurve; do
+for c in NavProto PrecondCore EvRowAgg EvLogger EvModelTemplate EvDriveLog EvUsbFeed RoadLearn ChargeLearn ChargeCurve; do
     cp "gpm-ev/src/$PKG/$c.java" "$B/src/$PKG/"
 done
 # the log header names the writer
