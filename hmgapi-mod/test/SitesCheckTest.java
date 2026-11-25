@@ -72,6 +72,10 @@ public final class SitesCheckTest {
         check("E-GMP by model code", HmgApiEntry.egmp("CVEV.CAN.0000.V015.010.260206") && HmgApiEntry.egmp("NEEV23SE.USA.0000.V015.012.260507")
                 && !HmgApiEntry.egmp("OSEV.USA.0000.V015.012.260507") && !HmgApiEntry.egmp("SG2EV.USA.0000.V015.012.260507")
                 && HmgApiEntry.egmp(""));
+        check("road load fitted: Ioniq 5 and EV6, not the Ioniq 6 or other EVs",
+                HmgApiEntry.roadFitted("NEEV23SE.USA.0000.V015.012.260507") && HmgApiEntry.roadFitted("CVEV.CAN.0000.V015.010.260206")
+                && !HmgApiEntry.roadFitted("CEEV.USA.0000.V015.012.260903") && !HmgApiEntry.roadFitted("OSEV.USA.0000.V015.012.260507")
+                && HmgApiEntry.roadFitted(""));
         System.out.println("SitesCheckTest: " + passed + " passed, " + failed + " failed");
         if (failed > 0) System.exit(1);
     }
