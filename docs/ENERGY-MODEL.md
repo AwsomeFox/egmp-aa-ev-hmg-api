@@ -3,7 +3,7 @@
 Date: 2026-10-27, updated 2026-10-29 (v0.2.0). Schema recovered from **Google Maps 26.43.00** (`private/maps-26.43/`, jadx output). The only real sample is still aa-proxy-rs's `ford_ev_model.bin` (Ford F-150 Lightning capture, 9.5 KB), kept in `reference/`.
 
 Files in `reference/`:
-- `vehicle_energy_model.proto`: the recovered schema. Field numbers and types are exact; names are ours.
+- `vehicle_energy_model.proto`: the recovered schema. Field numbers and types are exact. Since 2026-11-21 the names follow Google's own schema (see "Google's schema (VEM v1.2)" below).
 - `lite_schema.py`: dumps a protobuf-lite message tree from jadx sources (`python3 reference/lite_schema.py private/maps-26.43/jadx/sources/defpackage cdim`).
 - `pbdump.py` / `ford_ev_model.dump.txt`: the schema-less dump. **Note:** it shows `sint32` fields as raw varints, so the x axes in blocks 3 and 5 there are doubled.
 
@@ -20,14 +20,35 @@ Files in `reference/`:
 
 | | `bdjr` "fake" | `qgr` "demo-vemlite" | `qgr` "demo-vemzero" | Ford sample |
 |---|---|---|---|---|
-| `1.2` reserve Wh | 2000 | 2154 | 2501 | 3175 |
+| `1.2` mass kg (was read as reserve Wh) | 2000 | 2154 | 2501 | 3175 |
 | `1.3` current Wh | 73800 | % × 78000 | caller value | 68378 |
 | `1.4` capacity Wh | 82000 | 78000 | 65677 | 92403 |
 | `1.9` | 170000 | 170000 | 240000 | - |
 | `1.10` | 155000 | 155000 | 150000 | - |
 | road load A / B / C | 1200 / 0 / 1e-10 | 138.38 / 2.18 / 0.3617 | - | 167.3 / 2.8 / 0.75 |
 
-Every sample has a reserve of 2.4–3.8% of capacity. The vemlite road load fits a mid-size EV crossover in N, N/(m/s), N/(m/s)².
+Every sample's `1.2` is 2.4–3.8% of its capacity, which first read as a reserve; Google's schema says it is the mass in kg. The vemlite road load fits a mid-size EV crossover in N, N/(m/s), N/(m/s)².
+
+## Google's schema (VEM v1.2)
+
+Google's own definition, labelled "Vehicle energy model (v1.2)", package `maps.automotive.vehicle_energy_model`, is public in [kangrio/CarService-AOSP `proto/energy_model.proto`](https://github.com/kangrio/CarService-AOSP/blob/main/proto/energy_model.proto). It points to a partner-only page (`docs.partner.android.com/gas/integrate/maps/maps_ev/vem_reference`). It matches the recovered layout in every block: same field numbers, wire types and nesting, including `3.7` (drivetrain losses at 7, 1-6 reserved), `5.4` (battery losses at 4, 1-3 reserved), `6` {1, 3} with 2 reserved, the five-part block 10, and `1.5` as a 3-value enum. That settles most of the "unknown" rows below (2026-11-21):
+
+| Path | v1.2 name | Notes |
+|---|---|---|
+| `1.2` Q | `mass_kilograms` | **vehicle mass in kg**, not a Wh reserve. The demo values (2000-3175) are vehicle masses; the "~3% of capacity" was a coincidence. egmp sent 2400 until 0.8.x and sends 2200 now (2023 US Ioniq 5: 1,950-2,115 kg curb, plus a driver) |
+| `1.5` enum | `hvac_status` | 0 unknown, 1 off, 2 on. **Live now**: on when climate power (HEV 0x4f) is ≥ 150 W, with 60 s hysteresis |
+| `1.6` float | `reference_air_density` | |
+| `1.8` float | `battery_temp_celsius` | "only required if battery preconditioning parameters are provided". **Live now**: the cluster packet's min pack temp (`XEV_MIN_BATT_TEMP`); 25 °C until the first packet |
+| `1.9` uint32 | `peak_motor_power_watts` | "only required for lightweight predictions". **Sent by trim**: 168 kW (long-range RWD) until the front motor reports drive energy (HEV 0x47, AWD: 239 kW); 125 kW for a learned pack under 56 kWh (standard range) |
+| `1.10` uint32 | `maximum_charging_rate_watts` | lightweight predictions. **Sent now**: 235 kW, the 4.1 peak |
+| `1.11` bool | `heat_pump_equipped` | lightweight predictions. Trim-dependent; not sent |
+| `1.12[]` | - | not in v1.2 (newer than the leak) |
+| `4` | `max_regen_power` {1 at energy level, 2 at relative time} | **regen**, not charge, power. egmp fills 4.1 with the DC charge curve (the Ford sample has a charge-like curve there too). Car test: flatten 4.1 and see whether Maps' charge minutes move |
+| `6[]` | `auxiliary_drain_at_time` {1 relative time s, 3 drain W} | future aux drain, held > 15 min, then Maps falls back to 7 |
+| `7[]` Q2 / Q3 / Q4 | `hvac_drain_watts` / `battery_conditioning_drain_watts` / `total_drain_watts` | egmp fills the total, like Ford |
+| `8.2[]` | `charging_curves_at_temperature` (battery temp) | "only required if battery preconditioning parameters are provided" |
+| `9` | `current_charging_time` {target Wh, time remaining s} | only while plugged in |
+| `10` | `battery_preconditioning` | {1 target pack temp by charger power, 2 conditioning power W, 3 extra Wh by target temp, 4 minimum battery Wh, 5 max temp rise at a station by charger power} |
 
 ## Field map (paths are inside `SensorBatch.23`)
 
@@ -35,29 +56,29 @@ Confidence: **code** = proven by Maps code. **strong** = units and values fit ph
 
 | Path (type) | → `cbjh` | Ford value | Meaning | Confidence |
 |---|---|---|---|---|
-| `1.2` Q | 1.1.i | 3175 | reserve / below-zero buffer, Wh | strong (always ~3% of capacity) |
+| `1.2` Q | 1.1.i | 3175 | vehicle mass, kg | Google schema (v1.2) |
 | `1.3` Q | 1.1.d | 68378 | **current battery energy, Wh**. Must be > 0 | code |
 | `1.4` Q | 1.1.e | 92403 | **capacity, Wh** (100% point for battery %) | code |
-| `1.5` enum | 1.1.f | - | 3-valued enum (0,1,2), unknown | - |
+| `1.5` enum | 1.1.f | - | HVAC status: 0 unknown, 1 off, 2 on | Google schema (v1.2) |
 | `1.6` float | 1.1.g | 1.293 | air density, kg/m³ | strong |
 | `1.7` float | 1.1.h | 27.5 | outside temperature, °C | strong |
-| `1.8` float | 1.1.m | - | ? | - |
-| `1.9` uint32 | 1.1.j | - | power in W? (demos 170 kW / 240 kW). Maybe max DC charge power | guess |
-| `1.10` uint32 | 1.1.k | - | power in W? (demos 155 kW / 150 kW). Maybe max discharge or regen | guess |
-| `1.11` bool | 1.1.l | - | ? | - |
+| `1.8` float | 1.1.m | - | battery temperature, °C | Google schema (v1.2) |
+| `1.9` uint32 | 1.1.j | - | peak motor power, W (demos 170 kW / 240 kW) | Google schema (v1.2) |
+| `1.10` uint32 | 1.1.k | - | maximum charging rate, W (demos 155 kW / 150 kW) | Google schema (v1.2) |
+| `1.11` bool | 1.1.l | - | heat pump equipped | Google schema (v1.2) |
 | `1.12[]` {enum(5), uint32} | 1.1.n | - | ? (could be per-connector limits) | - |
 | `2.1.1` / `2.2.1` / `2.3.1` float | 2 | 167.3 / 2.8 / 0.75 | **road load A [N], B [N/(m/s)], C [N/(m/s)²]**. `x.2` float is never set | code (re-route thresholds) + strong |
 | `3.7[]` {float speed m/s, `2[]` {**sint32** x, Q y}} | 10 | 10 rows × 50 pts | **drivetrain loss map**: x = wheel power 0..191498 W (step 3908), y = loss W. Efficiency at 100 kW goes from 74% (standstill) to 91% (36 m/s). Ford has no negative x (regen) points | strong |
 | `3.8` uint32 | 10.d | - | ? | - |
-| `4.1[]` {int32 Wh, uint32 W} | 4.b | 26 rows | **max charge power vs battery energy** (flat 207 kW, tapering above 105 kWh) | strong |
-| `4.2[]` {int32, uint32} | 4.c | - | second table of the same shape (discharge/regen limit?) | guess |
+| `4.1[]` {int32 Wh, uint32 W} | 4.b | 26 rows | Google schema: **max regen power vs battery energy**. Ford's curve (flat 207 kW, tapering above 105 kWh) read as a charge curve, and egmp sends its charge curve here | Google schema (v1.2); egmp's use untested |
+| `4.2[]` {int32, uint32} | 4.c | - | max regen power vs relative time (s) | Google schema (v1.2) |
 | `5.4[]` {**sint32** x, Q y} | 11 | 30 pts | **battery internal loss**: x = battery power 5..150 kW, y = loss W, exactly I²R with R ≈ 0.030 Ω at 400 V | strong |
-| `6[]` {int32, Q at field 3} | 6 | - | unknown. Changes to `[0]` trigger a re-route | - |
-| `7[]` {float °C, Q 2, Q 3, Q 4} | 7 | 15 rows, only Q4 | **aux/HVAC power vs outside temp**, W. Q2/Q3 are probably other aux states | strong (Q4) |
+| `6[]` {int32, Q at field 3} | 6 | - | future aux drain: relative time s, drain W. Changes to `[0]` trigger a re-route | Google schema (v1.2) |
+| `7[]` {float °C, Q 2, Q 3, Q 4} | 7 | 15 rows, only Q4 | **aux drain vs outside temp**, W: Q2 HVAC, Q3 battery conditioning, Q4 total | Google schema (v1.2) |
 | `8.1[]` {int32 charger W, `2[]` {int32 Wh, int32 s}} | 8.b | 9 tables | **charge-time tables per charger power**. Each point is (**Wh still needed to reach full**, **seconds to full** from there), in descending headroom, no (0, 0) point. See "8.1 semantics" below | strong (DC: reproduces Maps' figures); AC rows uncertain |
-| `8.2[]` {float, `2[]` as 8.1} | 8.c | - | the same tables keyed by a float, probably temperature | guess |
-| `9` {int32, Q at field 2} | 9 | empty | ? | - |
-| `10` {UF[], u32, FU[], u32, UF[]} | 13 | - | ? `10.2` triggers re-routes | - |
+| `8.2[]` {float, `2[]` as 8.1} | 8.c | - | the same tables keyed by battery temperature | Google schema (v1.2) |
+| `9` {int32, Q at field 2} | 9 | empty | charging time while plugged in: target Wh, time remaining s | Google schema (v1.2) |
+| `10` {UF[], u32, FU[], u32, UF[]} | 13 | - | battery preconditioning (see the v1.2 table). `10.2` (conditioning power) triggers re-routes | Google schema (v1.2) |
 
 ## What an Ioniq 5 model needs
 
@@ -66,7 +87,9 @@ Write it as protobuf text (`vem.VehicleEnergyModel`), then `protoc --encode=vem.
 | Block | Source |
 |---|---|
 | `1.3` / `1.4` | `1.3` = BMS remaining energy (HEV 0x31 `ENERGYMAP` × 2 Wh), live. `1.4` = usable capacity learned on the car as that energy ÷ display SOC (~62.9 kWh on the owner's pack); 77.4 kWh (2022 US LR) until a sample is learned. See "Capacity scaling" |
-| `1.2` | ~3% of capacity |
+| `1.2` | vehicle mass, 2200 kg (2400 until 0.8.x, when it was read as a reserve) |
+| `1.5`, `1.8` | live: HVAC on/off from climate power (HEV 0x4f ≥ 150 W, 60 s hysteresis); pack temp from the cluster's battery packet (`XEV_MIN_BATT_TEMP`), 25 °C until known |
+| `1.10` | 235 kW, the 4.1 peak |
 | `1.6`, `1.7` | 1.225 static density; **outside temp is live** (nav battery packet `DATC_OUT_TEMP_SNSR` via `NavigationCluster.requestBatteryInfoReq()`, patched in place at runtime) |
 | `2.x` road load | **your rolldown data** (conversions below) |
 | `3.7` loss map | not in rolldown. Scale Ford's map, or build one from an efficiency estimate. Remember x is **sint32** |
@@ -74,7 +97,7 @@ Write it as protobuf text (`vem.VehicleEnergyModel`), then `protoc --encode=vem.
 | `5.4` | I²R: loss = R·(P/V)². Use the pack's DC resistance and ~650–700 V nominal. R is unmeasured; estimate it from the cell count and cell resistance, or from the voltage sag under load |
 | `7` aux power (Q4) | driving heater/A-C power vs outside temp; cold part calibrated with road load A (see "Cold weather") |
 | `8.1` | integrated from 4.1 (×η=0.95 charger→battery, 0.5% cells in 4 slices) + AC limits (10.9 kW onboard, 1.44 kW L1); 16 charger rows (350/330/325/320/260/250/240/200/175/150/125/100/50/25 kW DC, 10.9/1.44 kW AC). Each row has 29 points of (headroom to full, seconds to full): headroom from 100% down to 10% in 5% steps, then 9…1% in 1% steps, then 0.5%. **250 and 325 kW = Tesla Superchargers** (see "Tesla Superchargers" below): V3 cabinets (listed at 250 kW) and V4 posts on upgraded V3 cabinets (listed at 325 kW) run at ~500 V, so the 800 V pack charges via the boost converter at a flat 97 kW to 90% (no step-down or pause), then the normal taper. Maps keys these tables by charger power only, so the voltage limit has to live in those rows; 260/240 and 330/320 kW rows bracket them so other stations near 250 or 325 kW stay on the 800 V profile. 500 kW V4 cabinets are above the 350 kW row and charge at full speed. Energy axis and seconds defined for the 77.4 kWh reference pack and **rescaled at runtime** (see "Capacity scaling") |
-| leave out | `1.5`, `1.8`–`1.12`, 6, 9, 10 (Ford works without them) |
+| leave out | `1.11` (trim-dependent), `1.12`, 9 (Ford works without them); 6, 8.2 and 10 only with the `winter_model` test setting (see "Winter add-on") |
 
 ### Unit conversion for EPA-style rolldown (target) coefficients
 - A [N] = A[lbf] × 4.44822
@@ -201,7 +224,7 @@ Shipped-model decisions from this:
 - **Live outside temp** (nav battery packet `DATC_OUT_TEMP_SNSR` via `NavigationCluster.requestBatteryInfoReq()`) patches field 1.7, so the block-7 aux table does real work in winter/summer.
 
 Explored and parked:
-- **Temp-keyed charge tables (8.2 `by_temp`)**: implemented, then removed. The semantics are unconfirmed, and there's a structural hole: the planner can't pick a per-stop temperature without knowing pack temp and its evolution — no pack-temp field exists in the sensor-23 schema, so any 8.2 consumer needs its own thermal model. Possible real channel for pack temp: **sensor 25 (`cdhl`)** — schema `cdig{1: int32, 2: int32, 4: repeated {3: float, 4: float}}`, unconfirmed; Ford works without it. The self-correcting mechanism (re-send every 5 s, variant/curve always reflects current pack) is the robust path.
+- **Temp-keyed charge tables (8.2 `by_temp`)**: implemented, then removed. The semantics are unconfirmed, and there's a structural hole: the planner can't pick a per-stop temperature without knowing pack temp and its evolution — no pack-temp field exists in the sensor-23 schema, so any 8.2 consumer needs its own thermal model. (Correction, 2026-11-21: Google's v1.2 schema has one, `1.8` `battery_temp_celsius`, which egmp now sends live; 8.2 and block 10 would build on it.) Possible real channel for pack temp: **sensor 25 (`cdhl`)** — schema `cdig{1: int32, 2: int32, 4: repeated {3: float, 4: float}}`, unconfirmed; Ford works without it. The self-correcting mechanism (re-send every 5 s, variant/curve always reflects current pack) is the robust path.
 - **Pack-temp variant swap with hysteresis**: worked in code, but "current temp" is the wrong state for planning a stop an hour away (preconditioning). Stripped per above.
 - **Nav battery packet layout** (`BATTERY_INFO_RX`, 11 bytes): [0]=SOC in 0.5% steps ✓, [1]=min cell temp °C ✓, [2..3]=`EV_AVLBL_ENRG` big-endian uint16 tracking SOC (~7202 units at 24% — units unconfirmed; 2 Wh ⇒ 60 kWh full, conflicts with 77.4; maybe power, maybe display-buffered SOC), [6]=`VCU_DTE_BASE` 76 ≈ cluster km, [9]/[10] vary (status?). Pin units down with a drive/charge capture where SOC moves. *(Resolved, see [DATA-SOURCES.md](DATA-SOURCES.md) §1.1: [2..3] is the BMS remaining usable energy in 2 Wh steps, already degraded, so the "conflict" with 77.4 was the real capacity loss; byte 6 is the outside temperature and DTE is bytes 8–9.)*
 - **Regen (negative-x) drivetrain points**: shipped as an experiment (sint32 allows it, Ford omits it); validate downhill predictions on a hilly drive.
@@ -215,7 +238,8 @@ Maps doesn't take the car's state of charge from sensor 23: it shows **energy ÷
   ```
   cdpz { 1: cdqu { 1: int32, 2: int32, 4: repeated cdqt { 3: float raw %, 4: float shown % } } }
   ```
-- `avqa` keeps the points only if 0 < raw < 100, 0 ≤ shown ≤ 100, raw rising and shown not falling (fields 1 and 2 aren't read).
+- `avqa` keeps the points only if 0 < raw < 100, 0 ≤ shown ≤ 100, raw rising and shown not falling (`avqa` doesn't read fields 1 and 2).
+- **Fields 1 and 2 are the EV trip settings** (Maps 26.44, 2026-11-21): `awfg.b()` returns `cdqu.1` and `awfg.c()` returns `cdqu.2` when they are > 0 (and a projected-car check, `akvk.E().b()`, passes), ahead of the user's own vehicle-profile values and a server default. The profile class (`bdpt`) names them in its `toString`: **1 = `minimumArrivalBatteryPercentageForChargingStops`**, **2 = `targetArrivalBatteryPercentageForDestination`**. So the head unit can set Maps' "arrive at chargers with at least X %" and "arrive at the destination with Y %". egmp sends neither (0, not set), so Maps uses the user's settings. Debug overrides (`azqv.bO`/`bP`) come first. A mod setting for these is possible but untested on the car.
 - `ayzm.K(energy, capacity, curve)` takes raw % = energy × 100 ÷ capacity and maps it through the points, linear between them, with (0, 0) and (100, 100) assumed at the ends. Every battery percent Maps shows goes through it: the current level, arrival at stops and the destination, and its "arrives at 0 %" checks.
 
 **On the wire it's field 26, wrapped.** Maps' sensor numbers aren't Android Auto's (Maps' 11, driving status, is the wire's 13). Tested on a US Ioniq 5 with a curve that adds 20 points, so the effect is obvious in Maps:
@@ -228,7 +252,7 @@ Maps doesn't take the car's state of charge from sensor 23: it shows **energy ÷
 
 Field 26 is what Open Android Auto calls `RAW_EV_TRIP_SETTINGS {1: bytes}`; the phone asks for it as soon as the head unit offers it. The Android Auto library only parses requests for types it accepts, so the recipe raises `SensorType_IsValid` to 26 (`cmp r0,#25`, `tools/mkrecipe.py --max-type 26`); with only 23 accepted, a request for 26 logs `Failed to parse proto … SensorSource.cpp:209`.
 
-**What the mod sends** (`SocCurve`, every 5 s after the model, as its own `0x8003` message): 13 points (raw 1, 5, 10, 20 … 90, 95, 99 %) on the line through (raw 0, shown 2 %) and the car's current (energy ÷ capacity, display SOC), clamped to 0–100 and never falling. It's offered only where the recipe in memory takes type 26 (`NativeCheck.maxSensorType`): the US 260507 build today. The Ioniq 6 US 260903 recipe still stops at 23 until it's regenerated from that library with `--max-type 26`. Setting `battery_curve`.
+**What the mod sends** (`SocCurve`, every 5 s after the model, as its own `0x8003` message): 13 points (raw 1, 5, 10, 20 … 90, 95, 99 %) on the line through (raw 0, shown 2 %) and the car's current (energy ÷ capacity, display SOC), clamped to 0–100 and never falling. It's offered only where the recipe in memory takes type 26 (`NativeCheck.maxSensorType`): the US 260507 build today. The Ioniq 6 US 260903 recipe takes 26 too since 2026-11-21: its 16-byte window there has the same md5 as the US build's, so the new verify md5 was computed from those bytes (not yet checked on an Ioniq 6). Setting `battery_curve`. The same message carries the arrival targets when `arrival_charger_pct` / `arrival_dest_pct` are above 0 (cdqu fields 1 and 2, varints); with `battery_curve` off but a target set, sensor 26 still goes out, without points.
 
 **Zero point:** `EvModelTemplate.ENERGY_ZERO_PCT` = 2.3 %, from parked log rows (energy and display SOC together): a 2022 EV6 fits 649 Wh/% × (SOC − 2.32 %) from 7 to 100 %, a 2023 Ioniq 5 730 Wh/% × (SOC − 2.27 %) from 41 to 100 % (`tools/analyze_drive_logs.py capacity`). It was 2 % until 2026-11-17.
 
@@ -246,7 +270,7 @@ Issue #13 (AwsomeFox/egmp-aa-ev-hmg-api): a 2022 EV6 AWD, US 260507, ~90k mi. 28
 
 Not changed:
 - **Stop-and-go city driving:** it uses ~20 % more than the steady-speed model on both the EV6 and a 2023 Ioniq 5's city logs. Maps plans that part itself.
-- **Hills:** they cost ~4.8 Wh per metre of GPS altitude. Hills are Maps' server's job; the model has no mass field.
+- **Hills:** they cost ~4.8 Wh per metre of GPS altitude. Hills are Maps' server's job. (It has a mass field after all: `1.2`, see "Google's schema (VEM v1.2)".)
 
 **DC plateau 160 → 135 kW (53–80 %).**
 - After a 2–3 min ramp-up, the EV6 held 120–125 kW battery-side from 45 to 80 % on a 350 kW charger, with the pack at 20–28 °C.
@@ -342,3 +366,19 @@ Replaying the 2022 EV6's logs (`EV_LOGS=<folder> sh gpm-ev/test/run.sh`, ChargeL
 - open-android-auto (sensor 23/25 and VehicleEnergyForecast protos): https://github.com/Deadknight/open-android-auto
 - ArdaMapsEnergyProvider (the same model used on AAOS): https://github.com/Deadknight/ArdaMapsEnergyProvider
 - aa-proxy-rs issue #19 (early attempts; fuel type and connectors alone didn't trigger EV routing): https://github.com/aa-proxy/aa-proxy-rs/issues/19
+
+## Winter add-on and the block-4 test (test settings, 2026-11-21)
+
+**`winter_model`** (off by default) appends blocks Ford's sample doesn't have. They go after the model in the same sensor-23 message, and protobuf merges the second block 8 into the first. `EvModelSender.withWinter` rewrites the 2-byte length. The model plus the add-on is about 12.5 KB.
+- **6** `auxiliary_drain_at_time[0]`: the live climate power (HEV 0x4f × 20 W) plus the battery heater (HEV 0x43, W), in 100 W steps. A change of 400 W or more has to hold for 60 s before it is sent, because Maps re-routes when `6[0]` moves by 500 W or more.
+- **8.2** `charging_curves_at_temperature`: the DC rows (350–50 kW, the Supercharger rows included), 13 points each, capped at the cold-pack limits from the logbook: 5 °C → 90 kW, 12 °C → 120 kW, 18 °C → 160 kW, and 22 °C → the warm curve. Maps picks a set by `1.8`, the live pack temperature. They are scaled to the learned capacity like 8.1. The learned charge curve isn't applied to them, because they are caps.
+- **10** `battery_preconditioning`: **assumed** E-GMP values, nothing measured:
+  - target pack temperature 15 / 22 / 25 °C at 50 / 150 / 350 kW;
+  - a 5 kW heater;
+  - 120 Wh per °C above 5 °C;
+  - no preconditioning under 7.7 kWh (about 10 %);
+  - at most 5–8 °C of rise while charging.
+
+**`block4_flat_test`** (off) sets every 4.1 power to 150 kW after 8.1 has been integrated from the real curve. If Maps' planned charging minutes move, Maps reads 4.1 as a charge limit. If they don't, it is the regen limit, as v1.2 says.
+
+Host tests: `hmgapi-mod/test/WinterTest.java`. protoc decodes the model plus the add-on with the blocks merged: 16 charger rows and 4 temperature sets. Not yet on a car.

@@ -224,8 +224,26 @@ public final class EvModelSender {
                 : Integer.MIN_VALUE) * sScale;
         writeFloatLe(msg, EvModelTemplate.ROAD_A_OFFSET, roadA);
         writeFloatLe(msg, EvModelTemplate.ROAD_C_OFFSET, sBaseC * sScale);
+        int hvac = hvacStep(EvCar.hev(HEV_FLAG_CLIMATE_W, SHARED_MAX_AGE_MS), EvCar.now());
+        msg[EvModelTemplate.HVAC_OFFSET] = (byte) hvac;
+        int packC = EvCar.packMinC();
+        if (packC != Integer.MIN_VALUE) {
+            sPackC = packC;
+        }
+        writeFloatLe(msg, EvModelTemplate.BATT_TEMP_OFFSET, sPackC != Integer.MIN_VALUE
+                ? (float) sPackC : EvModelTemplate.BATT_TEMP_PLACEHOLDER_C);
+        int motorW = motorW(EvCar.hev(HEV_FLAG_FRONT_MOTOR_WH, SHARED_MAX_AGE_MS), cap);
+        writeFixedVarint(msg, EvModelTemplate.MOTOR_OFFSET, motorW, 3);
+        if (sBlock4Flat) {
+            flattenBlock4(msg);
+        }
+        int aux = -1;
+        if (sWinter) {
+            aux = auxStep(auxDrainRawW(), EvCar.now());
+            msg = withWinter(msg, cap, aux);
+        }
         int rc = sSource.send(msg);
-        if (sBatteryCurve) {
+        if (sSensor26) {
             sendBatteryCurve(wh, cap, halfPct);
         }
         sRoadA = roadA;
@@ -233,30 +251,262 @@ public final class EvModelSender {
                 + " Wh (" + capacitySource() + "), soc=" + halfPct
                 + "/200, enrg=" + sEnergyRaw + ", rc=" + rc
                 + ", out=" + (outOk ? String.valueOf(outC) : "?")
-                + "C, A=" + Math.round(roadA) + "N, " + EvCar.navSummary());
+                + "C, A=" + Math.round(roadA) + "N, hvac=" + hvac + ", pack="
+                + (sPackC != Integer.MIN_VALUE ? sPackC + "C" : "?") + ", motor=" + motorW / 1000 + "kW"
+                + (sWinter ? ", winter aux=" + aux + "W" : "") + (sBlock4Flat ? ", 4.1 flat" : "")
+                + ", " + EvCar.navSummary());
+    }
+
+    // ---- VEM 1.9 peak motor power by trim ----------------------------------------
+
+    /** HEV MCU_MG1MOTPOWER_WH: the front motor's drive energy this drive; only an AWD car moves it */
+    static final int HEV_FLAG_FRONT_MOTOR_WH = 0x47;
+    /** a learned usable capacity under this is a standard-range pack (58 kWh nominal; long range learns ~63) */
+    static final int SR_CAPACITY_WH = 56000;
+    private static volatile boolean sAwd;
+
+    /** peak_motor_power_w: AWD once the front motor has drive energy, SR for a small pack, else RWD long range */
+    static int motorW(int frontRaw, int capWh) {
+        if (frontRaw > 0 && frontRaw < 0xffff) {
+            sAwd = true;
+        }
+        if (sAwd) {
+            return EvModelTemplate.MOTOR_AWD_W;
+        }
+        return capWh > 0 && capWh < SR_CAPACITY_WH ? EvModelTemplate.MOTOR_SR_W : EvModelTemplate.MOTOR_RWD_W;
+    }
+
+    // ---- test: block 4 flat (setting block4_flat_test) -------------------------------
+
+    private static volatile boolean sBlock4Flat;
+    static final int BLOCK4_FLAT_W = 150000;
+
+    static void setBlock4Flat(boolean on) {
+        sBlock4Flat = on;
+    }
+
+    /**
+     * Every 4.1 power to BLOCK4_FLAT_W, after 8.1 was integrated from the real curve: if
+     * Maps' planned charging minutes move, it reads 4.1 as a charge limit; if not, 4.1 is
+     * regen (Google's v1.2: max_regen_power). The car test in docs/AA-INTEGRATION.md.
+     */
+    static void flattenBlock4(byte[] msg) {
+        for (int off : EvModelTemplate.POWER_OFFSETS) {
+            writeFixedVarint(msg, off, BLOCK4_FLAT_W, EvModelTemplate.SCALE_WIDTH);
+        }
+    }
+
+    // ---- the winter add-on (setting winter_model): blocks 6, 8.2 and 10 ----------------
+
+    private static volatile boolean sWinter;
+    private static byte[] sWinterTemplate, sWinterScaled;
+    private static int sWinterCapWh = -1;
+
+    static void setWinter(boolean on) {
+        sWinter = on;
+    }
+
+    /** host tests: the decoded add-on (android.util.Base64 is a stub off the car) */
+    static synchronized void setWinterTemplate(byte[] b) {
+        sWinterTemplate = b;
+        sWinterScaled = null;
+    }
+
+    /** HEV live climate power (~20 W per unit) and live battery heater power (W) */
+    static final int HEV_FLAG_BATT_HEATER_W = 0x43;
+    /** a new drain must differ by this much for this long before it is sent (Maps re-routes at 500 W) */
+    static final int AUX_STEP_W = 400;
+    static final long AUX_HOLD_MS = 60000;
+    private static int sAuxSent = -1, sAuxSeen = -1;
+    private static long sAuxSeenAt;
+
+    static int auxDrainRawW() {
+        int clim = EvCar.hev(HEV_FLAG_CLIMATE_W, SHARED_MAX_AGE_MS);
+        int heat = EvCar.hev(HEV_FLAG_BATT_HEATER_W, SHARED_MAX_AGE_MS);
+        if (clim < 0 && heat < 0) {
+            return -1;
+        }
+        float w = (clim > 0 ? clim * CLIMATE_W_PER_UNIT : 0f) + (heat > 0 && heat < 20000 ? heat : 0);
+        return Math.round(w);
+    }
+
+    /** The drain to send (W, in 100s) for this reading (-1: unknown), with AUX_STEP_W / AUX_HOLD_MS hysteresis. */
+    static synchronized int auxStep(int w, long now) {
+        if (w < 0) {
+            return sAuxSent < 0 ? 0 : sAuxSent;
+        }
+        int q = (w + 50) / 100 * 100;
+        if (sAuxSent < 0) {
+            sAuxSent = q;
+            return q;
+        }
+        if (Math.abs(q - sAuxSent) < AUX_STEP_W) {
+            sAuxSeen = -1;
+            return sAuxSent;
+        }
+        if (sAuxSeen < 0 || Math.abs(q - sAuxSeen) >= AUX_STEP_W) {
+            sAuxSeen = q;
+            sAuxSeenAt = now;
+        } else if (now - sAuxSeenAt >= AUX_HOLD_MS) {
+            sAuxSent = q;
+            sAuxSeen = -1;
+        }
+        return sAuxSent;
+    }
+
+    static synchronized void resetAux() {
+        sAuxSent = -1;
+        sAuxSeen = -1;
+    }
+
+    /**
+     * msg (the model, 80 03 BA 01 len model) with the winter add-on appended: protobuf merges
+     * its block 8 into the model's and adds blocks 6 and 10. Its 8.2 energy axes and seconds
+     * are scaled to capWh like 8.1 (the learned charge curve isn't applied to them: they are
+     * the cold-pack caps). The 2-byte length is rewritten.
+     */
+    static byte[] withWinter(byte[] msg, int capWh, int auxW) {
+        byte[] add = winterScaled(capWh);
+        if (add == null) {
+            return msg;
+        }
+        add = (byte[]) add.clone();
+        writeFixedVarint(add, EvModelTemplate.WINTER_AUX_OFFSET, Math.max(0, auxW), EvModelTemplate.SCALE_WIDTH);
+        byte[] out = new byte[msg.length + add.length];
+        System.arraycopy(msg, 0, out, 0, msg.length);
+        System.arraycopy(add, 0, out, msg.length, add.length);
+        int len = out.length - (EvModelTemplate.LENGTH_OFFSET + 2);
+        if (len >= 1 << 14) {
+            return msg;   // can't happen (the generator checks it): send the model alone
+        }
+        out[EvModelTemplate.LENGTH_OFFSET] = (byte) (0x80 | (len & 0x7f));
+        out[EvModelTemplate.LENGTH_OFFSET + 1] = (byte) (len >>> 7);
+        return out;
+    }
+
+    private static synchronized byte[] winterScaled(int capWh) {
+        try {
+            if (sWinterTemplate == null) {
+                sWinterTemplate = Base64.decode(EvModelTemplate.WINTER_B64, Base64.DEFAULT);
+            }
+            if (sWinterScaled == null || capWh != sWinterCapWh) {
+                sWinterScaled = scaleWinter(sWinterTemplate, capWh);
+                sWinterCapWh = capWh;
+            }
+            return sWinterScaled;
+        } catch (Throwable t) {
+            logTickFailure(t);
+            return null;
+        }
+    }
+
+    /** the add-on with its 8.2 energy axes and seconds x k = capWh / CAPACITY_WH */
+    static byte[] scaleWinter(byte[] add, int capWh) {
+        byte[] out = (byte[]) add.clone();
+        long ref = EvModelTemplate.CAPACITY_WH;
+        int width = EvModelTemplate.SCALE_WIDTH;
+        int max = (1 << (7 * width)) - 1;
+        int[][] sets = {EvModelTemplate.WINTER_AXIS_OFFSETS, EvModelTemplate.WINTER_AXIS_WH,
+            EvModelTemplate.WINTER_TIME_OFFSETS, EvModelTemplate.WINTER_TIME_S};
+        for (int k = 0; k < 4; k += 2) {
+            int[] offs = sets[k], vals = sets[k + 1];
+            for (int i = 0; i < offs.length; i++) {
+                long v = (vals[i] * (long) capWh + ref / 2) / ref;
+                writeFixedVarint(out, offs[i], (int) Math.min(v, max), width);
+            }
+        }
+        return out;
+    }
+
+    // ---- VEM v1.2 1.5 hvac_status and 1.8 battery_temp_c ----------------------
+
+    /** HEV DATC_CLMTPWRCNSMPTN_W: live climate power, ~20 W per unit (EvDriveLog, RoadLearn) */
+    static final int HEV_FLAG_CLIMATE_W = 0x4f;
+    static final float CLIMATE_W_PER_UNIT = 20f;
+    /** climate power at or above this is "on" (fans alone draw less) */
+    static final float HVAC_ON_W = 150f;
+    /** a new on/off state must hold this long before it is sent (Maps may re-route on a change) */
+    static final long HVAC_HOLD_MS = 60000;
+    /** VehicleInfo.HvacStatus */
+    static final int HVAC_UNKNOWN = 0, HVAC_OFF = 1, HVAC_ON = 2;
+
+    private static int sHvacSent = HVAC_UNKNOWN, sHvacSeen = -1;
+    private static long sHvacSeenAt;
+    /** last known pack temperature (cluster XEV_MIN_BATT_TEMP), C; kept when the packet goes stale */
+    private static volatile int sPackC = Integer.MIN_VALUE;
+
+    /**
+     * The hvac_status to send for this climate power reading (raw < 0: unknown), with
+     * HVAC_HOLD_MS of hysteresis. The first known state is sent at once.
+     */
+    static synchronized int hvacStep(int raw, long now) {
+        int s = raw < 0 ? HVAC_UNKNOWN : raw * CLIMATE_W_PER_UNIT >= HVAC_ON_W ? HVAC_ON : HVAC_OFF;
+        if (s == HVAC_UNKNOWN || s == sHvacSent) {
+            sHvacSeen = -1;
+            return sHvacSent;
+        }
+        if (sHvacSent == HVAC_UNKNOWN) {
+            sHvacSent = s;
+            sHvacSeen = -1;
+            return s;
+        }
+        if (s != sHvacSeen) {
+            sHvacSeen = s;
+            sHvacSeenAt = now;
+        } else if (now - sHvacSeenAt >= HVAC_HOLD_MS) {
+            sHvacSent = s;
+            sHvacSeen = -1;
+        }
+        return sHvacSent;
+    }
+
+    /** test hook */
+    static synchronized void resetHvac() {
+        sHvacSent = HVAC_UNKNOWN;
+        sHvacSeen = -1;
+        sPackC = Integer.MIN_VALUE;
     }
 
     // ---- the battery % curve (SocCurve) -------------------------------------
 
-    /** set by HmgApiEntry when sensor 26 is offered (setting on, library accepts it) */
+    /** set by HmgApiEntry: the curve is on (setting on, library accepts sensor 26) */
     private static volatile boolean sBatteryCurve;
+    /** set by HmgApiEntry: sensor 26 was offered (curve or trip settings) */
+    private static volatile boolean sSensor26;
+    /** the EV trip settings in sensor 26 (minimum arrival % at chargers, target % at the destination); 0: Maps' own */
+    private static volatile int sChargerPct, sDestPct;
 
     static void setBatteryCurve(boolean on) {
         sBatteryCurve = on;
     }
 
-    /** Sends the curve as its own 0x8003 message; never throws (the model went out already). */
+    static void setSensor26(boolean offered) {
+        sSensor26 = offered;
+    }
+
+    /** Can change mid-session (settings apply at once); 0 leaves the user's own Maps setting. */
+    static void setTripSettings(int chargerPct, int destPct) {
+        sChargerPct = SocCurve.clampPct(chargerPct, SocCurve.CHARGER_PCT_MAX);
+        sDestPct = SocCurve.clampPct(destPct, SocCurve.DEST_PCT_MAX);
+        sBatteryCurveLogged = false;
+    }
+
+    /** Sends sensor 26 (curve and/or trip settings) as its own 0x8003 message; never throws. */
     private static void sendBatteryCurve(int wh, int cap, int halfPct) {
         try {
-            if (cap <= 0 || halfPct <= 0) {
+            boolean curve = sBatteryCurve && cap > 0 && halfPct > 0;
+            int chg = sChargerPct, dst = sDestPct;
+            if (!curve && chg == 0 && dst == 0) {
                 return;
             }
-            float raw = wh * 100f / cap;
-            int rc = sSource.send(SocCurve.message(raw, halfPct / 2f));
+            float raw = curve ? wh * 100f / cap : 0f;
+            int rc = sSource.send(SocCurve.message(raw, halfPct / 2f, curve, chg, dst));
             if (rc != 0 || !sBatteryCurveLogged) {
                 sBatteryCurveLogged = true;
-                Log.i(TAG, "battery % curve sent: raw " + Math.round(raw * 10) / 10f
-                        + "% shows as " + halfPct / 2f + "%, rc=" + rc);
+                Log.i(TAG, "sensor 26 sent: " + (curve ? "battery % curve (raw " + Math.round(raw * 10) / 10f
+                        + "% shows as " + halfPct / 2f + "%)" : "no curve") + ", arrival at chargers "
+                        + (chg > 0 ? chg + "%" : "Maps'") + ", at the destination " + (dst > 0 ? dst + "%" : "Maps'")
+                        + ", rc=" + rc);
             }
         } catch (Throwable t) {
             Log.w(TAG, "battery % curve not sent: " + t);
@@ -627,11 +877,22 @@ public final class EvModelSender {
             writeFloatLe(aWant, 0, EvModelTemplate.ROAD_A_N);
             byte[] cWant = new byte[4];
             writeFloatLe(cWant, 0, EvModelTemplate.ROAD_C_N);
+            byte[] tWant = new byte[4];
+            writeFloatLe(tWant, 0, EvModelTemplate.BATT_TEMP_PLACEHOLDER_C);
             for (int i = 0; i < 4; i++) {
                 if (template[EvModelTemplate.ROAD_A_OFFSET + i] != aWant[i]
-                        || template[EvModelTemplate.ROAD_C_OFFSET + i] != cWant[i]) {
+                        || template[EvModelTemplate.ROAD_C_OFFSET + i] != cWant[i]
+                        || template[EvModelTemplate.BATT_TEMP_OFFSET + i] != tWant[i]) {
                     return false;
                 }
+            }
+            // hvac_status: tag (field 5, varint) then the placeholder byte 0
+            if (template[EvModelTemplate.HVAC_OFFSET - 1] != (byte) (5 << 3)
+                    || template[EvModelTemplate.HVAC_OFFSET] != 0) {
+                return false;
+            }
+            if (readFixedVarint(template, EvModelTemplate.MOTOR_OFFSET, 3) != EvModelTemplate.MOTOR_RWD_W) {
+                return false;
             }
             int width = EvModelTemplate.SCALE_WIDTH;
             int[] offs = EvModelTemplate.AXIS_OFFSETS;
