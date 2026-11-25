@@ -2,7 +2,10 @@
 # The HMG-API mod SDK this repo builds with, and HMG-API's hook maps for the tests:
 #   eval "$(sh hmgapi-mod/sdk.sh)"
 # prints HMGAPI_SDK=<the unpacked SDK> and HMGAPI_MAPS=<HMG-API's maps/ at the commit the SDK
-# was built from> (the SDK has no maps). The SDK is the release hmgapi-sdk.json pins
+# was built from> (the SDK has no maps). Since 1.1.0-rc.9 HMG-API's source keeps the maps
+# compact (maps/base/<app>.json plus each build's differences in its car.json); they are
+# expanded here with that commit's own tools/maplib.py into the per-app files a car reads,
+# which is what HMG-API's engine and engine-test.sh read. The SDK is the release hmgapi-sdk.json pins
 # ({"version": ..., "sha256": ...}, the same pin HMG-API's reusable mod workflow reads),
 # checked against that SHA-256. Both are cached in .hmgapi/ (not committed). A variable
 # already set is kept: HMGAPI_SDK for an SDK you built (./build.sh sdk in HMG-API),
@@ -38,14 +41,20 @@ t = tarfile.open(sys.argv[1])
 n = 0
 for m in t.getmembers():
     parts = m.name.split("/", 1)
-    if len(parts) == 2 and parts[1].startswith("maps/") and (m.isfile() or m.isdir()) and ".." not in m.name:
+    if len(parts) == 2 and (parts[1].startswith("maps/") or parts[1] == "tools/maplib.py") \
+            and (m.isfile() or m.isdir()) and ".." not in m.name:
         m.name = parts[1]
         t.extract(m, sys.argv[2])
-        n += m.isfile()
+        n += m.isfile() and m.name.startswith("maps/")
 if n == 0:
     sys.exit("no maps/ in HMG-API's source at that commit")
 PY
         rm -f "$C/src.tar.gz"
+        # compact maps (a maps/base/ folder): expand them as HMG-API's build.sh does
+        if [ -d "$C/maps-$B/maps/base" ]; then
+            python3 "$C/maps-$B/tools/maplib.py" expand "$C/maps-$B/full" "$C/maps-$B/maps" >&2
+            rm -rf "$C/maps-$B/maps" && mv "$C/maps-$B/full" "$C/maps-$B/maps"
+        fi
         touch "$C/maps-$B/points-ok"
     fi
     HMGAPI_MAPS=$C/maps-$B/maps
