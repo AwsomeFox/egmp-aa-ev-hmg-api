@@ -10,6 +10,7 @@
       "warning": "The selected capacity must be available for this vehicle. Apply changes and fully reboot after changing it.",
       "options": [
         { "value": "auto", "title": "Automatic (BMS)" },
+        { "value": "53000", "title": "53 kWh (Ioniq 6 only)" },
         { "value": "58000", "title": "58 kWh" },
         { "value": "72600", "title": "72.6 kWh (Ioniq 5 only)" },
         { "value": "77400", "title": "77.4 kWh" },

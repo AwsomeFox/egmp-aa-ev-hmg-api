@@ -1,5 +1,5 @@
 {
-  "version": "0.5.1",
+  "version": "0.5.2",
   "nemesis_id": "carplay.ev-routing",
   "mod_id": "egmp-carplay-ev-routing",
   "author_uuid": "b45fb2d9-e6e8-83a2-bce9-cd5c40d2232d",
@@ -29,6 +29,13 @@
       "firmware": "*",
       "path": "hyundai/ioniq-5/profiles.json",
       "status": "experimental 2022 compatibility; on-car validation pending"
+    },
+    {
+      "prefix": "CEEV.",
+      "model": "CEEV",
+      "firmware": "*",
+      "path": "hyundai/ioniq-6/profiles.json",
+      "status": "integration concept tested; estimated energy model unvalidated"
     }
   ]
 }

@@ -9,7 +9,7 @@ def main():
  uuid='b45fb2d9-e6e8-83a2-bce9-cd5c40d2232d';cp=str(R/'out/hmg-classes')
  version=json.loads((R/'release.json').read_text())['version']
  wireless_version=json.loads((a.wireless_source/'wireless-carplay-aa/mod.json').read_text())['version']
- for model in ['NEEV23','CVEV','NEEV']:
+ for model in ['NEEV23','CVEV','NEEV','CEEV']:
   with tempfile.TemporaryDirectory() as tmp:
    root=Path(tmp);product=model+'.USA.'+('S5W_M' if model=='NEEV' else '0000')+'.V015.012.260507';(root/'props.txt').write_text('ro.build.product='+product+'\n')
    env=dict(os.environ,HMGAPI_ROOT=tmp,HMGAPI_HOST='1')
@@ -21,13 +21,14 @@ def main():
     return result.stdout
    engine('install',payload,'--uuid','00000000-0000-8000-8000-000000000000',rc=3,contains='not the expected')
    engine('install',payload,'--uuid',uuid,contains='installed egmp-carplay-ev-routing '+version)
-   installed=root/'data/hmgapi/mods/egmp-carplay-ev-routing';assert (installed/'profiles/neev23.json').exists();assert (installed/'profiles/cvev.json').exists()
+   installed=root/'data/hmgapi/mods/egmp-carplay-ev-routing';assert all((installed/('profiles/'+name+'.json')).exists() for name in ['neev23','cvev','neev','ceev'])
    # No real car files: the engine applies only our helper and selected JSON in this temporary root.
    wireless=root/'data/hmgapi/mods/wireless-carplay-aa';wireless.mkdir();(wireless/'mod.json').write_text(json.dumps({'id':'wireless-carplay-aa','version':wireless_version}));(wireless/'patches.json').write_text('{"changes":[]}')
    engine('plan');engine('apply')
    selected=root/'system/etc/carplay.ev-routing/profile.json'
    assert selected.read_bytes()==(installed/'profiles'/(model.lower()+'.json')).read_bytes()
-   assert json.loads(selected.read_text())['vehicle']['model']==('Ioniq 5' if model in ['NEEV23','NEEV'] else 'EV6')
+   expected_model={'NEEV23':'Ioniq 5','NEEV':'Ioniq 5','CVEV':'EV6','CEEV':'Ioniq 6'}[model]
+   assert json.loads(selected.read_text())['vehicle']['model']==expected_model
    assert sorted(str(p.relative_to(root/'system')) for p in (root/'system').rglob('*') if p.is_file())==['etc/carplay.ev-routing/profile.json','lib/libcarplayev.so']
    # Even an explicit compatibility override must not silently combine the two new files.
    settings=root/'data/hmgapi/settings/hmgapi.json';settings.parent.mkdir(parents=True,exist_ok=True)
@@ -45,7 +46,7 @@ def main():
    engine('install',payload,'--uuid',uuid);engine('plan');engine('apply')
    assert selected.read_bytes()==(installed/'profiles'/(model.lower()+'.json')).read_bytes()
    engine('remove','egmp-carplay-ev-routing');engine('apply')
-   (root/'props.txt').write_text('ro.build.product=CEEV.USA.0000.260507\n')
+   (root/'props.txt').write_text('ro.build.product=SG2EV.USA.0000.260507\n')
    engine('install',payload,'--uuid',uuid,rc=3,contains="isn't for this head unit")
    print('PASS real HMG-API package engine:',model,'same ZIP, model-only selection across region/firmware, signed update, author/tamper/unknown-model refusal')
 if __name__=='__main__':main()

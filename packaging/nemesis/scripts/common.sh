@@ -43,7 +43,7 @@ select_profile() {
     local _prefix _firmware _zip _md5 _extra
     PRODUCT=$(getprop ro.build.product)
     while read -r _prefix _firmware _zip _md5 _extra; do
-        # v0.5.1 selects only by the allowlisted model prefix. HMG-API map
+        # v0.5.2 selects only by the allowlisted model prefix. HMG-API map
         # resolution and the exact native hashes remain the safety gates.
         case "$PRODUCT" in "$_prefix"*)
             PAYLOAD=payload/$_zip; EXPECTED=$_md5

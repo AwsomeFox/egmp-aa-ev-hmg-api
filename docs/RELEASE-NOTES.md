@@ -1,3 +1,11 @@
+# v0.5.2 — Experimental
+
+- Add Hyundai Ioniq 6 (`CEEV`) to the shared signed package.
+- Bundle estimated 53 and 77.4 kWh Ioniq 6 profiles with an Ioniq 6-specific charging curve and consumption model.
+- Keep the existing HMG-API map, hook and native-library compatibility checks mandatory and fail-closed.
+- Add 53 kWh manual selection and off-car package-engine coverage for CEEV selection, update and removal.
+- Treat Ioniq 6 numerical accuracy as unvalidated. Incorrect values may change Apple Maps estimates and charging-stop choices; the mod does not control vehicle charging or the BMS.
+
 # v0.5.1 — Experimental
 
 - Accept Ioniq 5 (`NEEV23`, `NEEV`) and EV6 (`CVEV`) by model family without restricting region or firmware version.

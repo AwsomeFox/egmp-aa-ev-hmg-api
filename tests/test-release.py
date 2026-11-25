@@ -153,10 +153,10 @@ class Package(unittest.TestCase):
   self.assertEqual(native.read_bytes(),(STAGE/'payload/mod.zip').read_bytes())
   with zipfile.ZipFile(native) as z:
    self.assertIn('mod.json',z.namelist());self.assertIn('META-HMGAPI/signature',z.namelist());self.assertNotIn('NEMESIS.data',z.namelist())
-   meta=json.loads(z.read('mod.json'));self.assertEqual(meta['system'],[{'model':['NEEV23','NEEV','CVEV']}])
+   meta=json.loads(z.read('mod.json'));self.assertEqual(meta['system'],[{'model':['NEEV23','NEEV','CVEV','CEEV']}])
    setting=json.loads(z.read('settings.json'))['settings'][0];self.assertEqual(setting['key'],'battery_capacity_wh_override');self.assertEqual(setting['default'],'auto')
-   offered={o['value'] for o in setting['options']};self.assertEqual(offered,{'auto','58000','72600','77400','84000'})
-   expected={'NEEV23':[58000,72600,77400,84000],'NEEV':[58000,72600,77400,84000],'CVEV':[58000,77400,84000]}
+   offered={o['value'] for o in setting['options']};self.assertEqual(offered,{'auto','53000','58000','72600','77400','84000'})
+   expected={'NEEV23':[58000,72600,77400,84000],'NEEV':[58000,72600,77400,84000],'CVEV':[58000,77400,84000],'CEEV':[53000,77400]}
    for entry in CONFIG['profiles']:
     name='profiles/'+entry['model'].lower()+'.json';self.assertIn(name,z.namelist());profile=json.loads(z.read(name));self.assertEqual(profile['supported_capacities_wh'],expected[entry['model']]);self.assertEqual(sorted(map(int,profile['capacity_profiles'])),expected[entry['model']])
     for capacity in expected[entry['model']]:self.assertEqual(profile['capacity_profiles'][str(capacity)]['charging_contract']['vehicle_parameters']['vehicle_energy_axis_wh'][-1],capacity)
