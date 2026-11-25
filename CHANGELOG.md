@@ -1,3 +1,10 @@
+# 0.5.2 — experimental
+
+- Add Hyundai Ioniq 6 (`CEEV`) profile selection with prepared 53 and 77.4 kWh variants.
+- Use an Ioniq 6-specific estimated charging curve and consumption model derived from the earlier local 74 kWh usable-energy draft, normalized to the current nominal-capacity convention.
+- Keep the existing HMG-API map, required-hook and exact native-library checks fail-closed. The new risk is limited to unvalidated Apple Maps charging, arrival-energy and charging-stop estimates after compatibility checks pass.
+- Add the 53 kWh manual capacity override and package-engine coverage for Ioniq 6 profile installation and removal.
+
 # 0.5.1 — experimental
 
 - Accept the existing Ioniq 5 (`NEEV23`, `NEEV`) and EV6 (`CVEV`) profiles without restricting the firmware region or version. A resolving HMG-API map and the exact `libiap2session.so` hash remain mandatory.

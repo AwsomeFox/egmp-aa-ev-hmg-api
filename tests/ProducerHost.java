@@ -50,6 +50,12 @@ public final class ProducerHost {
         try{new VehicleSource(null,profile,63000);throw new AssertionError("accepted unsupported override");}catch(java.io.IOException expected){check(expected.getMessage().indexOf("unsupported battery capacity override")>=0,"unsupported override diagnostic");}
         String ev6Profile=new String(Files.readAllBytes(Paths.get(args[2])),"UTF-8");
         try{new VehicleSource(null,ev6Profile,72600);throw new AssertionError("accepted Ioniq 5-only override on EV6");}catch(java.io.IOException expected){check(expected.getMessage().indexOf("unsupported battery capacity override")>=0,"EV6 rejects 72.6 kWh override");}
+        String ioniq6Profile=new String(Files.readAllBytes(Paths.get(args[4])),"UTF-8");
+        VehicleSource ioniq6=new VehicleSource(null,ioniq6Profile,53000);
+        check(ioniq6.batterySelection().equals("settings_override_profile_53000"),"Ioniq 6 selects compiled 53 kWh profile");
+        JSONObject i6=new JSONObject(ioniq6Profile);
+        check(i6.getJSONArray("supported_capacities_wh").toString().equals("[53000,77400]"),"Ioniq 6 compiled capacity list");
+        check(i6.getJSONObject("capacity_profiles").getJSONObject("77400").getJSONObject("charging_contract").getJSONObject("vehicle_parameters").getJSONArray("vehicle_charge_axis_w").getInt(2)==233000,"Ioniq 6 charging peak");
         VehicleSource.Snapshot held=VehicleSource.encode(0,77400,ch,co,Double.valueOf(50),Integer.valueOf(206),Integer.valueOf(310),false);
         check(held.auxiliarySource.equals("profile_default") && held.auxiliaryW==310,"profile auxiliary before first average");
         check(VehicleSource.fresh(1,15000000001L) && !VehicleSource.fresh(1,15000000002L) && !VehicleSource.fresh(2,1),"sample freshness");

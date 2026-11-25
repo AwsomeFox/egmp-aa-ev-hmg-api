@@ -10,7 +10,7 @@ def main():
  with zipfile.ZipFile(package) as z:
   metadata=configparser.ConfigParser();metadata.read_string(z.read('NEMESIS.data').decode());n=metadata['nemesis'];assert n['id']==pid;assert n['depends'].strip('"')==','.join(policy['depends']);assert z.read('mod/package.zip')==native.read_bytes();assert hashlib.sha256(z.read('mod/package.zip')).hexdigest()==policy['mod_sha256']
  with zipfile.ZipFile(folder/(stem+'-nemesis.zip')) as z:assert z.read('packages/'+pid+'.zip')==package.read_bytes()
- for model,wireless in [('NEEV23',True),('CVEV',True),('NEEV23',False)]:
+ for model,wireless in [('NEEV23',True),('CVEV',True),('CEEV',True),('NEEV23',False)]:
   with tempfile.TemporaryDirectory() as t:
    root=Path(t);data=root/'data/hmgapi';system=root/'system';(system/'bin').mkdir(parents=True);(data/'mods').mkdir(parents=True);(data/'settings').mkdir();(root/'props.txt').write_text('ro.build.product='+model+'.USA.0000.V015.012.260507\n')
    bin=root/'bin';bin.mkdir();getprop=bin/'getprop';getprop.write_text('#!/bin/sh\necho 0\n');getprop.chmod(0o755)
