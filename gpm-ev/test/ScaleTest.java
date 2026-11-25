@@ -332,7 +332,10 @@ public final class ScaleTest {
                 "Ioniq 5 (2023): A 190 N, C 0.40");
         check(EvModelSender.carIndex("NEEV.CAN.0000.V015.010.260206") == i5
                 && EvModelSender.carIndex("NEEV23SE.USA.0000.V015.012.260507") == i5, "every Ioniq 5 build: the same");
-        check(EvModelSender.carIndex("CEEV.USA.0000.V016.010.260903") < 0, "Ioniq 6: the template's");
+        int i6e = EvModelSender.carIndex("CEEV.USA.0000.V016.010.260903");
+        check(i6e >= 0 && i6e != i5 && EvModelTemplate.CAR_ROAD_A_N[i6e] == 175f && EvModelTemplate.CAR_ROAD_C_N[i6e] == 0.3f,
+                "Ioniq 6: its own estimate, A 175 N, C 0.30");
+        check(EvModelSender.carIndex("OSEV.USA.0000.V015.012.260507") < 0, "Kona Electric: the template's");
         check(EvModelSender.carIndex("") < 0 && EvModelSender.carIndex(null) < 0, "unknown product: the template's");
 
         // Supercharger rows (250 kW V3, 325 kW "V3.5"): ~500 V, boost-limited

@@ -97,6 +97,24 @@ public final class HmgApiEntry extends ModEntry {
         return EGMP.contains(dot < 0 ? product : product.substring(0, dot));
     }
 
+    /**
+     * Model codes whose road load was fitted from their own logs (EvModelTemplate.CAR_PREFIX
+     * also holds estimates, such as the Ioniq 6's): only these learn it slowly (RoadLearn.PRIOR).
+     */
+    static final java.util.List<String> ROAD_FITTED = java.util.Arrays.asList("NEEV", "CVEV");
+
+    static boolean roadFitted(String product) {
+        if (product == null || product.isEmpty()) {
+            return true;   // unknown: as before
+        }
+        for (String p : ROAD_FITTED) {
+            if (product.startsWith(p)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     static boolean modelOn() {
         return on("energy_model");
     }
@@ -184,7 +202,8 @@ public final class HmgApiEntry extends ModEntry {
         ChargeLearn.setEnabled(on("model_learning"));
         String product = EvDriveLog.prop("ro.build.product");
         if (egmp(product)) {
-            RoadLearn.setPrior(RoadLearn.PRIOR);
+            // the Ioniq 6's road load is an estimate until its logs fit it: learn it faster
+            RoadLearn.setPrior(roadFitted(product) ? RoadLearn.PRIOR : RoadLearn.PRIOR_OTHER);
             ChargeLearn.setPrior(ChargeLearn.PRIOR);
         } else {
             // another EV (mod.json "system"): E-GMP values to start from, learned faster

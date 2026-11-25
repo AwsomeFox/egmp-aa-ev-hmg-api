@@ -17,9 +17,9 @@ final class EvModelTemplate {
     static final int ROAD_C_OFFSET = 58;  // road_load.c_n_per_mps2 float bits
     static final float ROAD_C_N = 0.493f;
     // road load per model: product id prefix, A (N), C (N/(m/s)^2)
-    static final String[] CAR_PREFIX = {"CV", "NEEV"};
-    static final float[] CAR_ROAD_A_N = {180.0f, 190.0f};
-    static final float[] CAR_ROAD_C_N = {0.4f, 0.4f};
+    static final String[] CAR_PREFIX = {"CV", "NEEV", "CEEV"};
+    static final float[] CAR_ROAD_A_N = {180.0f, 190.0f, 175.0f};
+    static final float[] CAR_ROAD_C_N = {0.4f, 0.4f, 0.3f};
     // drivetrain loss (3.7): spin W + W per m/s, plus a fraction of wheel power
     static final float DL_SPIN_W = 300.0f;
     static final float DL_SPIN_W_PER_MPS = 40.0f;

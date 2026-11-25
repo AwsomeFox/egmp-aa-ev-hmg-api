@@ -242,7 +242,7 @@ Issue #13 (AwsomeFox/egmp-aa-ev-hmg-api): a 2022 EV6 AWD, US 260507, ~90k mi. 28
 - Highway data can't separate A from C. Any C from 0.35 to 0.45 with its fitted A matches within ~3 Wh/km.
 - The EV6 now gets **A = 180 N, C = 0.40 N/(m/s)²** (`CAR_ROAD_LOAD`). That is CdA ~0.65 m² against the Ioniq 5's ~0.80, and rolling resistance ~0.0085. With it, the model comes out 4 % high on the same stretches.
 - The sender picks the pair once per session from `ro.build.product` (`EvModelSender.carIndex`) and patches it into 2.1.1 (A, plus the cold penalty) and 2.3.1 (C, `ROAD_C_OFFSET`).
-- Other models keep the rolldown values until their logs say otherwise. The Ioniq 5 got its own pair from issue #22 (see "Field findings (2026-11-21)"). The Ioniq 6 is the obvious next one: it is much sleeker, but there are no logs yet.
+- Other models keep the rolldown values until their logs say otherwise. The Ioniq 5 got its own pair from issue #22 (see "Field findings (2026-11-21)"). The Ioniq 6 has an estimate, A 175 N and C 0.30, until logs fit it. EPA highway figures put it at about 0.77 of the Ioniq 5's energy (127 against 98 MPGe, long range RWD on 18"; about 0.87 for AWD on 20"), and an owner's road trip agreed: Maps planned 42 % for 72 miles from the rolldown values and the car used 27 % (0.64 of the plan, 0.75 of the Ioniq 5's fitted values). The pair is 0.81 of the Ioniq 5's road force at 113 km/h, a little on the safe side for the 20" trims, and the Ioniq 6 learns road load with the other-EV prior (5 stretches, `HmgApiEntry.roadFitted`) so it settles in a few highway drives.
 
 Not changed:
 - **Stop-and-go city driving:** it uses ~20 % more than the steady-speed model on both the EV6 and a 2023 Ioniq 5's city logs. Maps plans that part itself.
