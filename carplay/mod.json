@@ -1,0 +1,82 @@
+{
+  "id": "egmp-carplay-ev-routing",
+  "name": "E-GMP CarPlay EV Routing",
+  "version": "0.5.2",
+  "hmgapi": ">=1.1.0-rc.3 <2.0.0",
+  "authors": [
+    "E-GMP CarPlay EV Routing contributors"
+  ],
+  "license": "GPL-3.0-or-later",
+  "description": "Experimental native EV serializer extension for Apple Maps.",
+  "system": [
+    {
+      "model": [
+        "NEEV23",
+        "NEEV",
+        "CVEV",
+        "CEEV"
+      ]
+    }
+  ],
+  "requires": [
+    "wireless-carplay-aa >=2.2.0-rc.4 <3.0.0"
+  ],
+  "logs": {
+    "tags": [
+      "CarPlayEV"
+    ],
+    "match": [
+      "CarPlayEV"
+    ]
+  },
+  "hooks": {
+    "jar": "egmp-carplay-ev-routing.jar",
+    "entry": "org.egmp.carplay.ev.EvRouting",
+    "points": {
+      "iap2.service.on_create": "observe",
+      "iap2.service.on_destroy": "observe"
+    }
+  },
+  "services": [
+    {
+      "name": "runtime-capture",
+      "script": "svc/capture.sh",
+      "user": "root",
+      "restart": true
+    }
+  ],
+  "parts": [
+    {
+      "id": "neev23",
+      "system": {
+        "model": [
+          "NEEV23"
+        ]
+      }
+    },
+    {
+      "id": "cvev",
+      "system": {
+        "model": [
+          "CVEV"
+        ]
+      }
+    },
+    {
+      "id": "neev",
+      "system": {
+        "model": [
+          "NEEV"
+        ]
+      }
+    },
+    {
+      "id": "ceev",
+      "system": {
+        "model": [
+          "CEEV"
+        ]
+      }
+    }
+  ]
+}

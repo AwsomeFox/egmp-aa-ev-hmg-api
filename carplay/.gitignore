@@ -1,0 +1,36 @@
+# Local system/editor files
+.DS_Store
+._*
+.idea/
+.vscode/
+__pycache__/
+*.py[cod]
+.venv/
+
+# Generated outputs and private analysis
+/build/
+/out/
+/dist/
+/analysis/
+/reference-binaries/
+/private/
+*.apk
+*.odex
+*.dex
+*.so
+*.jar
+*.log
+*.pem
+*.key
+.env
+.env.*
+
+# Private HU captures and local tool dependencies
+/post-leafia-install-state/
+/logs/
+/deps/
+*.zip
+
+# Generated HU diagnostic exports
+NEMESIS-report-carplay.ev-routing/
+.diagnostic-context
