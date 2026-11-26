@@ -148,7 +148,7 @@ sh tools/build_release.sh v0.2.0           # USB release zip
 - **Route data from the Phone Turn-by-Turn mod.** The full Android Auto build needs Maps'
   route data, which the Wireless mod's turn-by-turn library patch provides today
   (`"requires": ["wireless-carplay-aa >=2.1.0"]`). That patch is moving to
-  [Phone Turn-by-Turn](https://github.com/Open-HMG/hmgapi-projection-tbt)
+  [Phone Turn-by-Turn](https://github.com/AwsomeFox/hmgapi-projection-tbt)
   (`projection-tbt`); when Wireless 3.0 and that mod are released, the requirement moves
   with it. HMG-API can't yet say "either of these mods", so the switch has to happen in
   one release.
