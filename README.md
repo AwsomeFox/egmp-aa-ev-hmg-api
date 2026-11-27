@@ -119,6 +119,8 @@ Both builds come from the same sources: [`hmgapi-mod/variants.py`](hmgapi-mod/va
 
 **Releases** are built by CI ([`.github/workflows/release.yml`](.github/workflows/release.yml)): set `"version"` in `hmgapi-mod/mod.json`, merge, then create a release in GitHub's UI with the tag `v<version>`. CI checks the tag matches, runs the tests, builds both mods signed with the `HMGAPI_AUTHOR_KEY` secret (your HMG-API author key file's contents) and attaches each one's zip and NEMESIS packages to the release. More: [hmgapi-mod/README.md](hmgapi-mod/README.md#releasing).
 
+**The CarPlay mod** (`carplay/`) builds with its own tools ([carplay/docs/BUILDING.md](carplay/docs/BUILDING.md)). CI builds and tests it against the HMG-API source of the release `hmgapi-sdk.json` pins, and the same Wireless mod, signed with a throwaway key: [`tools/carplay-ci.sh`](tools/carplay-ci.sh) (its top lists the inputs; the same command runs locally). Its releases are signed with its own author key (`carplay/release.json` `author_uuid`), so they're built by whoever holds that key, not by `release.yml`.
+
 ## Legacy: NEMESIS + Leafia package
 
 The original package (`gpm-ev/`, `packages/`, `release/`), for a head unit with NEMESIS and **HMG Leafia Plus v1.0.5** on US 260507 (`NEEV.USA.0000.V015.012.260507`). It modifies the Android Auto app's files: the installer checks every file first and keeps a byte-for-byte backup.
