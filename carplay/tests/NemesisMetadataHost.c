@@ -13,7 +13,7 @@ static int lookup(const char *id,char *version,size_t cap) {
 int main(int argc,char **argv) {
     ini_file ini;pkg_meta m;char err[512],why[1024];
     CHECK(argc==2);CHECK(ini_load(&ini,argv[1])==0);CHECK(meta_parse(&ini,&m,err,sizeof err)==0);
-    CHECK(!strcmp(m.id,"carplay.ev-routing"));CHECK(!strcmp(m.meta_ver,"1.1"));CHECK(!strcmp(m.pkg_ver,"0.5.2"));
+    CHECK(!strcmp(m.id,"carplay.ev-routing"));CHECK(!strcmp(m.meta_ver,"1.1"));CHECK(!strcmp(m.pkg_ver,"0.5.3"));
     CHECK(meta_depends_on(m.depends,"hmgapi"));CHECK(!strcmp(ini_get(&ini,"app.0","kind"),"sh"));
     CHECK(meta_compat(&m,"NEEV23.USA.0000.V015.012.260507","NEEV23",lookup,why,sizeof why)==COMPAT_FULL);
     CHECK(meta_compat(&m,"CVEV.USA.0000.V015.012.260507","CVEV",lookup,why,sizeof why)==COMPAT_FULL);

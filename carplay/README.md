@@ -2,7 +2,7 @@
 
 Adds EV routing to Apple Maps through CarPlay on supported Hyundai Ioniq 5, Hyundai Ioniq 6 and Kia EV6 Gen5W head units. Apple Maps can show estimated battery levels and include charging stops when planning a route.
 
-**Current release: v0.5.2 (experimental)**
+**Current release: v0.5.3 (experimental)**
 
 This is an experimental, unofficial modification. It changes software on the infotainment system and is not affiliated with Hyundai, Kia or Apple.
 
@@ -16,7 +16,7 @@ This is an experimental, unofficial modification. It changes software on the inf
 | Hyundai Ioniq 6 | `CEEV` | 53 and 77.4 kWh |
 | Kia EV6 | `CVEV` | 58, 77.4 and 84 kWh |
 
-Installation is selected by vehicle model, without a region or firmware allowlist. At startup, the head unit must still pass HMG-API's car-map checks and the mod's native-library compatibility check; an unknown build may install but remain inactive.
+Installation is selected by vehicle model, without a region or firmware allowlist. At startup, the head unit must still pass HMG-API's car-map checks and the mod's native-library compatibility check; an unknown build may install but remain inactive. The Korean EV6 (260902) is one: its HMG-API map lacks required iAP2 points ([Compatibility](docs/COMPATIBILITY.md)).
 
 The Ioniq 5 integration has been tested on US firmware 260507. Other configurations remain experimental. EV6 and Ioniq 6 energy models need further validation; inaccurate values affect Apple Maps estimates, not the car's battery controls.
 
@@ -35,7 +35,7 @@ Confirm that ordinary CarPlay works before installing EV Routing.
 
 ## Install
 
-1. Download `egmp-carplay-ev-routing-v0.5.2.zip` from the v0.5.2 release.
+1. Download `egmp-carplay-ev-routing-v0.5.3.zip` from the v0.5.3 release.
 2. Copy the ZIP unchanged into `HMGAPI/updates/` on a USB stick. Do not unzip it.
 3. In HMG-API, select **Check USB updates**, install and enable E-GMP CarPlay EV Routing, then select **Apply changes**.
 4. Remove the USB stick and fully reboot the head unit.

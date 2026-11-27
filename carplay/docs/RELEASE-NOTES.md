@@ -1,3 +1,9 @@
+# v0.5.3 — Experimental
+
+- Accept Wireless CarPlay + Android Auto 3.x, which keeps the shared CarPlay identification API; 4.0.0 and its pre-releases are not accepted.
+- The Korean EV6 (`CVEV.KOR.`, 260902) installs but stays inactive: its HMG-API map lacks required iAP2 service points.
+- No code changes.
+
 # v0.5.2 — Experimental
 
 - Add Hyundai Ioniq 6 (`CEEV`) to the shared signed package.

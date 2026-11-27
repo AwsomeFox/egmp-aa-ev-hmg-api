@@ -1,3 +1,9 @@
+# 0.5.3 — experimental
+
+- Accept Wireless CarPlay + Android Auto 3.x (`>=2.2.0-rc.4 <4.0.0-0`). Wireless 3.0 moves turn-by-turn to its own mod (Phone Turn-by-Turn) and keeps the shared CarPlay identification API this mod uses. 4.0.0 pre-releases are not accepted.
+- Document that the Korean EV6 (`CVEV.KOR.`, 260902) stays inactive: its HMG-API map lacks four of the iAP2 service points the mod requires.
+- No code changes.
+
 # 0.5.2 — experimental
 
 - Add Hyundai Ioniq 6 (`CEEV`) profile selection with prepared 53 and 77.4 kWh variants.

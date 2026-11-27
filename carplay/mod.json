@@ -1,7 +1,7 @@
 {
   "id": "egmp-carplay-ev-routing",
   "name": "E-GMP CarPlay EV Routing",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "hmgapi": ">=1.1.0-rc.3 <2.0.0",
   "authors": [
     "E-GMP CarPlay EV Routing contributors"
@@ -19,7 +19,7 @@
     }
   ],
   "requires": [
-    "wireless-carplay-aa >=2.2.0-rc.4 <4.0.0"
+    "wireless-carplay-aa >=2.2.0-rc.4 <4.0.0-0"
   ],
   "logs": {
     "tags": [
