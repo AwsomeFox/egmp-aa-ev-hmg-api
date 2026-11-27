@@ -253,5 +253,21 @@ eng plan
 # (the fake unit has no Wi-Fi chip, so the Wireless mod itself reports it doesn't fit: not a conflict)
 hasnt "standalone beside the Wireless mod: no conflict" "conflict" "$out"
 
+echo "=== Wireless 3.0"
+# Wireless 3.0 moves its turn-by-turn library patch (Maps' route data) to projection-tbt, so
+# the full build requires Wireless before 3.0: beside 3.0 it doesn't load (the standalone
+# build is the one then; HmgApiEntry.standDown lets it run beside Wireless 3.0, ModTest)
+W3=$D/wireless3/wireless-carplay-aa
+mkdir -p "$D/wireless3" && cp -r "$WIRELESS" "$W3"
+python3 - "$W3/mod.json" <<'PY2'
+import json, sys
+m = json.load(open(sys.argv[1])); m["version"] = "3.0.0-beta.1"
+json.dump(m, open(sys.argv[1], "w"), indent=2)
+PY2
+unit $P "$FULL" "$W3"
+eng plan
+has "full build beside Wireless 3.0.0-beta.1: doesn't load" "egmp-aa-ev won't load" "$out"
+has "... because it requires Wireless before 3.0" "<3.0.0-beta.1" "$(echo "$out" | grep "egmp-aa-ev won't load" || true)"
+
 echo "--- plan on NEEV23 260507:"; sed 's/^/    /' "$T/plan-egmp-aa-ev-NEEV23.USA.0000.V015.012.260507.txt"
 exit $fail

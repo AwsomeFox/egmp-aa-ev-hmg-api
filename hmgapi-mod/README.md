@@ -65,7 +65,7 @@ sh hmgapi-mod/build.sh ~/hmg-keys/egmp.key
 1. **Remove the NEMESIS build first** (NEMESIS Manager → `aa.ev.model` → uninstall,
    reboot), and HMG Leafia Plus: both replace the files HMG-API hooks, and two energy
    models would go to Maps.
-2. HMG-API 1.0.0 or newer, with its **Wireless CarPlay + Android Auto** mod
+2. HMG-API 1.0.0 or newer, with its **Wireless CarPlay + Android Auto** mod 2.x (before 3.0)
    (its turn-by-turn adds Maps' route data, which preconditioning needs).
 3. Hook map: the EV6 US 260507 and Ioniq 6 US 260903 maps are verified; the others
    still need the on-car check. In the HMG-API app's **Settings**, tap **Check the map on this car**
