@@ -1,0 +1,41 @@
+{
+  "version": "0.5.3",
+  "nemesis_id": "carplay.ev-routing",
+  "mod_id": "egmp-carplay-ev-routing",
+  "author_uuid": "b45fb2d9-e6e8-83a2-bce9-cd5c40d2232d",
+  "minimum_hmgapi": "1.1.0-rc.3",
+  "minimum_hmgapi_package": "1.0.99.3",
+  "native_md5": {
+    "libiap2session.so": "fc7cb675b46a44bd893a1edc054c5e71"
+  },
+  "profiles": [
+    {
+      "prefix": "NEEV23.",
+      "model": "NEEV23",
+      "firmware": "*",
+      "path": "hyundai/ioniq-5/profiles.json",
+      "status": "tested integration; energy model uncalibrated"
+    },
+    {
+      "prefix": "CVEV.",
+      "model": "CVEV",
+      "firmware": "*",
+      "path": "kia/ev6/profiles.json",
+      "status": "untested; copied Ioniq 5 values"
+    },
+    {
+      "prefix": "NEEV.",
+      "model": "NEEV",
+      "firmware": "*",
+      "path": "hyundai/ioniq-5/profiles.json",
+      "status": "experimental 2022 compatibility; on-car validation pending"
+    },
+    {
+      "prefix": "CEEV.",
+      "model": "CEEV",
+      "firmware": "*",
+      "path": "hyundai/ioniq-6/profiles.json",
+      "status": "integration concept tested; estimated energy model unvalidated"
+    }
+  ]
+}

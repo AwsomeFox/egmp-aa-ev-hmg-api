@@ -4,6 +4,10 @@
 # hmgapi-mod/mod.json) -> Publish. To build again for an existing release (after a
 # failed run, say): Actions -> Release -> Run workflow, with its tag.
 #
+# Only the Android Auto mod (hmgapi-mod/). The CarPlay mod (carplay/) is released by the holder
+# of its own author key (carplay/release.json "author_uuid"), with carplay/tools/build-release.py
+# (carplay/docs/BUILDING.md); CI only builds and tests it.
+#
 # Needs the repository secret HMGAPI_AUTHOR_KEY: the contents of the HMG-API author
 # key file (hmgapi.engine.Signing keygen). Every version must be signed with the
 # same key, or HMG-API won't update the installed mod.

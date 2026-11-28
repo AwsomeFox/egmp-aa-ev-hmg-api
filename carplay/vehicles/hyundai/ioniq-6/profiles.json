@@ -1,0 +1,229 @@
+{
+  "schema_version": 1,
+  "profile_id": "hyundai.ioniq6.us.77kwh",
+  "profile_version": 1,
+  "vehicle": {
+    "manufacturer": "Hyundai",
+    "model": "Ioniq 6",
+    "market": "US",
+    "default_display_name": "Hyundai Ioniq 6",
+    "display_name": "Hyundai Ioniq 6"
+  },
+  "battery": {
+    "minimum_energy_wh": 0,
+    "maximum_energy_wh": 77400
+  },
+  "connectors": [
+    {
+      "type": "ccs1",
+      "maximum_power_w": 233000
+    },
+    {
+      "type": "j1772",
+      "maximum_power_w": 10900
+    }
+  ],
+  "charging_contract": {
+    "model_id": 12582922,
+    "vehicle_parameters": {
+      "vehicle_energy_axis_wh": [
+        0,
+        7740,
+        34830,
+        38700,
+        54180,
+        61920,
+        65790,
+        69660,
+        73530,
+        75852,
+        77400
+      ],
+      "vehicle_charge_axis_w": [
+        205000,
+        221000,
+        233000,
+        186000,
+        184000,
+        158000,
+        122000,
+        63000,
+        40000,
+        23000,
+        12000
+      ],
+      "energy_w_per_h": [
+        0,
+        3661,
+        7374,
+        11296,
+        15114,
+        18722,
+        22592,
+        26358,
+        30176,
+        34046,
+        37863,
+        41576,
+        45394,
+        49421,
+        53029,
+        57161,
+        60926,
+        64953,
+        68771,
+        72746,
+        77034
+      ],
+      "efficiency_factor": 0.95
+    }
+  },
+  "consumption_contract": {
+    "model_id": 12582921,
+    "vehicle_parameters": {
+      "vehicle_auxiliary_power_w": 400.0,
+      "vehicle_consumption_values_wh_per_m": [
+        0.1961,
+        0.1586,
+        0.16808,
+        0.18609,
+        0.14973,
+        0.14973,
+        0.1593,
+        0.17852,
+        0.19714,
+        0.22481
+      ],
+      "vehicle_altitude_gain_consumption_wh_per_m": 6.29,
+      "vehicle_altitude_loss_consumption_wh_per_m": 4.24
+    }
+  },
+  "calibration": {
+    "status": "unvalidated estimate",
+    "basis": "Older local Ioniq 6 draft, normalized from 74.0 kWh usable energy to the current 77.4 kWh nominal-capacity convention.",
+    "note": "Charging and consumption values are an informed guess and require on-car validation."
+  },
+  "reference_capacity_wh": 77400,
+  "supported_capacities_wh": [
+    53000,
+    77400
+  ],
+  "capacity_profiles": {
+    "53000": {
+      "maximum_energy_wh": 53000,
+      "charging_contract": {
+        "model_id": 12582922,
+        "vehicle_parameters": {
+          "vehicle_energy_axis_wh": [
+            0,
+            5300,
+            23850,
+            26500,
+            37100,
+            42400,
+            45050,
+            47700,
+            50350,
+            51940,
+            53000
+          ],
+          "vehicle_charge_axis_w": [
+            205000,
+            221000,
+            233000,
+            186000,
+            184000,
+            158000,
+            122000,
+            63000,
+            40000,
+            23000,
+            12000
+          ],
+          "energy_w_per_h": [
+            0,
+            2507,
+            5049,
+            7735,
+            10349,
+            12820,
+            15470,
+            18049,
+            20663,
+            23313,
+            25927,
+            28470,
+            31084,
+            33841,
+            36312,
+            39141,
+            41720,
+            44477,
+            47091,
+            49813,
+            52749
+          ],
+          "efficiency_factor": 0.95
+        }
+      }
+    },
+    "77400": {
+      "maximum_energy_wh": 77400,
+      "charging_contract": {
+        "model_id": 12582922,
+        "vehicle_parameters": {
+          "vehicle_energy_axis_wh": [
+            0,
+            7740,
+            34830,
+            38700,
+            54180,
+            61920,
+            65790,
+            69660,
+            73530,
+            75852,
+            77400
+          ],
+          "vehicle_charge_axis_w": [
+            205000,
+            221000,
+            233000,
+            186000,
+            184000,
+            158000,
+            122000,
+            63000,
+            40000,
+            23000,
+            12000
+          ],
+          "energy_w_per_h": [
+            0,
+            3661,
+            7374,
+            11296,
+            15114,
+            18722,
+            22592,
+            26358,
+            30176,
+            34046,
+            37863,
+            41576,
+            45394,
+            49421,
+            53029,
+            57161,
+            60926,
+            64953,
+            68771,
+            72746,
+            77034
+          ],
+          "efficiency_factor": 0.95
+        }
+      }
+    }
+  }
+}

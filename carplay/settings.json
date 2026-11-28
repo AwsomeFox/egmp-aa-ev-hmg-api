@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "settings": [
+    {
+      "key": "battery_capacity_wh_override",
+      "type": "choice",
+      "default": "auto",
+      "title": "Battery capacity",
+      "description": "Automatic uses the capacity reported by the BMS. Choose a value only when automatic detection does not select the correct bundled profile.",
+      "warning": "The selected capacity must be available for this vehicle. Apply changes and fully reboot after changing it.",
+      "options": [
+        { "value": "auto", "title": "Automatic (BMS)" },
+        { "value": "53000", "title": "53 kWh (Ioniq 6 only)" },
+        { "value": "58000", "title": "58 kWh" },
+        { "value": "72600", "title": "72.6 kWh (Ioniq 5 only)" },
+        { "value": "77400", "title": "77.4 kWh" },
+        { "value": "84000", "title": "84 kWh" }
+      ]
+    }
+  ]
+}

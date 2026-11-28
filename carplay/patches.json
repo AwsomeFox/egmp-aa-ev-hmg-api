@@ -1,0 +1,38 @@
+{
+  "changes": [
+    {
+      "type": "add",
+      "path": "/system/lib/libcarplayev.so",
+      "src": "files/libcarplayev.so",
+      "mode": "644"
+    },
+    {
+      "type": "add",
+      "path": "/system/etc/carplay.ev-routing/profile.json",
+      "src": "profiles/neev23.json",
+      "mode": "644",
+      "part": "neev23"
+    },
+    {
+      "type": "add",
+      "path": "/system/etc/carplay.ev-routing/profile.json",
+      "src": "profiles/cvev.json",
+      "mode": "644",
+      "part": "cvev"
+    },
+    {
+      "type": "add",
+      "path": "/system/etc/carplay.ev-routing/profile.json",
+      "src": "profiles/neev.json",
+      "mode": "644",
+      "part": "neev"
+    },
+    {
+      "type": "add",
+      "path": "/system/etc/carplay.ev-routing/profile.json",
+      "src": "profiles/ceev.json",
+      "mode": "644",
+      "part": "ceev"
+    }
+  ]
+}

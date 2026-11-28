@@ -1,0 +1,13 @@
+{
+  "hmgapi_version": "1.0.0",
+  "depends": [
+    "hmgapi@>=1.0",
+    "hmgapi.wireless-carplay-aa@>=2.2.0",
+    "!carplay.ev-routing"
+  ],
+  "repository": "https://github.com/isaacwisdom/egmp-carplay-ev-routing",
+  "mod_sha256": "c1bd5b8f80ae48e76ff5470ccb848be6c489de33d7f5ec95ab5df3fd4c17f222",
+  "minimum_nemesis": "1.16.3",
+  "rollout_status": "on_hold",
+  "hold_reason": "Await investigation of upstream HMG-API v1.0.0 operational issues and HU verification; resume only when explicitly authorized."
+}

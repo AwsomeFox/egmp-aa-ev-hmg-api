@@ -1,5 +1,9 @@
-# Builds and tests the HMG-API mod's two builds on every push and pull request, with the
-# HMG-API mod SDK hmgapi-sdk.json pins and the same Wireless mod as the release workflow.
+# Builds and tests both halves on every push and pull request:
+#   hmgapi-mod  the Android Auto mod's two builds, with the HMG-API mod SDK hmgapi-sdk.json
+#               pins and the same Wireless mod as the release workflow
+#   carplay     the CarPlay mod (carplay/), against the HMG-API source of that same release and
+#               the same Wireless mod, signed with a throwaway key (tools/carplay-ci.sh): its
+#               releases are signed with its own author key, outside this repository
 name: CI
 
 on:
@@ -12,6 +16,9 @@ permissions:
 
 env:
   WIRELESS_REF: v2.2.0-rc.5
+  # JSON-java for the CarPlay mod's host tests (Maven Central org.json:json)
+  JSON_JAR_VERSION: "20240303"
+  JSON_JAR_SHA256: 3cf6cd6892e32e2b4c1c39e0f52f5248a2f5b37646fdfbb79a66b46b618414ed
 
 jobs:
   hmgapi-mod:
@@ -52,3 +59,55 @@ jobs:
             c=$(sed -n "s/^  $k: *//p" .github/workflows/ci.yml)
             [ "$r" = "$c" ] || { echo "::error::$k is $c here but $r in release.yml"; exit 1; }
           done
+
+  carplay:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: The HMG-API release hmgapi-sdk.json pins
+        id: hmgapi
+        run: echo "ref=v$(python3 -c 'import json; print(json.load(open("hmgapi-sdk.json"))["version"])')" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+        with:
+          repository: Open-HMG/HMG-API
+          ref: ${{ steps.hmgapi.outputs.ref }}
+          path: HMG-API
+
+      - uses: actions/checkout@v4
+        with:
+          repository: Open-HMG/hmgapi-wireless-cp-aa
+          ref: ${{ env.WIRELESS_REF }}
+          path: hmgapi-wireless-cp-aa
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Tools (clang, lld, pyelftools, JSON-java)
+        run: |
+          sudo apt-get update -q && sudo apt-get install -y -q clang lld >/dev/null
+          pip install -q pyelftools
+          curl -fsSL -o "$RUNNER_TEMP/json.jar" "https://repo1.maven.org/maven2/org/json/json/$JSON_JAR_VERSION/json-$JSON_JAR_VERSION.jar"
+          echo "$JSON_JAR_SHA256  $RUNNER_TEMP/json.jar" | sha256sum -c -
+
+      - name: Android SDK (build-tools with d8, a platform android.jar)
+        run: |
+          ls "$ANDROID_HOME"/build-tools/*/lib/d8.jar >/dev/null 2>&1 && ls "$ANDROID_HOME"/platforms/android-*/android.jar >/dev/null 2>&1 \
+            || yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "build-tools;35.0.0" "platforms;android-35" >/dev/null
+          echo "D8_JAR=$(ls "$ANDROID_HOME"/build-tools/*/lib/d8.jar | sort -V | tail -1)" >> "$GITHUB_ENV"
+          echo "ANDROID_JAR=$(ls "$ANDROID_HOME"/platforms/android-*/android.jar | sort -V | tail -1)" >> "$GITHUB_ENV"
+
+      - name: Build and test the CarPlay mod
+        env:
+          HMGAPI_SRC: ${{ github.workspace }}/HMG-API
+          WIRELESS_SRC: ${{ github.workspace }}/hmgapi-wireless-cp-aa
+          JSON_JAR: ${{ runner.temp }}/json.jar
+          PYTHON: python
+        run: sh tools/carplay-ci.sh

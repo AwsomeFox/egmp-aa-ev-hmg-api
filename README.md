@@ -1,4 +1,26 @@
-# egmp-aa-ev-feat (HMG-API)
+# EV routing for phone projection (HMG-API): Android Auto and CarPlay
+
+EV routing from the car's live battery data in the phone's own maps, on Hyundai, Kia and
+Genesis Gen5W head units with [HMG-API](https://github.com/Open-HMG/HMG-API):
+
+| | Android Auto (Google Maps) | CarPlay (Apple Maps) |
+|---|---|---|
+| Where | this folder (`hmgapi-mod/`, `gpm-ev/`, `tools/`, `docs/`) | [`carplay/`](carplay/README.md) |
+| Mod id | `egmp-aa-ev`, `egmp-aa-ev-standalone` | `egmp-carplay-ev-routing` |
+| From | [egmp-aa-ev-hmg-api](https://github.com/AwsomeFox/egmp-aa-ev-hmg-api) (AwsomeFox), a fork of [egmp-aa-ev-feat](https://github.com/willemcvu/egmp-aa-ev-feat) (willemcvu) | [egmp-carplay-ev-routing](https://github.com/isaacwisdom/egmp-carplay-ev-routing) (Isaac Wisdom) |
+| Battery % on arrival, charging stops | ✅ | ✅ |
+| Battery preconditioning on the way to a fast charger | ✅ | not yet (no signal found from Apple Maps) |
+| Licence | AGPL-3.0 | GPL-3.0-or-later |
+
+> **Status: the two projects are side by side here, each with its full history, and still
+> build and install as separate mods.** Nothing in either changed in the move except one
+> version range (below). Making them one mod with one settings page is the next step
+> ([Roadmap for the combined mod](#roadmap-for-the-combined-mod)).
+
+The rest of this page is the Android Auto mod's; the CarPlay mod's own page is
+[carplay/README.md](carplay/README.md).
+
+## Android Auto: egmp-aa-ev
 
 Real EV routing in Google Maps on Android Auto for E-GMP cars with Gen5W head units (Hyundai Ioniq 5 and Ioniq 6, Kia EV6): battery % on arrival, charging stops, realistic charge times, and automatic battery preconditioning on the way to a fast charger.
 
@@ -97,6 +119,8 @@ Both builds come from the same sources: [`hmgapi-mod/variants.py`](hmgapi-mod/va
 
 **Releases** are built by CI ([`.github/workflows/release.yml`](.github/workflows/release.yml)): set `"version"` in `hmgapi-mod/mod.json`, merge, then create a release in GitHub's UI with the tag `v<version>`. CI checks the tag matches, runs the tests, builds both mods signed with the `HMGAPI_AUTHOR_KEY` secret (your HMG-API author key file's contents) and attaches each one's zip and NEMESIS packages to the release. More: [hmgapi-mod/README.md](hmgapi-mod/README.md#releasing).
 
+**The CarPlay mod** (`carplay/`) builds with its own tools ([carplay/docs/BUILDING.md](carplay/docs/BUILDING.md)). CI builds and tests it against the HMG-API source of the release `hmgapi-sdk.json` pins, and the same Wireless mod, signed with a throwaway key: [`tools/carplay-ci.sh`](tools/carplay-ci.sh) (its top lists the inputs; the same command runs locally). Its releases are signed with its own author key (`carplay/release.json` `author_uuid`), so they're built by whoever holds that key, not by `release.yml`.
+
 ## Legacy: NEMESIS + Leafia package
 
 The original package (`gpm-ev/`, `packages/`, `release/`), for a head unit with NEMESIS and **HMG Leafia Plus v1.0.5** on US 260507 (`NEEV.USA.0000.V015.012.260507`). It modifies the Android Auto app's files: the installer checks every file first and keeps a byte-for-byte backup.
@@ -116,12 +140,56 @@ sh tools/test_evlog.sh                     # EV log tools
 sh tools/build_release.sh v0.2.0           # USB release zip
 ```
 
+## Roadmap for the combined mod
+
+- **One mod for both phones.** One `mod.json` whose entry class hands each app to the
+  Android Auto or CarPlay half, one settings page, one release. Each half already turns
+  itself off on a car it doesn't know.
+- **One source of car data.** Both halves read the same battery values (state of charge,
+  capacity, temperatures) in their own way today.
+- **Route data from the Phone Turn-by-Turn mod.** The full Android Auto build needs Maps'
+  route data, which the Wireless mod's turn-by-turn library patch provides today
+  (`"requires": ["wireless-carplay-aa >=2.1.0"]`). That patch is moving to
+  [Phone Turn-by-Turn](https://github.com/AwsomeFox/hmg-api-turn-by-turn)
+  (`projection-tbt`); when Wireless 3.0 and that mod are released, the requirement moves
+  with it. HMG-API can't yet say "either of these mods", so the switch has to happen in
+  one release.
+- **The CarPlay half and Wireless 3.0.** It uses the Wireless mod's shared CarPlay
+  identity, which stays in that mod. Its requirement here now allows Wireless 3.x
+  (`>=2.2.0-rc.4 <4.0.0`, was `<3.0.0`): the one change made to `carplay/` in this
+  repository.
+
+## Hook points and readings this mod is waiting for
+
+Until HMG-API has these, the Android Auto half reaches the same things by method name or
+with its own library patch:
+
+| For | What | Where it stands |
+|---|---|---|
+| Climate state for the energy model; the sensor source's teardown and raw send | `framework.datc_service.is_unit_celsius`, `framework.datc_service.vr_climate_status`, `gpm.sensor_source.report_diagnostics`, `gpm.sensor_source.shutdown` | [HMG-API #214](https://github.com/Open-HMG/HMG-API/pull/214), open |
+| Usable energy, range, charge limits, aux power and drive mode as HMG-API readings | readings | [HMG-API #212](https://github.com/Open-HMG/HMG-API/pull/212), open |
+| Raw Android Auto sends and a navigation listener from HMG-API itself | API | [HMG-API #221](https://github.com/Open-HMG/HMG-API/pull/221), open |
+
 ## Credits
 
-[HMG-API](https://github.com/VysseCodes/HMG-API) (VysseCodes), [NEMESIS](https://github.com/xwtk/hmg_nemesis) (xwtk), [HMG Leafia Plus](https://github.com/VysseCodes/HMG-Leafia-Plus) (including `lpatch`, GPL-3.0), [aa-proxy-rs](https://github.com/aa-proxy/aa-proxy-rs), [open-android-auto](https://github.com/mrmees/open-android-auto), [gen5w-preconditioning](https://github.com/paytondevs/gen5w-preconditioning).
+**Android Auto half:** [willemcvu](https://github.com/willemcvu) wrote
+[egmp-aa-ev-feat](https://github.com/willemcvu/egmp-aa-ev-feat): the energy model, battery
+preconditioning and EV logging this is built on. [AwsomeFox](https://github.com/AwsomeFox)
+ported it to HMG-API and added the per-car calibration, the learning and the battery %
+curve. Car logs and test builds: **biscober** (EV6 calibration, issue #13), **Weab-chan**
+(Canadian Ioniq 6 and EV6 test build and its fixes, #23, and the Ioniq 6 route data patch),
+the Ioniq 5 owner in issue #22, **Alex Kozler**, **lemoyneiv** and
+**crashahotrod** (pull requests).
+
+**CarPlay half:** [Isaac Wisdom](https://github.com/isaacwisdom) wrote
+[egmp-carplay-ev-routing](https://github.com/isaacwisdom/egmp-carplay-ev-routing). Its
+charging and consumption dictionaries come from [augard/evmaps](https://github.com/augard/evmaps);
+its own credits are in [carplay/NOTICE.md](carplay/NOTICE.md).
+
+**Both:** [HMG-API](https://github.com/VysseCodes/HMG-API) (VysseCodes), [NEMESIS](https://github.com/xwtk/hmg_nemesis) (xwtk), [HMG Leafia Plus](https://github.com/VysseCodes/HMG-Leafia-Plus) (including `lpatch`, GPL-3.0), [aa-proxy-rs](https://github.com/aa-proxy/aa-proxy-rs), [open-android-auto](https://github.com/mrmees/open-android-auto), [gen5w-preconditioning](https://github.com/paytondevs/gen5w-preconditioning).
 
 The standalone build's route data patch is the [Wireless CarPlay + Android Auto](https://github.com/Open-HMG/hmgapi-wireless-cp-aa) mod's turn-by-turn library recipes, copied unchanged ([hmgapi-mod/route/](hmgapi-mod/route/README.md)): US 260507 and the Canadian Ioniq 5 by **VysseCodes** (from NEMESIS's `projection.tbt` package), the Ioniq 6 by **Weab-chan**. Weab-chan's Canadian Ioniq 6 and EV6 test build also found the Android Auto shutdown crash and the other fixes in [#23](https://github.com/AwsomeFox/egmp-aa-ev-hmg-api/pull/23).
 
 ## License
 
-[AGPL-3.0](LICENSE), the same as HMG-API. `third_party/lpatch` stays GPL-3.0 (its own [LICENSE](third_party/lpatch/LICENSE)), which the AGPL allows combining with.
+The Android Auto half and everything outside `carplay/` is [AGPL-3.0](LICENSE), the same as HMG-API. `carplay/` stays GPL-3.0-or-later ([carplay/LICENSE](carplay/LICENSE)); the two can be combined in one work (GPLv3 section 13), each part under its own licence. `third_party/lpatch` stays GPL-3.0 (its own [LICENSE](third_party/lpatch/LICENSE)), which the AGPL allows combining with.
