@@ -7,6 +7,7 @@
     "E-GMP CarPlay EV Routing contributors"
   ],
   "license": "GPL-3.0-or-later",
+  "repo": "https://github.com/AwsomeFox/egmp-aa-ev-hmg-api",
   "description": "Experimental native EV serializer extension for Apple Maps.",
   "system": [
     {
