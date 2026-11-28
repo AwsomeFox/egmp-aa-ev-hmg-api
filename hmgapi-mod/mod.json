@@ -8,6 +8,7 @@
     "AwsomeFox"
   ],
   "license": "AGPL-3.0",
+  "repo": "https://github.com/AwsomeFox/egmp-aa-ev-hmg-api",
   "description": "Needs the Wireless CarPlay + Android Auto mod 2.x. Google Maps EV routing: battery, charge curves, EV plugs, DC preconditioning. Built for E-GMP; other EVs learn over a few drives.",
   "requires": ["wireless-carplay-aa >=2.1.0 <3.0.0-beta.1"],
   "conflicts": ["egmp-aa-ev-standalone"],
