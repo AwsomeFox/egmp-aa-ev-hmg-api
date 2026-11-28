@@ -161,17 +161,54 @@ public final class HmgApiEntry extends ModEntry {
     static final String FULL = "egmp-aa-ev", STANDALONE = "egmp-aa-ev-standalone";
     static final java.io.File STATE = new java.io.File("/data/hmgapi/public/state.json");
 
+    static final String WIRELESS = "wireless-carplay-aa", TBT = "projection-tbt";
+    /** the Wireless mod's releases that carry the turn-by-turn library patch (3.0 moved it to projection-tbt) */
+    static final String WIRELESS_WITH_TBT = "<3.0.0-beta.1";
+
     /**
-     * The standalone build stays off while the Wireless mod is on. Its library recipes carry
-     * the Wireless mod's turn-by-turn patch, and HMG-API refuses the second of two mods'
-     * recipes on the same bytes: whichever asked first would win, and the Wireless mod
-     * could lose its own cluster directions. With the Wireless mod the full build is the
-     * one to use (it also keeps the two builds from both running: HMG-API 1.1.0 checks
-     * "conflicts" only for mods that change files). HMG-API's public state (its mods,
-     * enabled or not) says.
+     * The standalone build stays off while a Wireless mod before 3.0 is on. Its library
+     * recipes carry that Wireless mod's turn-by-turn patch, and HMG-API refuses the second
+     * of two mods' recipes on the same bytes: whichever asked first would win, and the
+     * Wireless mod could lose its own cluster directions. With it the full build is the
+     * one to use (this also keeps the two builds from both running: HMG-API 1.1.0 checks
+     * "conflicts" only for mods that change files). Wireless 3.0 has no library patch, so
+     * the standalone build runs beside it (the full build requires Wireless before 3.0).
+     * HMG-API's public state (its mods, enabled or not, and their versions) says.
      */
     static boolean standDown(String id, java.io.File state) {
         if (!STANDALONE.equals(id)) return false;
+        java.util.Map<?, ?> w = modIn(state, WIRELESS);
+        return w != null && Boolean.TRUE.equals(w.get("enabled")) && withTbt(w.get("version"));
+    }
+
+    /** a Wireless version with the turn-by-turn library patch; no version, or not one: taken as before 3.0 */
+    static boolean withTbt(Object version) {
+        if (!(version instanceof String)) return true;
+        try {
+            return hmgapi.engine.Version.satisfies((String) version, WIRELESS_WITH_TBT);
+        } catch (RuntimeException e) {
+            return true;
+        }
+    }
+
+    /**
+     * Phone Turn-by-Turn (projection-tbt, the Wireless mod's turn-by-turn from 3.0) puts the
+     * same route data patch on the same bytes, on wired cars too. With it on, the standalone
+     * build asks for its library patch only after every mod's appLoaded, so projection-tbt's
+     * goes on first (HMG-API applies the requests in order). Ours (energy model and route
+     * data in one recipe) then overlaps it, and HMG-API takes our next recipe that fits:
+     * the energy model's alone. Maps' route data comes from projection-tbt, and neither mod
+     * loses its patch to load order. Where projection-tbt puts nothing on (no recipe for the
+     * build, or GPM's own turn-by-turn), ours goes on whole as before.
+     */
+    static boolean yieldRoute(String id, java.io.File state) {
+        if (!STANDALONE.equals(id)) return false;
+        java.util.Map<?, ?> t = modIn(state, TBT);
+        return t != null && Boolean.TRUE.equals(t.get("enabled"));
+    }
+
+    /** a mod's entry in HMG-API's public state, or null (no state, or no such mod) */
+    static java.util.Map<?, ?> modIn(java.io.File state, String id) {
         try {
             byte[] b = new byte[(int) state.length()];
             java.io.FileInputStream in = new java.io.FileInputStream(state);
@@ -182,15 +219,11 @@ public final class HmgApiEntry extends ModEntry {
                 in.close();
             }
             Object mods = hmgapi.engine.Json.object(new String(b, "UTF-8")).get("mods");
-            return mods instanceof java.util.Map && enabledIn((java.util.Map<?, ?>) mods, "wireless-carplay-aa");
+            Object m = mods instanceof java.util.Map ? ((java.util.Map<?, ?>) mods).get(id) : null;
+            return m instanceof java.util.Map ? (java.util.Map<?, ?>) m : null;
         } catch (Exception e) {
-            return false;   // no state: run
+            return null;   // no state: run
         }
-    }
-
-    static boolean enabledIn(java.util.Map<?, ?> mods, String id) {
-        Object m = mods.get(id);
-        return m instanceof java.util.Map && Boolean.TRUE.equals(((java.util.Map<?, ?>) m).get("enabled"));
     }
 
     static boolean precondOn() {
@@ -237,8 +270,8 @@ public final class HmgApiEntry extends ModEntry {
             return;
         }
         if (standDown(mod.id, STATE)) {
-            mod.error("the Wireless CarPlay + Android Auto mod is on: this standalone build stays off (it would take"
-                    + " the Wireless mod's library patch). Use " + FULL + " with the Wireless mod", null);
+            mod.error("the Wireless CarPlay + Android Auto mod (before 3.0) is on: this standalone build stays off (it would"
+                    + " take the Wireless mod's library patch). Use " + FULL + " with the Wireless mod", null);
             return;
         }
         sMod = mod;
@@ -248,7 +281,18 @@ public final class HmgApiEntry extends ModEntry {
             return;
         }
         if (mod.settingBoolean("energy_model", true)) {
-            mod.nativePatch(app, "libautoreceiver_infobank.so");
+            if (yieldRoute(mod.id, STATE)) {
+                mod.log("Phone Turn-by-Turn (" + TBT + ") is on: Maps' route data comes from its library patch;"
+                        + " this build's goes on after it (the energy model's part)");
+                new android.os.Handler(android.os.Looper.getMainLooper()).post(new Runnable() {
+                    @Override
+                    public void run() {
+                        mod.nativePatch(app, "libautoreceiver_infobank.so");
+                    }
+                });
+            } else {
+                mod.nativePatch(app, "libautoreceiver_infobank.so");
+            }
         }
         RoadLearn.setEnabled(on("model_learning"));
         ChargeLearn.setEnabled(on("model_learning"));

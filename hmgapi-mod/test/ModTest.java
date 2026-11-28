@@ -304,6 +304,28 @@ public final class ModTest {
             check("standalone with the Wireless mod on (no full build): off, so the Wireless mod keeps its library patch",
                     HmgApiEntry.standDown("egmp-aa-ev-standalone", st));
             check("no state file: the standalone one runs", !HmgApiEntry.standDown("egmp-aa-ev-standalone", new java.io.File(st.getPath() + ".none")));
+            // Wireless 3.0 has no turn-by-turn library patch (it moved to projection-tbt)
+            java.nio.file.Files.write(st.toPath(), ("{\"mods\": {\"egmp-aa-ev-standalone\": {\"enabled\": true}, "
+                    + "\"wireless-carplay-aa\": {\"enabled\": true, \"version\": \"2.2.0-rc.9\"}}}").getBytes("UTF-8"));
+            check("Wireless 2.2.0-rc.9 on: the standalone one stays off", HmgApiEntry.standDown("egmp-aa-ev-standalone", st));
+            java.nio.file.Files.write(st.toPath(), ("{\"mods\": {\"egmp-aa-ev-standalone\": {\"enabled\": true}, "
+                    + "\"wireless-carplay-aa\": {\"enabled\": true, \"version\": \"3.0.0-beta.1\"}}}").getBytes("UTF-8"));
+            check("Wireless 3.0.0-beta.1 on (no library patch): the standalone one runs", !HmgApiEntry.standDown("egmp-aa-ev-standalone", st));
+            check("... and has no turn-by-turn mod to yield to", !HmgApiEntry.yieldRoute("egmp-aa-ev-standalone", st));
+            java.nio.file.Files.write(st.toPath(), ("{\"mods\": {\"egmp-aa-ev-standalone\": {\"enabled\": true}, "
+                    + "\"wireless-carplay-aa\": {\"enabled\": true, \"version\": \"3.0.0\"}, "
+                    + "\"projection-tbt\": {\"enabled\": true, \"version\": \"1.0.0-beta.1\"}}}").getBytes("UTF-8"));
+            check("Wireless 3.0.0 and projection-tbt on: the standalone one runs", !HmgApiEntry.standDown("egmp-aa-ev-standalone", st));
+            check("... and its library patch goes on after projection-tbt's", HmgApiEntry.yieldRoute("egmp-aa-ev-standalone", st));
+            check("... the full build never yields", !HmgApiEntry.yieldRoute("egmp-aa-ev", st));
+            java.nio.file.Files.write(st.toPath(), ("{\"mods\": {\"egmp-aa-ev-standalone\": {\"enabled\": true}, "
+                    + "\"projection-tbt\": {\"enabled\": true}}}").getBytes("UTF-8"));
+            check("projection-tbt alone (wired car): the standalone one runs", !HmgApiEntry.standDown("egmp-aa-ev-standalone", st));
+            check("... and yields its route patch", HmgApiEntry.yieldRoute("egmp-aa-ev-standalone", st));
+            java.nio.file.Files.write(st.toPath(), ("{\"mods\": {\"egmp-aa-ev-standalone\": {\"enabled\": true}, "
+                    + "\"projection-tbt\": {\"enabled\": false}}}").getBytes("UTF-8"));
+            check("projection-tbt off: nothing to yield to", !HmgApiEntry.yieldRoute("egmp-aa-ev-standalone", st));
+            check("Wireless version missing or not one: as before 3.0", HmgApiEntry.withTbt(null) && HmgApiEntry.withTbt("x.y"));
         } catch (java.io.IOException e) {
             check("state file for the two-builds checks: " + e, false);
         }
